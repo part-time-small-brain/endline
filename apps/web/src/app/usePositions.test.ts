@@ -80,14 +80,14 @@ describe("positions", () => {
     expect(positions(paid, finalAt)?.[0]).toMatchObject({ status: "paid", payout: 500_000_000n });
   });
 
-  it("sums what a cell is worth across both balances, and counts P&L only from bets with a price and a cost", () => {
+  it("sums what a cell is worth across both balances, and shows P&L only when every bet in it has a price and a cost", () => {
     const marks = { "BTC-X": { series_id: "BTC-X", ask: "400000000", bid: "380000000", vol: 0.4 } };
     const fill = (side: "buy" | "sell", size: string, premium: string) => ({ quote_id: side, series_id: series.id, side, account_id: "user.near", size, premium, tx_hash: "tx", at_ms: NOW * 1_000 });
     const both = (fills: ReturnType<typeof fill>[], tapFills: ReturnType<typeof fill>[], withMarks: Parameters<typeof data>[0] = marks) => holding(positions({ ...data(withMarks), fills, tapBalances: { "opt:BTC-X": 2_000_000n }, tapFills }, NOW) ?? [], series.id);
-    expect(both([fill("buy", "25000000", "80000000")], [])).toEqual({ value: 102_600_000n, pnl: 15_000_000n, paid: 80_000_000n });
-    expect(both([fill("buy", "30000000", "90000000"), fill("sell", "5000000", "19000000")], [fill("buy", "2000000", "5000000")])).toEqual({ value: 102_600_000n, pnl: 26_600_000n, paid: 95_000_000n });
-    expect(both([fill("buy", "25000000", "80000000")], [], {})).toEqual({ value: undefined, pnl: undefined, paid: 0n });
-    expect(holding([], series.id)).toEqual({ value: undefined, pnl: undefined, paid: 0n });
+    expect(both([fill("buy", "25000000", "80000000")], [])).toEqual({ value: 102_600_000n, pnl: undefined, change: undefined });
+    expect(both([fill("buy", "30000000", "90000000"), fill("sell", "5000000", "19000000")], [fill("buy", "2000000", "5000000")])).toEqual({ value: 102_600_000n, pnl: 26_600_000n, change: 0.28 });
+    expect(both([fill("buy", "25000000", "80000000")], [fill("buy", "2000000", "5000000")], {})).toEqual({ value: undefined, pnl: undefined, change: undefined });
+    expect(holding([], series.id)).toEqual({ value: undefined, pnl: undefined, change: undefined });
   });
 
   it("stop valuing at the bid once the series is close-only", () => {

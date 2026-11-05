@@ -60,14 +60,17 @@ export function pnlOf(view: PositionView): bigint | undefined {
 export interface Holding {
   value: bigint | undefined;
   pnl: bigint | undefined;
-  paid: bigint;
+  change: number | undefined;
 }
 
 export function holding(views: PositionView[], seriesId: string): Holding {
   const own = views.filter((v) => v.series.id === seriesId);
-  const sum = (values: (bigint | undefined)[]) => values.reduce<bigint | undefined>((total, v) => (v === undefined ? total : (total ?? 0n) + v), undefined);
-  const costed = own.filter((v) => pnlOf(v) !== undefined);
-  return { value: sum(own.map(valueOf)), pnl: sum(costed.map(pnlOf)), paid: costed.reduce((total, v) => total + v.paid, 0n) };
+  const values = own.map(valueOf);
+  const pnls = own.map(pnlOf);
+  const value = values.some((v) => v !== undefined) ? values.reduce<bigint>((total, v) => total + (v ?? 0n), 0n) : undefined;
+  if (own.length === 0 || pnls.includes(undefined)) return { value, pnl: undefined, change: undefined };
+  const pnl = pnls.reduce<bigint>((total, v) => total + (v ?? 0n), 0n);
+  return { value, pnl, change: Number(pnl) / Number(own.reduce((total, v) => total + v.paid, 0n)) };
 }
 
 export function usePositions(nowSec: number): PositionView[] | undefined {

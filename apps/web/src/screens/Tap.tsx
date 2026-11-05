@@ -64,7 +64,6 @@ export function Tap({ state, nowSec, views, onConnect, onAddFunds, onQuote }: Pr
     const pnl = own?.pnl === undefined ? "" : own.pnl > 0n ? ` · up ${formatUsd(own.pnl, quoteDecimals)}` : own.pnl < 0n ? ` · down ${formatUsd(-own.pnl, quoteDecimals)}` : " · even";
     return `${up ? "Up" : "Down"} · ${symbol} ends ${up ? "above" : "below"} ${formatPrice(strike, quoteDecimals)} · ${dayLabel(expiry, nowSec)} ${formatClock(expiry)} · ${pays}${worth}${pnl}${cell.winning ? " · winning now" : ""}${cell.held ? " · you hold this" : ""}`;
   };
-  const changeOf = (own: Holding | undefined) => (own?.pnl === undefined || own.paid === 0n ? undefined : toNumber(own.pnl, quoteDecimals) / toNumber(own.paid, quoteDecimals));
 
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-4 px-4 lg:px-6 lg:pt-2">
@@ -122,7 +121,7 @@ export function Tap({ state, nowSec, views, onConnect, onAddFunds, onQuote }: Pr
                             cell={cell}
                             label={cell ? label(cell, strike, expiry, own) : ""}
                             value={formatMoney(own?.value)}
-                            change={changeOf(own)}
+                            change={own?.change}
                             state={cell && taps.states[cell.series.id]}
                             onTap={onTap}
                           />

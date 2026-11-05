@@ -643,7 +643,7 @@ test.describe("Tap", () => {
     await page.getByRole("button", { name: "Connect", exact: true }).click();
     await page.getByRole("button", { name: /Ethereum wallet/ }).click();
     const cell = page.getByRole("table").getByRole("button", { name: /^Up · BTC ends above \$81,000 · Tomorrow/ });
-    const flashes = () => cell.evaluate((el) => el.getAnimations({ subtree: true }).filter((a) => (a as CSSAnimation).animationName === "cross-flash").length);
+    const flashes = () => cell.evaluate((el) => el.getAnimations({ subtree: true }).filter((a) => (a as CSSAnimation).animationName === "fade").length);
     await expect(cell).toHaveAccessibleName(/· pays up to 5\.0× · worth \$7\.60 · up \$2\.60 · you hold this$/);
     await expect(cell).toContainText("+52%");
     expect(await flashes()).toBe(0);

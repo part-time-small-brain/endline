@@ -6,20 +6,15 @@ import { formatMultiple, formatPct } from "../../lib/money.ts";
 import { SideGlyph } from "../Glyphs.tsx";
 
 const LOOK = {
-  call: "text-up-ink hover:border-up hover:bg-up-field hover:shadow-[0_0_18px_var(--up-glow-soft)]",
-  put: "text-down-ink hover:border-down hover:bg-down-field hover:shadow-[0_0_18px_var(--down-glow-soft)]",
-} as const;
-
-const FILL = {
   call: {
-    rest: "border-up/25 bg-up-soft",
-    held: "border-up/25 bg-up-soft shadow-[inset_0_0_0_1.5px_currentColor]",
-    winning: "border-up bg-up-field shadow-[inset_0_0_0_1.5px_currentColor,0_0_20px_var(--up-glow)]",
+    open: "border-up/25 bg-up-soft text-up-ink hover:border-up hover:bg-up-field hover:shadow-[0_0_18px_var(--up-glow-soft)]",
+    held: "border-up/25 bg-up-soft text-up-ink inset-ring-[1.5px] inset-ring-current hover:border-up",
+    winning: "border-up bg-up-field text-up-ink inset-ring-[1.5px] inset-ring-current shadow-[0_0_20px_var(--up-glow)]",
   },
   put: {
-    rest: "border-down/25 bg-down-soft",
-    held: "border-down/25 bg-down-soft shadow-[inset_0_0_0_1.5px_currentColor]",
-    winning: "border-down bg-down-field shadow-[inset_0_0_0_1.5px_currentColor,0_0_20px_var(--down-glow)]",
+    open: "border-down/25 bg-down-soft text-down-ink hover:border-down hover:bg-down-field hover:shadow-[0_0_18px_var(--down-glow-soft)]",
+    held: "border-down/25 bg-down-soft text-down-ink inset-ring-[1.5px] inset-ring-current hover:border-down",
+    winning: "border-down bg-down-field text-down-ink inset-ring-[1.5px] inset-ring-current shadow-[0_0_20px_var(--down-glow)]",
   },
 } as const;
 
@@ -46,7 +41,9 @@ export function Cell({ cell, label, value, change, state, onTap }: Props) {
 
   if (!cell) return <span className="block size-full rounded-md border border-rule/60" aria-hidden="true" />;
   const { series, multiple, held } = cell;
-  const text = change === undefined ? (multiple === undefined ? "—" : formatMultiple(multiple)) : formatPct(change);
+  const pays = multiple === undefined ? "—" : formatMultiple(multiple);
+  const text = change === undefined ? pays : formatPct(change);
+  const look = LOOK[series.kind][winning && state?.status !== "done" ? "winning" : held ? "held" : "open"];
   return (
     <m.button
       type="button"
@@ -57,11 +54,18 @@ export function Cell({ cell, label, value, change, state, onTap }: Props) {
       whileTap={{ scale: 0.9 }}
       animate={{ scale: state?.status === "done" ? [1, 1.08, 1] : 1 }}
       onClick={() => onTap(cell)}
-      className={`relative flex size-full flex-col items-center justify-center gap-1 rounded-md border font-mono transition-[background-color,border-color,box-shadow] disabled:opacity-40 ${LOOK[series.kind]} ${FILL[series.kind][winning ? "winning" : held ? "held" : "rest"]} ${state ? RING[state.status] : ""}`}
+      className={`relative flex size-full flex-col items-center justify-center gap-1 rounded-md border font-mono transition-[background-color,border-color,box-shadow] disabled:opacity-40 ${look} ${state ? RING[state.status] : ""}`}
     >
-      {flips > 0 && <span key={flips} aria-hidden="true" className="pointer-events-none absolute inset-0 rounded-md opacity-0 [animation:cross-flash_1.2s_var(--ease-out)_1]" />}
+      {flips > 0 && (
+        <span
+          key={flips}
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 rounded-md opacity-0 shadow-[0_0_0_2px_currentColor,0_0_28px_currentColor] [animation:fade_1.2s_var(--ease-out)_1_reverse]"
+        />
+      )}
       {value === undefined ? <SideGlyph kind={series.kind} size={14} /> : <span className="text-[0.6875rem] leading-none font-semibold">{value}</span>}
       <span className={`leading-none font-medium ${text.length > 5 ? "text-xs sm:text-base" : "text-[15px] sm:text-lg"} ${change === undefined ? "" : change > 0 ? "text-up-ink" : change < 0 ? "text-down-ink" : "text-ink-2"}`}>{text}</span>
+      {change !== undefined && <span className="text-[0.625rem] leading-none opacity-70">{pays}</span>}
     </m.button>
   );
 }
