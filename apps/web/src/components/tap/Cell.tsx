@@ -8,17 +8,17 @@ import { SideGlyph } from "../Glyphs.tsx";
 const LOOK = {
   call: {
     open: "border-up/25 bg-up-soft text-up-ink hover:border-up hover:bg-up-field hover:shadow-[0_0_18px_var(--up-glow-soft)]",
-    held: "border-up/25 bg-up-soft text-up-ink inset-ring-[1.5px] inset-ring-current hover:border-up",
-    winning: "border-up bg-up-field text-up-ink inset-ring-[1.5px] inset-ring-current shadow-[0_0_20px_var(--up-glow)]",
+    held: "border-up/25 bg-up-soft text-up-ink inset-ring-[1.5px] hover:border-up",
+    winning: "border-up bg-up-field text-up-ink inset-ring-[1.5px] shadow-[0_0_20px_var(--up-glow)]",
   },
   put: {
     open: "border-down/25 bg-down-soft text-down-ink hover:border-down hover:bg-down-field hover:shadow-[0_0_18px_var(--down-glow-soft)]",
-    held: "border-down/25 bg-down-soft text-down-ink inset-ring-[1.5px] inset-ring-current hover:border-down",
-    winning: "border-down bg-down-field text-down-ink inset-ring-[1.5px] inset-ring-current shadow-[0_0_20px_var(--down-glow)]",
+    held: "border-down/25 bg-down-soft text-down-ink inset-ring-[1.5px] hover:border-down",
+    winning: "border-down bg-down-field text-down-ink inset-ring-[1.5px] shadow-[0_0_20px_var(--down-glow)]",
   },
 } as const;
 
-const RING = { busy: "animate-pulse", done: "shadow-[0_0_28px_currentColor]", failed: "ring-2 ring-danger" } as const;
+const RING = { busy: "animate-pulse", done: "shadow-[0_0_28px_currentColor]!", failed: "ring-2 ring-danger" } as const;
 
 interface Props {
   cell: GridCell | undefined;
@@ -44,7 +44,7 @@ export function Cell({ cell, label, value, change, state, onTap }: Props) {
   const pays = multiple === undefined ? "—" : formatMultiple(multiple);
   const pct = change === undefined ? undefined : Math.round(change * 100);
   const text = pct === undefined ? pays : `${pct > 0 ? "+" : ""}${pct}%`;
-  const look = LOOK[series.kind][winning && state?.status !== "done" ? "winning" : held ? "held" : "open"];
+  const look = LOOK[series.kind][winning ? "winning" : held ? "held" : "open"];
   return (
     <m.button
       type="button"

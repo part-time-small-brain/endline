@@ -628,6 +628,7 @@ test.describe("Tap", () => {
 
   test("a held cell shows what it's worth and its P&L, and glows and flashes each time spot crosses its price to beat", async ({ page }) => {
     let index = 80_650;
+    let marks = [{ series_id: "BTC-5NOV26-81000_83000-C", ask: String(400 * USD), bid: String(380 * USD), vol: 0.4 }];
     const token = "nep245:opt.demo.testnet:BTC-5NOV26-81000_83000-C";
     await page.addInitScript(() => {
       (window as unknown as { ethereum: object }).ethereum = {
@@ -640,7 +641,7 @@ test.describe("Tap", () => {
     await page.route("**/fills/*", (route) =>
       route.fulfill({ json: [{ quote_id: "q", series_id: "BTC-5NOV26-81000_83000-C", side: "buy", account_id: "0x1111111111111111111111111111111111111111", size: "2000000", premium: String(5 * USD), tx_hash: "tx", at_ms: NOW_MS - 3_600_000 }] }),
     );
-    await live(page, () => [{ series_id: "BTC-5NOV26-81000_83000-C", ask: String(400 * USD), bid: String(380 * USD), vol: 0.4 }], () => index);
+    await live(page, () => marks, () => index);
     await page.route("**/rpc", (route) => {
       const params = route.request().postDataJSON().params;
       const args = JSON.parse(Buffer.from(params.args_base64, "base64").toString());
@@ -652,7 +653,7 @@ test.describe("Tap", () => {
     const cell = page.getByRole("table").getByRole("button", { name: /^Up · BTC ends above \$81,000 · Tomorrow/ });
     const flashes = () => cell.evaluate((el) => el.getAnimations({ subtree: true }).filter((a) => (a as CSSAnimation).animationName === "fade").length);
     await expect(cell).toHaveAccessibleName(/· pays up to 5\.0× · worth \$7\.60 · up \$2\.60 · you hold this$/);
-    await expect(cell).toContainText("+52%");
+    await expect(cell).toHaveText("$7.60+52%5.0×");
     expect(await flashes()).toBe(0);
     index = 81_200;
     await page.clock.fastForward(5_000);
@@ -663,6 +664,14 @@ test.describe("Tap", () => {
     await page.clock.fastForward(5_000);
     await expect.poll(flashes, { intervals: [50] }).toBe(1);
     await expect(cell).toHaveAccessibleName(/· up \$2\.60 · you hold this$/);
+    marks = [{ series_id: "BTC-5NOV26-81000_83000-C", ask: String(400 * USD), bid: String(262.5 * USD), vol: 0.4 }];
+    await page.clock.fastForward(5_000);
+    await expect(cell).toHaveText("$5.25+5%5.0×");
+    marks = [];
+    await page.clock.fastForward(5_000);
+    const unpriced = page.getByRole("table").getByRole("button", { name: /^Up · BTC ends above \$81,000 · Tomorrow .* · no price right now · you hold this$/ });
+    await expect(unpriced).toBeDisabled();
+    await expect(unpriced).toHaveCSS("opacity", "1");
   });
 
   async function heldThroughTheEnd(page: Page) {
