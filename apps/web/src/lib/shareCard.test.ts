@@ -1,6 +1,6 @@
 import type { ListedSeries } from "@endline/sdk";
 import { describe, expect, it } from "vitest";
-import { winCard } from "./shareCard.ts";
+import { callCard, winCard } from "./shareCard.ts";
 
 const USD = 1_000_000n;
 const series: ListedSeries = {
@@ -25,5 +25,17 @@ describe("winCard", () => {
       text: "BTC Up $81,000: Won $40.00 on Endline",
     });
     expect(winCard(series, 40n * USD, 0n, 81_400n * USD, 6).detail).toBe("");
+  });
+});
+
+describe("callCard", () => {
+  it("shows the points a free call won and the multiple it was called at", () => {
+    expect(callCard(series, 50n, 400, 83_000n * USD, 6)).toEqual({
+      title: "BTC Up $81,000",
+      result: "+400 points",
+      detail: "Free call at 5.0×",
+      footer: "Final price $83,000 · 5 Nov 08:00 UTC",
+      text: "BTC Up $81,000: +400 points on Endline",
+    });
   });
 });

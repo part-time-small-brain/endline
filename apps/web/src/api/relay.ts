@@ -1,4 +1,4 @@
-import { Fill, Mark, type PublishRequest, Quote, type QuoteRequest, SeriesListing, type SignedPayload, StatusUpdate } from "@endline/sdk";
+import { Call, type CallRequest, Fill, Leaderboard, Mark, type PublishRequest, Quote, type QuoteRequest, SeriesListing, type SignedPayload, StatusUpdate } from "@endline/sdk";
 import { z } from "zod";
 
 export interface Relay {
@@ -13,6 +13,9 @@ export interface Relay {
   relayerId(): Promise<string>;
   claim(signed: SignedPayload): Promise<void>;
   faucet(accountId: string): Promise<string>;
+  call(request: CallRequest): Promise<Call>;
+  calls(accountId: string): Promise<Call[]>;
+  leaderboard(accountId?: string): Promise<Leaderboard>;
 }
 
 export class RelayError extends Error {
@@ -93,5 +96,8 @@ export function httpRelay(baseUrl: string): Relay {
       await call(url("/claims"), Claimed, { signed });
     },
     faucet: async (accountId) => (await call(url("/faucet"), Executed, { account_id: accountId })).tx_hash,
+    call: (request) => call(url("/calls"), Call, request),
+    calls: (accountId) => call(url(`/calls/${encodeURIComponent(accountId)}`), Call.array()),
+    leaderboard: (accountId) => call(url(accountId === undefined ? "/leaderboard" : `/leaderboard/${encodeURIComponent(accountId)}`), Leaderboard),
   };
 }

@@ -3,6 +3,7 @@ import { useApp } from "../app/context.ts";
 import { useData } from "../app/data.tsx";
 import { Link } from "../app/router.tsx";
 import { setTradeMode, useTradeMode } from "../hooks/useTradeMode.ts";
+import { shortAccount } from "../lib/labels.ts";
 import type { TradeMode } from "../lib/tradeMode.ts";
 import type { Route } from "../lib/route.ts";
 import { useWallet } from "../wallet/context.tsx";
@@ -20,7 +21,6 @@ interface Props {
 }
 
 const VIEWS = { lite: "Lite", pro: "Pro", tap: "Tap" } as const;
-const short = (account: string) => (account.length > 16 ? `${account.slice(0, 6)}…${account.slice(-4)}` : account);
 
 export function Header({ route, open, toCollect, onConnect, onAddFunds }: Props) {
   const { config } = useApp();
@@ -119,7 +119,7 @@ export function Header({ route, open, toCollect, onConnect, onAddFunds }: Props)
                   <span className="grid size-11 place-items-center rounded-[10px] bg-ink text-on-ink xl:size-10">
                     <Wallet size={22} weight="bold" aria-hidden="true" />
                   </span>
-                  <span className="hidden xl:inline">{short(wallet.accountId)}</span>
+                  <span className="hidden xl:inline">{shortAccount(wallet.accountId)}</span>
                 </>
               }
               buttonClassName="flex h-11 items-center gap-2 rounded-xl text-sm font-semibold transition-colors duration-150 xl:h-12 xl:bg-surface xl:py-1 xl:pr-4 xl:pl-1 xl:hover:bg-paper"

@@ -1,7 +1,7 @@
 import type { ListedSeries } from "@endline/sdk";
 import { describe, expect, it } from "vitest";
 import type { PricePoint } from "../api/market.ts";
-import { averageEstimate, closingOf, phaseOf, verdictAt } from "./reveal.ts";
+import { averageEstimate, callVerdict, closingOf, phaseOf, pointsSays, verdictAt } from "./reveal.ts";
 
 const E = 1_800_028_800;
 const USD = 1_000_000n;
@@ -70,5 +70,18 @@ describe("closingOf", () => {
     expect(closingOf([next, E, E], (e) => e === E, none, E + 60)).toEqual({ expiry: E, phase: "ended" });
     expect(closingOf([E, next], () => true, () => ({ price: 81_400n * USD, finalAt: E + 300 }), E + 600)).toEqual({ expiry: E, phase: "final" });
     expect(closingOf([E, next], () => true, none, E - 1_801)).toBeUndefined();
+  });
+});
+
+describe("free calls in the reveal", () => {
+  it("are a win only above their stake, too close near the price to beat until the price is known, and say their points", () => {
+    expect(callVerdict(series("call"), "final_round", 81_500n * USD, 25)).toBe("win");
+    expect(callVerdict(series("call"), "final_round", 81_500n * USD, -50)).toBe("lose");
+    expect(callVerdict(series("call"), "ended", 81_050n * USD, -88)).toBe("close");
+    expect(callVerdict(series("call"), "final", 81_050n * USD, -88)).toBe("lose");
+    expect(pointsSays("final_round", "win", "+25 pts")).toBe("on track for +25 pts");
+    expect(pointsSays("proposed", "lose", "-100 pts")).toBe("-100 pts if the proposed price stands");
+    expect(pointsSays("final", "win", "+25 pts")).toBe("+25 pts");
+    expect(pointsSays("ended", "close", "-88 pts")).toBe("too close to call");
   });
 });

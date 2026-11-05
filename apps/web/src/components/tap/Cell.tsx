@@ -25,11 +25,13 @@ interface Props {
   label: string;
   value: string | undefined;
   change: number | undefined;
+  called?: string;
+  blocked?: boolean;
   state: TapState | undefined;
   onTap: (cell: GridCell) => void;
 }
 
-export function Cell({ cell, label, value, change, state, onTap }: Props) {
+export function Cell({ cell, label, value, change, called, blocked = false, state, onTap }: Props) {
   const winning = cell?.winning ?? false;
   const last = useRef(winning);
   const [flips, setFlips] = useState(0);
@@ -43,7 +45,7 @@ export function Cell({ cell, label, value, change, state, onTap }: Props) {
   const { series, multiple, held } = cell;
   const pays = multiple === undefined ? "—" : formatMultiple(multiple);
   const pct = change === undefined ? undefined : Math.round(change * 100);
-  const text = pct === undefined ? pays : `${pct > 0 ? "+" : ""}${pct}%`;
+  const text = pct === undefined ? (called ?? pays) : `${pct > 0 ? "+" : ""}${pct}%`;
   const look = LOOK[series.kind][winning ? "winning" : held ? "held" : "open"];
   return (
     <m.button
@@ -51,7 +53,7 @@ export function Cell({ cell, label, value, change, state, onTap }: Props) {
       aria-label={label}
       aria-busy={state?.status === "busy" || undefined}
       title={label}
-      disabled={multiple === undefined}
+      disabled={multiple === undefined || blocked}
       whileTap={{ scale: 0.9 }}
       animate={{ scale: state?.status === "done" ? [1, 1.08, 1] : 1 }}
       onClick={() => onTap(cell)}
@@ -64,7 +66,13 @@ export function Cell({ cell, label, value, change, state, onTap }: Props) {
           className="pointer-events-none absolute inset-0 rounded-md opacity-0 shadow-[0_0_0_2px_currentColor,0_0_28px_currentColor] [animation:fade_1.2s_ease-in_1_reverse]"
         />
       )}
-      {value === undefined ? <SideGlyph kind={series.kind} size={14} /> : <span className="text-[0.6875rem] leading-none font-semibold">{value}</span>}
+      {value !== undefined ? (
+        <span className="text-[0.6875rem] leading-none font-semibold">{value}</span>
+      ) : called !== undefined ? (
+        <span className="text-[0.5625rem] leading-none font-semibold tracking-[0.1em] uppercase">Called</span>
+      ) : (
+        <SideGlyph kind={series.kind} size={14} />
+      )}
       <span className={`leading-none font-medium ${text.length > (pct === undefined ? 5 : 4) ? "text-xs sm:text-base" : "text-[15px] sm:text-lg"} ${pct === undefined ? "" : pct > 0 ? "text-up-ink" : pct < 0 ? "text-down-ink" : "text-ink-2"}`}>{text}</span>
       {pct !== undefined && <span className="text-[0.625rem] leading-none opacity-70">{pays}</span>}
     </m.button>

@@ -1,0 +1,50 @@
+import { callMultiple, type ListedSeries, termsOf } from "@endline/sdk";
+import { useCallback, useState } from "react";
+import { RelayError } from "../api/relay.ts";
+import { useApp } from "../app/context.ts";
+import { useData } from "../app/data.tsx";
+import { seriesTitle } from "../lib/labels.ts";
+import { formatMultiple } from "../lib/money.ts";
+import { useWallet } from "../wallet/context.tsx";
+import { cachedSession, forgetSession, signSession } from "../wallet/session.ts";
+import type { TapState } from "./useTaps.ts";
+
+const SHOWN_MS = 3_000;
+
+function messageOf(error: unknown): string {
+  const text = error instanceof RelayError && !error.message.startsWith("relay returned") ? error.message : "That call didn't go through. Try again.";
+  return `${text.charAt(0).toUpperCase()}${text.slice(1).replace(/\.?$/, ".")}`;
+}
+
+export function useCalls() {
+  const { config, services } = useApp();
+  const { wallet } = useWallet();
+  const { quoteDecimals, reload } = useData();
+  const [states, setStates] = useState<Record<string, TapState>>({});
+  const [notice, setNotice] = useState<{ text: string; failed: boolean }>();
+
+  const call = useCallback(
+    async (series: ListedSeries) => {
+      if (!wallet) return;
+      const id = series.id;
+      setStates((current) => ({ ...current, [id]: { status: "busy" } }));
+      const finish = (state: TapState, text: string) => {
+        setStates((current) => ({ ...current, [id]: state }));
+        setNotice({ text, failed: state.status === "failed" });
+        setTimeout(() => setStates((current) => (current[id] === state ? Object.fromEntries(Object.entries(current).filter(([key]) => key !== id)) : current)), SHOWN_MS);
+      };
+      try {
+        const session = await (cachedSession(wallet) ?? signSession(wallet, config.intentsId, services.chain.salt));
+        const made = await services.relay.call({ series_id: id, signer: { standard: wallet.standard, signer_id: wallet.accountId }, session });
+        reload();
+        finish({ status: "done" }, `Called ${seriesTitle(series, quoteDecimals)} at ${formatMultiple(callMultiple(termsOf(made.terms), BigInt(made.ask)))}.`);
+      } catch (error) {
+        if (error instanceof RelayError && error.status === 401) forgetSession(wallet);
+        finish({ status: "failed" }, messageOf(error));
+      }
+    },
+    [wallet, config.intentsId, services, quoteDecimals, reload],
+  );
+
+  return { states, notice, call };
+}
