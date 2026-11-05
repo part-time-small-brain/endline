@@ -12,7 +12,7 @@ import { HttpError, type Relay } from "./relay.ts";
 
 const MAX_BODY_BYTES = 64 * 1024;
 const LIMITED = new Set(["POST /quote", "POST /execute", "POST /transfer", "POST /claims", "POST /faucet", "POST /deposit-quote"]);
-const SAME_ORIGIN = new Set(["/faucet", "/deposit-quote"]);
+const APP_ONLY = new Set(["/faucet", "/deposit-quote"]);
 const MAX_REQUESTS_PER_MINUTE = 30;
 const FaucetRequest = z.object({ account_id: AccountId });
 const FAUCET_IPV6_GROUPS = 3;
@@ -58,12 +58,18 @@ function isJson(request: IncomingMessage): boolean {
   return request.headers["content-type"]?.split(";")[0]?.trim().toLowerCase() === "application/json";
 }
 
+function corsFor(request: IncomingMessage, appOrigins: ReadonlySet<string>): Record<string, string> {
+  if (!APP_ONLY.has(pathOf(request) ?? "")) return CORS;
+  const origin = request.headers.origin;
+  return origin !== undefined && appOrigins.has(origin) ? { ...CORS, "access-control-allow-origin": origin, vary: "origin" } : { vary: "origin" };
+}
+
 function send(response: ServerResponse, status: number, body: unknown, cors: object): void {
   response.writeHead(status, { ...cors, "content-type": "application/json" });
   response.end(JSON.stringify(body));
 }
 
-export function createRelayServer(relay: Relay, fills: Fills, hub: MmHub, collector: Collector, oneClick: OneClick, faucet?: Faucet, trustProxy = false): Server {
+export function createRelayServer(relay: Relay, fills: Fills, hub: MmHub, collector: Collector, oneClick: OneClick, faucet?: Faucet, trustProxy = false, appOrigins: ReadonlySet<string> = new Set()): Server {
   const allow = rateLimit(MAX_REQUESTS_PER_MINUTE, 60_000);
   const route = async (request: IncomingMessage): Promise<[number, unknown]> => {
     const path = pathOf(request);
@@ -112,7 +118,7 @@ export function createRelayServer(relay: Relay, fills: Fills, hub: MmHub, collec
   };
 
   const server = createServer((request, response) => {
-    const cors = SAME_ORIGIN.has(pathOf(request) ?? "") ? {} : CORS;
+    const cors = corsFor(request, appOrigins);
     if (request.method === "OPTIONS") {
       response.writeHead(204, cors).end();
       return;

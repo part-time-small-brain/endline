@@ -8,7 +8,7 @@ The hosted testnet stack: what's running, how to deploy, and what to do when an 
 |---|---|
 | Server | A Docker host (Docker Desktop on Windows, PowerShell) reached over SSH: `ssh <server>` |
 | Compose dir | `<deploy-dir>` on the server (`compose.yaml`, `.env`). Run every server command below from here: `cd <deploy-dir>` |
-| Public URL | Cloudflare quick tunnel, changes whenever `tunnel` restarts ([below](#public-url)) |
+| Public URLs | `api.endline.trade`: the relay, through the named tunnel. Landing, app and docs are on Cloudflare Pages, not on the server ([system.md](system.md#hosting)) |
 | Alerts | `monitor` logs, plus `ALERT_WEBHOOK_URL` when set |
 | Ids | `deploy/testnet.json`. Owner, oracle and relayer: `near-options-dev.testnet`. MM and lister: `near-options-funder-1.testnet` |
 
@@ -20,6 +20,7 @@ From the Mac, run any server command in one go: `ssh <server> "cd <deploy-dir>; 
 |---|---|
 | Containers and state | `docker compose ps` (`Restarting` = crash loop, see [.env](#env)) |
 | Logs of one service | `docker compose logs --tail 100 -f relay` (`mm`, `lister`, `monitor`, `proposer`, `web`, `tunnel`) |
+| Relay reachable from outside | `curl https://api.endline.trade/health` (on the Mac). Fails while `/health` inside works: `docker compose logs --tail 20 tunnel` should show `Registered tunnel connection` |
 | Errors only (PowerShell) | `docker compose logs --tail 500 lister \| Select-String -Pattern 'fail\|error'` |
 | Relay up, MMs connected | `docker compose exec web wget -qO- http://localhost/health` → `{"ok":true,"market_makers":1}` (no port is published on the host) |
 | Open alerts | `docker compose logs --tail 5 monitor` (`monitor: N open alerts`) |
@@ -33,15 +34,7 @@ From the Mac, run any server command in one go: `ssh <server> "cd <deploy-dir>; 
 | Pick up a changed `.env` | `docker compose up -d --no-build --pull never --no-deps mm` (`restart` keeps the old env) |
 | Stop one | `docker compose stop lister` |
 
-Never `docker compose down`, `restart` with no service, or `up` naming `tunnel`, unless you want a new public URL. Name the services every time.
-
-### Public URL
-
-```powershell
-docker compose logs tunnel | Select-String trycloudflare.com | Select-Object -Last 1
-```
-
-The web app calls the relay on its own origin, so a new URL needs no rebuild: just share the new link.
+Name the services every time: `docker compose down` or a bare `restart` stops trading for everyone. The tunnel keeps its URL across restarts.
 
 ## Deploy
 
@@ -54,7 +47,8 @@ scp deploy/compose.yaml <server>:<deploy-dir>/   # only if it changed
 ssh <server> "cd <deploy-dir>; docker compose up -d --no-build --pull never relay mm lister monitor proposer web"
 ```
 
-- `env.example` holds the testnet ids that get baked into the web build; no secrets go into an image. The `Caddyfile` is baked into `near-options-web` too: a change ships with the image.
+- The landing, app and docs deploy themselves: Cloudflare Pages builds `main` on every merge ([system.md](system.md#hosting)). Their testnet ids live in the `endline-web` project's env, not in an image.
+- `near-options-web` is Caddy with the `Caddyfile` baked in: a change to the relay's public routes ships with that image. No secrets go into an image.
 - `.env` lives only on the server. Edit it there; never copy it.
 - App containers run as the `node` user. A `relay-data` volume created before that is owned by root: once, before the first deploy that switches, run `docker compose run --rm --no-deps --user root --entrypoint chown relay -R node:node /data` on the server.
 - Base images are pinned by tag and digest (`deploy/Dockerfile`, `compose.yaml`) and wasmtime by `WASMTIME` and `WASMTIME_SHA256`. To bump, take the new tag's digest from `docker buildx imagetools inspect <image>:<tag>` and the tarball's `sha256sum`.
@@ -105,14 +99,15 @@ Names only; values live on the server. Template: `deploy/env.example`.
 
 | Key | Used by |
 |---|---|
-| `NEAR_RPC_URL`, `OPTIONS_ID` | relay, mm, lister, monitor, proposer, web build |
-| `NETWORK_ID`, `INTENTS_ID` | relay, mm, monitor, web build; `lister` takes `INTENTS_ID` only |
-| `QUOTE_ASSET` | relay, web build |
-| `MM_API_KEYS`, `FAUCET`, `ONECLICK_JWT` | relay |
+| `NEAR_RPC_URL`, `OPTIONS_ID` | relay, mm, lister, monitor, proposer |
+| `NETWORK_ID`, `INTENTS_ID` | relay, mm, monitor; `lister` takes `INTENTS_ID` only |
+| `QUOTE_ASSET` | relay |
+| `MM_API_KEYS`, `FAUCET`, `ONECLICK_JWT`, `APP_ORIGINS` | relay |
 | `RELAYER_ACCOUNT_ID`, `RELAYER_PRIVATE_KEY` | relay; `monitor` watches the account; `proposer` falls back to them |
 | `MM_ACCOUNT_ID`, `MM_PRIVATE_KEY` | mm, lister |
 | `MM_API_KEY` | mm |
 | `ORACLE_ACCOUNT_ID`, `ORACLE_PRIVATE_KEY` | proposer (optional) |
 | `ALERT_WEBHOOK_URL`, `HEALTH_URL` | monitor (optional; `HEALTH_URL` defaults to `http://web/health`) |
+| `TUNNEL_TOKEN` | tunnel. Rotate it in Zero Trust → Networks → Tunnels if it leaks: anyone holding it can serve `api.endline.trade` |
 
-Gotcha: a key set to an empty or invalid value crashes its service on start, and `restart: unless-stopped` turns that into a crash loop. Optional keys must be a valid value or absent: `ALERT_WEBHOOK_URL` a full `https://…` URL, `ONECLICK_JWT` non-empty, `FAUCET` `true`/`false`. `HEALTH_URL` and `ORACLE_*` are the exception: blank falls back to their default. Comment the line out instead of blanking it. `docker compose logs --tail 20 <service>` names the bad key.
+Gotcha: a key set to an empty or invalid value crashes its service on start, and `restart: unless-stopped` turns that into a crash loop. Optional keys must be a valid value or absent: `ALERT_WEBHOOK_URL` a full `https://…` URL, `ONECLICK_JWT` non-empty, `FAUCET` `true`/`false`, `APP_ORIGINS` origins only (`https://app.endline.trade`, no trailing slash). `HEALTH_URL` and `ORACLE_*` are the exception: blank falls back to their default. Comment the line out instead of blanking it. `docker compose logs --tail 20 <service>` names the bad key.

@@ -1,9 +1,10 @@
 import { m } from "motion/react";
+import { useApp } from "../../app/context.ts";
 import { Link } from "../../app/router.tsx";
-import { PATHS } from "../../lib/route.ts";
 import { EASE_DRAWER } from "./motion.ts";
 
 export function FinalCta() {
+  const { paths } = useApp().config;
   return (
     <section aria-label="Get started" className="relative grid h-[440px] grid-rows-2 overflow-hidden lg:h-[560px]">
       <div className="flex items-end bg-page text-ink">
@@ -12,7 +13,7 @@ export function FinalCta() {
       <div className="bg-page">
         <div className="mx-auto max-w-7xl px-4 pt-10 lg:px-12">
           <Link
-            href={PATHS.trade}
+            href={paths.trade}
             className="inline-flex h-14 items-center rounded-2xl bg-ink px-6 font-semibold text-on-ink transition-[transform,opacity] duration-150 ease-out hover:opacity-90 active:scale-[0.97]"
           >
             Start trading

@@ -1,5 +1,6 @@
 import { domAnimation, LazyMotion, MotionConfig } from "motion/react";
 import { useLayoutEffect, useState } from "react";
+import { useApp } from "./app/context.ts";
 import { useData } from "./app/data.tsx";
 import { Link, navigate, usePathname } from "./app/router.tsx";
 import { usePositions } from "./app/usePositions.ts";
@@ -13,14 +14,14 @@ import { QuoteSheet, type QuoteSelection } from "./components/QuoteSheet.tsx";
 import { useNow } from "./hooks/useNow.ts";
 import { syncThemeColor } from "./hooks/useTheme.ts";
 import { useTradeMode } from "./hooks/useTradeMode.ts";
-import { PATHS, type Route, routeOf } from "./lib/route.ts";
+import { type Route, routeOf } from "./lib/route.ts";
 import { Landing } from "./screens/Landing.tsx";
 import { Positions } from "./screens/Positions.tsx";
 import { Trade } from "./screens/Trade.tsx";
 import { useWallet } from "./wallet/context.tsx";
 
 export function App() {
-  const route = routeOf(usePathname());
+  const route = routeOf(usePathname(), useApp().config.paths);
   const { wallet } = useWallet();
   const [sheet, setSheet] = useState<"connect" | "deposit" | QuoteSelection>();
   const connect = () => setSheet("connect");
@@ -46,6 +47,7 @@ function Shell({ route, onConnect, onAddFunds, onQuote }: {
   onQuote: (selection: QuoteSelection) => void;
 }) {
   const mode = useTradeMode();
+  const { paths } = useApp().config;
   const { quoteDecimals } = useData();
   const nowSec = Math.floor(useNow(1000) / 1000);
   const views = usePositions(nowSec);
@@ -74,13 +76,13 @@ function Shell({ route, onConnect, onAddFunds, onQuote }: {
         {route === "trade" && <Trade mode={mode} nowSec={nowSec} views={views} onConnect={onConnect} onAddFunds={onAddFunds} onQuote={onQuote} />}
         {route === "positions" && (
           <div className="mx-auto w-full max-w-2xl px-4 pt-2 pb-10 lg:px-6">
-            <Positions views={views} nowSec={nowSec} onConnect={onConnect} onTrade={() => navigate(PATHS.trade)} onQuote={onQuote} />
+            <Positions views={views} nowSec={nowSec} onConnect={onConnect} onTrade={() => navigate(paths.trade)} onQuote={onQuote} />
           </div>
         )}
         {route === "missing" && (
           <div className="mx-auto w-full max-w-md px-4 pt-16">
             <Notice title="Nothing here" body="This page doesn't exist.">
-              <Link href={PATHS.trade} className="mt-5 inline-flex h-10 items-center rounded-xl bg-ink px-4 text-sm font-semibold text-on-ink">
+              <Link href={paths.trade} className="mt-5 inline-flex h-10 items-center rounded-xl bg-ink px-4 text-sm font-semibold text-on-ink">
                 Go to Trade
               </Link>
             </Notice>

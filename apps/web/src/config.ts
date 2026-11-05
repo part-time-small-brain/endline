@@ -1,10 +1,15 @@
 import { AccountId } from "@endline/sdk";
 import { z } from "zod";
+import { PATHS, type Paths, pathsFor } from "./lib/route.ts";
 
 const Network = z.enum(["mainnet", "testnet"]);
 
 const Live = z.object({
   VITE_RELAY_URL: z.url().optional(),
+  VITE_APP_URL: z
+    .string()
+    .refine((url) => URL.canParse(url) && new URL(url).origin === url, "an origin like https://app.example.com: no path, no trailing slash")
+    .optional(),
   VITE_NETWORK: Network,
   VITE_RPC_URL: z.url(),
   VITE_INTENTS_ID: AccountId,
@@ -15,6 +20,7 @@ const Live = z.object({
 export interface Config {
   mock: boolean;
   relayUrl: string;
+  paths: Paths;
   network: z.infer<typeof Network>;
   rpcUrl: string;
   intentsId: string;
@@ -25,6 +31,7 @@ export interface Config {
 const MOCK: Config = {
   mock: true,
   relayUrl: "",
+  paths: PATHS,
   network: "mainnet",
   rpcUrl: "",
   intentsId: "intents.near",
@@ -40,6 +47,7 @@ export function loadConfig(env: Record<string, unknown>): Config {
   return {
     mock: false,
     relayUrl: e.VITE_RELAY_URL ?? window.location.origin,
+    paths: e.VITE_APP_URL === undefined ? PATHS : pathsFor(e.VITE_APP_URL, window.location.origin),
     network: e.VITE_NETWORK,
     rpcUrl: e.VITE_RPC_URL,
     intentsId: e.VITE_INTENTS_ID,

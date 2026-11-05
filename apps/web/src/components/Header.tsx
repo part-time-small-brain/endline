@@ -4,7 +4,7 @@ import { useData } from "../app/data.tsx";
 import { Link } from "../app/router.tsx";
 import { setTradeMode, useTradeMode } from "../hooks/useTradeMode.ts";
 import type { TradeMode } from "../lib/tradeMode.ts";
-import { PATHS, type Route } from "../lib/route.ts";
+import type { Route } from "../lib/route.ts";
 import { useWallet } from "../wallet/context.tsx";
 import { Button } from "./Button.tsx";
 import { Mark, Wordmark } from "./Glyphs.tsx";
@@ -41,8 +41,8 @@ export function Header({ route, open, toCollect, onConnect, onAddFunds }: Props)
       </span>
     ) : null;
   const tabs = [
-    { href: PATHS.trade, label: "Trade", Icon: ChartLine, current: route === "trade" },
-    { href: PATHS.positions, label: "Positions", Icon: Stack, current: route === "positions" },
+    { href: config.paths.trade, label: "Trade", Icon: ChartLine, current: route === "trade" },
+    { href: config.paths.positions, label: "Positions", Icon: Stack, current: route === "positions" },
   ];
 
   const navigation = (
@@ -57,7 +57,7 @@ export function Header({ route, open, toCollect, onConnect, onAddFunds }: Props)
           >
             <Icon size={18} aria-hidden="true" className="hidden sm:block" />
             <span className="sm:sr-only lg:not-sr-only">{label}</span>
-            {href === PATHS.positions && badge}
+            {href === config.paths.positions && badge}
           </Link>
         ))}
       </nav>
@@ -82,7 +82,7 @@ export function Header({ route, open, toCollect, onConnect, onAddFunds }: Props)
   return (
     <header className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 px-4 py-1.5 sm:min-h-16 sm:px-6 sm:py-0 near:border-b near:border-rule">
       <div className="flex shrink-0 items-center gap-3">
-        <Link href={PATHS.landing} aria-label="Endline home" className="-m-2 rounded-lg p-2 sm:m-0 sm:p-0">
+        <Link href="/" aria-label="Endline home" className="-m-2 rounded-lg p-2 sm:m-0 sm:p-0">
           <span className="hidden sm:inline">
             <Wordmark />
           </span>

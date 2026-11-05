@@ -11,7 +11,7 @@
       (function () {
       try { var theme = localStorage.getItem("theme"); } catch (e) {}
       theme = theme === "light" || theme === "dark" ? theme : matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
-      var near = location.pathname.replace(/\/+$/, "") !== "";
+      var near = location.pathname.replace(/\/+$/, "") !== "" || "%VITE_APP_URL%" === location.origin;
       document.documentElement.dataset.theme = theme;
       if (near) document.documentElement.dataset.look = "near";
       document.querySelector('meta[name="theme-color"]').content = near ? "#0a0a0a" : theme === "dark" ? "#000000" : "#dee3ea";

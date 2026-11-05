@@ -2,7 +2,6 @@
 	header {
 		X-Content-Type-Options nosniff
 		Referrer-Policy strict-origin-when-cross-origin
-		Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()"
 	}
 	@relay path /health /series /marks /quote /publish /status/* /fills/* /execute /transfer /claims /faucet /deposit-quote
 	handle @relay {
@@ -10,42 +9,7 @@
 			header_up X-Forwarded-For {http.request.header.CF-Connecting-IP}
 		}
 	}
-	@docsSlash path_regexp slash ^(/docs(?:/.*?)?)/+$
-	redir @docsSlash {re.slash.1}{?query} 308
-	@docs path /docs /docs/*
-	handle @docs {
-		root * /srv
-		@markdown path *.md
-		header @markdown {
-			Content-Type "text/markdown; charset=utf-8"
-			match status 200
-		}
-		header /docs/api/search {
-			Content-Type application/json
-			match status 200
-		}
-		try_files {path} {path}.html {path}/index.html
-		file_server
-	}
-	handle /assets/* {
-		root * /srv
-		header {
-			Cache-Control "public, max-age=31536000, immutable"
-			match status 200
-		}
-		file_server
-	}
 	handle {
-		root * /srv
-		header Cache-Control no-cache
-		try_files {path} /index.html
-		file_server
-	}
-	handle_errors 404 {
-		handle @docs {
-			root * /srv
-			rewrite * /docs/404.html
-			file_server
-		}
+		respond 404
 	}
 }

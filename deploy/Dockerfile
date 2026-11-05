@@ -13,7 +13,7 @@ WORKDIR /app
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json ./
 COPY packages packages
 COPY apps apps
-RUN chmod -R a+rX /app && pnpm install --frozen-lockfile --filter '!@endline/docs'
+RUN chmod -R a+rX /app && pnpm install --frozen-lockfile --filter '!@endline/docs' --filter '!@endline/web'
 
 FROM deps AS app
 RUN mkdir /data && chown node:node /data
@@ -21,15 +21,5 @@ RUN mkdir /data && chown node:node /data
 ENV pnpm_config_verify_deps_before_run=false
 USER node
 
-FROM deps AS web-build
-ARG VITE_NETWORK VITE_RPC_URL VITE_INTENTS_ID VITE_OPTIONS_ID VITE_QUOTE_ASSET
-RUN pnpm --filter @endline/web build
-
-FROM deps AS docs-build
-ARG DOCS_BASE_PATH=/docs
-RUN pnpm install --frozen-lockfile --filter @endline/docs && pnpm --filter @endline/docs build
-
 FROM caddy:2.11.7-alpine@sha256:eb4d35b7452d1ab6171fbdbe8d9275b2301dad6dad92115d91e19fb9b24d510f AS web
 COPY deploy/Caddyfile /etc/caddy/Caddyfile
-COPY --from=web-build /app/apps/web/dist /srv
-COPY --from=docs-build /app/apps/docs/out /srv/docs

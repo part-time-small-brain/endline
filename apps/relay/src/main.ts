@@ -49,4 +49,4 @@ submitClaims();
 
 const oneClick = new OneClick(config.QUOTE_ASSET, config.ONECLICK_JWT);
 
-createRelayServer(relay, fills, hub, collector, oneClick, faucet, config.TRUST_PROXY).listen(config.PORT, () => console.log(`relay listening on :${config.PORT}`));
+createRelayServer(relay, fills, hub, collector, oneClick, faucet, config.TRUST_PROXY, new Set(config.APP_ORIGINS)).listen(config.PORT, () => console.log(`relay listening on :${config.PORT}`));
