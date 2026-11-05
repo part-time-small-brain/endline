@@ -42,31 +42,35 @@ async function drawCard(card: Card): Promise<File> {
 
 const KEEP_URL_MS = 60_000;
 
+function download(file: File) {
+  const url = URL.createObjectURL(file);
+  const link = document.body.appendChild(Object.assign(document.createElement("a"), { href: url, download: file.name }));
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), KEEP_URL_MS);
+}
+
 export function ShareButton({ card }: { card: Card }) {
   const [file, setFile] = useState<File | null>();
-  const key = JSON.stringify(card);
+  const { title, result, detail, footer, text } = card;
+  // drawn before the click: an await inside the click handler uses up the user activation navigator.share needs on iOS
   useEffect(() => {
     let live = true;
-    drawCard(JSON.parse(key) as Card).then(
+    drawCard({ title, result, detail, footer, text }).then(
       (drawn) => live && setFile(drawn),
       () => live && setFile(null),
     );
     return () => {
       live = false;
     };
-  }, [key]);
+  }, [title, result, detail, footer, text]);
 
   const share = () => {
     if (!file) return;
-    if (navigator.canShare?.({ files: [file] })) {
-      navigator.share({ files: [file], text: card.text }).catch(() => undefined);
-      return;
-    }
-    const url = URL.createObjectURL(file);
-    const link = document.body.appendChild(Object.assign(document.createElement("a"), { href: url, download: file.name }));
-    link.click();
-    link.remove();
-    setTimeout(() => URL.revokeObjectURL(url), KEEP_URL_MS);
+    if (!navigator.canShare?.({ files: [file] })) return download(file);
+    navigator.share({ files: [file], text }).catch((error: unknown) => {
+      if (!(error instanceof DOMException && error.name === "AbortError")) download(file);
+    });
   };
 
   if (file === null) return null;

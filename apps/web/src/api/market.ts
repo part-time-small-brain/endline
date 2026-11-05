@@ -6,6 +6,17 @@ export interface MarketSnapshot {
 
 export type PricePoint = [ms: number, price: number];
 
+const CHART_STEP_MS = 300_000;
+
+export function chartPoints(points: PricePoint[]): PricePoint[] {
+  let last = -Infinity;
+  return points.filter(([ms], i) => {
+    if (ms - last < CHART_STEP_MS && i < points.length - 1) return false;
+    last = ms;
+    return true;
+  });
+}
+
 export interface Market {
   snapshot(underlyings: string[]): Promise<MarketSnapshot>;
   history(underlying: string): Promise<PricePoint[]>;

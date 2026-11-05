@@ -1,4 +1,3 @@
-import { longPayout, termsOf } from "@endline/sdk";
 import { useState } from "react";
 import { settlementKey } from "../app/data.tsx";
 import type { useTicket } from "../app/useTicket.ts";
@@ -15,8 +14,8 @@ import { PriceLine } from "../components/tap/PriceLine.tsx";
 import { AmountPicker } from "../components/trade/AmountPicker.tsx";
 import { AssetPicker } from "../components/trade/AssetPicker.tsx";
 import { MarketStats } from "../components/trade/MarketStats.tsx";
-import { buildGrid, type GridCell, rowOf, winningAt } from "../lib/grid.ts";
-import { averageEstimate, closingOf, isEstimate, type Phase, PHASE_TITLES, revealSays, verdictOf } from "../lib/reveal.ts";
+import { buildGrid, type GridCell, rowOf } from "../lib/grid.ts";
+import { averageEstimate, closingOf, PHASE_TITLES } from "../lib/reveal.ts";
 import { maxLossOf } from "../lib/tap.ts";
 import { formatMultiple, formatPct, formatPrice, formatUsd, toNumber, toUnits } from "../lib/money.ts";
 import { seriesTitle } from "../lib/labels.ts";
@@ -57,23 +56,18 @@ export function Tap({ state, nowSec, views, onConnect, onAddFunds, onQuote }: Pr
   const yours = views?.filter((v) => v.series.underlying === symbol) ?? [];
   const here = data.listing?.series.filter((s) => s.underlying === symbol) ?? [];
   const settlementOf = (expiry: number) => data.settlements[settlementKey({ underlying: symbol, expiry })] ?? null;
-  const closing = closingOf([...here, ...yours.map((v) => v.series)].map((s) => s.expiry), (expiry) => yours.some((v) => v.series.expiry === expiry), settlementOf, nowSec);
+  const closing = closingOf(here.map((s) => s.expiry), yours.map((v) => v.series.expiry), settlementOf, nowSec);
   const stakes = closing ? yours.filter((v) => v.series.expiry === closing.expiry) : [];
-  const settlement = closing ? settlementOf(closing.expiry) : null;
   const average = closing && spotNumber !== undefined ? averageEstimate(data.minutes?.[symbol] ?? [], closing.expiry, nowSec * 1000, spotNumber) : undefined;
-  const closingPrice = settlement?.price ?? (average === undefined ? undefined : toUnits(average, quoteDecimals));
+  const closingPrice = closing?.settlement?.price ?? (average === undefined ? undefined : toUnits(average, quoteDecimals));
   const active = yours.filter((v) => v.status === "active");
-  const open = active.filter((v) => v.series.expiry !== closing?.expiry);
   const mine = active.filter((v) => v.tap);
-  const bothSides = (v: PositionView) => stakes.some((o) => o.series.strike === v.series.strike && o.series.kind !== v.series.kind);
-  const shownStakes = stakes.filter((v) => !bothSides(v) || (closingPrice !== undefined && winningAt(v.series, closingPrice)));
-  const held = new Set([...open, ...shownStakes].map((v) => v.series.id));
-  const listed = [
-    ...priced.filter((s) => s.underlying === symbol && s.expiry !== closing?.expiry && !held.has(s.id)),
-    ...here.filter((s) => s.expiry === closing?.expiry && !held.has(s.id)),
-    ...[...open, ...shownStakes].map((v) => v.series),
-  ];
-  const grid = spot === undefined ? undefined : buildGrid(listed, spot, budget, data.marks, held);
+  const kept = yours.filter((v) => v.status === "active" || v.series.expiry === closing?.expiry);
+  const held = new Set(kept.map((v) => v.series.id));
+  const open = priced.filter((s) => s.underlying === symbol && s.expiry !== closing?.expiry && !held.has(s.id));
+  const rowsElsewhere = new Set([...open, ...kept.map((v) => v.series)].map((s) => s.strike));
+  const listed = [...open, ...here.filter((s) => s.expiry === closing?.expiry && !held.has(s.id) && rowsElsewhere.has(s.strike)), ...kept.map((v) => v.series)];
+  const grid = spot === undefined ? undefined : buildGrid(listed, spot, budget, data.marks, held, (expiry) => (expiry === closing?.expiry ? (closingPrice ?? spot) : spot));
   const closingColumn = closing && grid ? grid.expiries.indexOf(closing.expiry) : -1;
   const staked = (seriesId: string) => stakes.filter((v) => v.series.id === seriesId).reduce((total, v) => total + v.amount, 0n);
   const rows = grid?.strikes.length ?? 0;
@@ -82,11 +76,6 @@ export function Tap({ state, nowSec, views, onConnect, onAddFunds, onQuote }: Pr
   const where = (cell: GridCell, strike: bigint) => {
     const up = cell.series.kind === "call";
     return `${up ? "Up" : "Down"} · ${symbol} ends ${up ? "above" : "below"} ${formatPrice(strike, quoteDecimals)}`;
-  };
-  const reveal = (cell: GridCell, strike: bigint, phase: Phase, price: bigint, amount: bigint) => {
-    const verdict = verdictOf(cell.series, phase, price);
-    const usd = formatUsd(longPayout(termsOf(cell.series), amount, price), quoteDecimals);
-    return { kind: cell.series.kind, verdict, amount: `${isEstimate(phase) ? "≈ " : ""}${usd}`, label: `${where(cell, strike)} · ${PHASE_TITLES[phase].toLowerCase()} · ${revealSays(phase, verdict, usd)} · you hold this` };
   };
   const label = (cell: GridCell, strike: bigint, expiry: number, own: Holding | undefined) => {
     const pays = cell.multiple === undefined ? "no price right now" : `pays up to ${formatMultiple(cell.multiple)}`;
@@ -144,18 +133,18 @@ export function Tap({ state, nowSec, views, onConnect, onAddFunds, onQuote }: Pr
                     )}
                     {grid.cells[r]?.map((cell, c) => {
                       const expiry = grid.expiries[c] ?? 0;
-                      if (c === closingColumn && closing) {
+                      if (closing && expiry === closing.expiry) {
                         return (
                           <td key={cell?.series.id ?? expiry} className="h-[var(--row)] p-0.5">
-                            {cell?.held && closingPrice !== undefined ? (
-                              <RevealCell {...reveal(cell, strike, closing.phase, closingPrice, staked(cell.series.id))} />
+                            {cell?.held ? (
+                              <RevealCell series={cell.series} phase={closing.phase} price={closingPrice} amount={staked(cell.series.id)} where={where(cell, strike)} quoteDecimals={quoteDecimals} />
                             ) : (
                               <span className="block size-full rounded-md border border-rule/40" aria-hidden="true" />
                             )}
                           </td>
                         );
                       }
-                      const own = cell?.held ? holding(open, cell.series.id) : undefined;
+                      const own = cell?.held ? holding(active, cell.series.id) : undefined;
                       return (
                         <td key={cell?.series.id ?? expiry} className="h-[var(--row)] p-0.5">
                           <Cell
@@ -195,7 +184,7 @@ export function Tap({ state, nowSec, views, onConnect, onAddFunds, onQuote }: Pr
             {spot !== undefined && !loading ? "No prices right now" : empty}
           </p>
         )}
-        {closing && closingPrice !== undefined && <RevealNote phase={closing.phase} price={closingPrice} settlement={settlement} stakes={stakes} quoteDecimals={quoteDecimals} />}
+        {closing && <RevealNote closing={closing} price={closingPrice} stakes={stakes} quoteDecimals={quoteDecimals} />}
         <p role="status" className={`min-h-5 px-1 pt-2 text-sm ${unlockError || taps.notice?.failed ? "text-danger" : "text-ink-2"}`}>
           {unlockError ?? taps.notice?.text}
         </p>

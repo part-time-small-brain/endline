@@ -1,6 +1,6 @@
 import { type Fill, intentsAssetId, type ListedSeries, type Mark, type SeriesListing, type Timing } from "@endline/sdk";
 import { createContext, type ReactNode, useCallback, useContext, useMemo } from "react";
-import type { MarketSnapshot, PricePoint } from "../api/market.ts";
+import { chartPoints, type MarketSnapshot, type PricePoint } from "../api/market.ts";
 import { usePoll } from "../hooks/usePoll.ts";
 import { verifiedListing } from "../lib/listing.ts";
 import type { SettlementView } from "../lib/status.ts";
@@ -30,9 +30,6 @@ export interface AppData {
   reload(): void;
 }
 
-const CHART_EVERY = 5;
-const thin = (points: PricePoint[]) => points.filter((_, i) => i % CHART_EVERY === 0 || i === points.length - 1);
-
 export const settlementKey = (s: Pick<ListedSeries, "underlying" | "expiry">) => `${s.underlying}:${s.expiry}`;
 
 const DataContext = createContext<AppData | null>(null);
@@ -59,7 +56,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     underlyings.join(),
   );
 
-  const charts = useMemo(() => history.data && Object.fromEntries(Object.entries(history.data).map(([u, points]) => [u, thin(points)])), [history.data]);
+  const charts = useMemo(() => history.data && Object.fromEntries(Object.entries(history.data).map(([u, points]) => [u, chartPoints(points)])), [history.data]);
   const optionAsset = useCallback((seriesId: string) => intentsAssetId(config.optionsId, seriesId), [config.optionsId]);
   const assets = useMemo(
     () => [config.quoteAsset, ...(listing?.series.map((s) => optionAsset(s.id)) ?? [])],

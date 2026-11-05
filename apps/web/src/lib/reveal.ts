@@ -4,52 +4,56 @@ import { winningAt } from "./grid.ts";
 import { type SeriesStatus, type SettlementView, seriesStatus } from "./status.ts";
 
 const MINUTES = TWAP_WINDOW_SEC / 60;
+const MIN_MINUTES = 25;
 const KEEP_SEC = 3 * 3_600;
 const TOO_CLOSE_BPS = 10n;
 
 export type Phase = Exclude<SeriesStatus, "active">;
 export type Verdict = "win" | "lose" | "close";
 
+export interface Closing {
+  expiry: number;
+  phase: Phase;
+  settlement: SettlementView | null;
+}
+
 export const PHASE_TITLES: Record<Phase, string> = { close_only: "Final round", awaiting_price: "Ended", proposed: "Ended", final: "Result" };
 export const isEstimate = (phase: Phase) => phase === "close_only" || phase === "awaiting_price";
 
-export function averageEstimate(history: PricePoint[], expiry: number, nowMs: number, spot: number): number {
+export function averageEstimate(history: PricePoint[], expiry: number, nowMs: number, spot: number): number | undefined {
   const done = twapPoints(history, expiry, nowMs);
+  if (nowMs >= expiry * 1000 && done.length < MIN_MINUTES) return undefined;
   const missing = Math.max(MINUTES - done.length, 0);
   return (done.reduce((sum, price) => sum + price, 0) + missing * spot) / (done.length + missing);
 }
 
 export function phaseOf(expiry: number, settlement: SettlementView | null, nowSec: number): Phase | undefined {
-  if (nowSec < expiry - TWAP_WINDOW_SEC || nowSec >= expiry + KEEP_SEC) return undefined;
+  if (nowSec >= expiry + KEEP_SEC) return undefined;
   const status = seriesStatus(expiry, TWAP_WINDOW_SEC, settlement, nowSec);
   return status === "active" ? undefined : status;
 }
 
-export function verdictAt(series: ListedSeries, price: bigint): Verdict {
-  const strike = BigInt(series.strike);
-  const gap = price > strike ? price - strike : strike - price;
-  if (gap * 10_000n < strike * TOO_CLOSE_BPS) return "close";
-  return winningAt(series, price) ? "win" : "lose";
-}
-
-export function closingOf(expiries: number[], staked: (expiry: number) => boolean, settlementOf: (expiry: number) => SettlementView | null, nowSec: number): { expiry: number; phase: Phase } | undefined {
-  for (const expiry of [...new Set(expiries)].sort((a, b) => a - b)) {
-    const phase = phaseOf(expiry, settlementOf(expiry), nowSec);
-    if (phase === "close_only" || (phase && staked(expiry))) return { expiry, phase };
+export function closingOf(expiries: number[], staked: number[], settlementOf: (expiry: number) => SettlementView | null, nowSec: number): Closing | undefined {
+  for (const expiry of [...expiries].sort((a, b) => a - b)) {
+    const settlement = settlementOf(expiry);
+    const phase = phaseOf(expiry, settlement, nowSec);
+    if (phase === "close_only" || (phase && staked.includes(expiry))) return { expiry, phase, settlement };
   }
   return undefined;
 }
 
 export function verdictOf(series: ListedSeries, phase: Phase, price: bigint): Verdict {
-  if (isEstimate(phase)) return verdictAt(series, price);
+  const strike = BigInt(series.strike);
+  const gap = price > strike ? price - strike : strike - price;
+  if (isEstimate(phase) && gap * 10_000n < strike * TOO_CLOSE_BPS) return "close";
   return winningAt(series, price) ? "win" : "lose";
 }
 
 export function revealSays(phase: Phase, verdict: Verdict, usd: string): string {
   if (verdict === "close") return "too close to call";
-  const win = verdict === "win";
-  if (phase === "close_only") return win ? `on track to win about ${usd}` : "on track to lose";
-  if (phase === "awaiting_price") return win ? `looks like a win, about ${usd}` : "looks like a loss";
-  if (phase === "proposed") return win ? `pays ${usd} if the proposed price stands` : "pays nothing if the proposed price stands";
-  return win ? `pays ${usd}` : "lost";
+  const pays = verdict === "win";
+  if (phase === "close_only") return pays ? `on track to pay about ${usd}` : "on track to pay nothing";
+  if (phase === "awaiting_price") return pays ? `looks like it pays about ${usd}` : "looks like it pays nothing";
+  if (phase === "proposed") return pays ? `pays ${usd} if the proposed price stands` : "pays nothing if the proposed price stands";
+  return pays ? `pays ${usd}` : "lost";
 }
