@@ -17,27 +17,25 @@ interface Dot {
 
 export function HeroDots({ still }: { still: boolean }) {
   const ref = useRef<HTMLCanvasElement>(null);
+  const lineRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const canvas = ref.current;
+    const line = lineRef.current;
     const area = canvas?.parentElement;
     const ctx = canvas?.getContext("2d");
-    if (!canvas || !area || !ctx) return;
+    if (!canvas || !line || !area || !ctx) return;
     const part = still ? 0 : PART;
     let width = 0;
     let height = 0;
     let dots: Dot[] = [];
     let cursor: { x: number; y: number } | undefined;
-    let line = { x: 0, y: 0 };
     let shown = 0;
     let frame = 0;
 
     const readColors = () => {
       const style = getComputedStyle(canvas);
-      ctx.fillStyle = style.getPropertyValue("--ink");
-      // canvas reads an opaque color back as #rrggbb, so a 00 suffix makes it transparent
-      const ink = String(ctx.fillStyle);
-      return { ink, grid: style.getPropertyValue("--grid"), up: style.getPropertyValue("--up"), down: style.getPropertyValue("--down") };
+      return { grid: style.getPropertyValue("--grid"), up: style.getPropertyValue("--up"), down: style.getPropertyValue("--down") };
     };
     let colors = readColors();
 
@@ -53,7 +51,8 @@ export function HeroDots({ still }: { still: boolean }) {
       frame = 0;
       shown += ((cursor ? 1 : 0) - shown) * EASE;
       let moving = Math.abs((cursor ? 1 : 0) - shown) > 0.005;
-      if (cursor) line = cursor;
+      if (cursor) line.style.transform = `translate(${cursor.x - REACH.x}px, ${cursor.y - 1}px)`;
+      line.style.opacity = still ? "0" : String(0.9 * shown);
       ctx.clearRect(0, 0, width, height);
 
       ctx.fillStyle = colors.grid;
@@ -76,16 +75,6 @@ export function HeroDots({ still }: { still: boolean }) {
         ctx.beginPath();
         circle(dot, DOT + 1.6 * dot.strength);
         ctx.fill();
-      }
-
-      if (shown > 0.005) {
-        const fade = ctx.createLinearGradient(line.x - REACH.x, 0, line.x + REACH.x, 0);
-        fade.addColorStop(0, `${colors.ink}00`);
-        fade.addColorStop(0.5, colors.ink);
-        fade.addColorStop(1, `${colors.ink}00`);
-        ctx.globalAlpha = 0.9 * shown;
-        ctx.fillStyle = fade;
-        ctx.fillRect(line.x - REACH.x, line.y - 1, REACH.x * 2, 2);
       }
       ctx.globalAlpha = 1;
       if (moving) wake();
@@ -134,5 +123,15 @@ export function HeroDots({ still }: { still: boolean }) {
     };
   }, [still]);
 
-  return <canvas ref={ref} aria-hidden="true" className="pointer-events-none absolute inset-0 size-full" />;
+  return (
+    <>
+      <canvas ref={ref} aria-hidden="true" className="pointer-events-none absolute inset-0 size-full" />
+      <div
+        ref={lineRef}
+        aria-hidden="true"
+        className="pointer-events-none absolute top-0 left-0 h-0.5 bg-linear-to-r from-transparent via-ink to-transparent opacity-0"
+        style={{ width: REACH.x * 2 }}
+      />
+    </>
+  );
 }

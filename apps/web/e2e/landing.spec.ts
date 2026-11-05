@@ -31,19 +31,22 @@ async function pixels(page: Page, x: number, y: number, width: number, height: n
     );
 }
 
-async function tints(page: Page, x: number, y: number) {
-  const tint = (data: number[]) => {
-    let up = 0;
-    let down = 0;
-    for (let i = 0; i < data.length; i += 4) {
-      const [r = 0, g = 0, , a = 0] = data.slice(i, i + 4);
-      if (a > 64 && g - r > 60) up++;
-      if (a > 64 && r - g > 60) down++;
-    }
-    return up && down ? "mixed" : up ? "up" : down ? "down" : "none";
-  };
-  return { above: tint(await pixels(page, x - 30, y - 30, 60, 24)), below: tint(await pixels(page, x - 30, y + 6, 60, 24)) };
+function tintOf(data: number[]) {
+  let up = 0;
+  let down = 0;
+  for (let i = 0; i < data.length; i += 4) {
+    const [r = 0, g = 0, , a = 0] = data.slice(i, i + 4);
+    if (a > 64 && g - r > 60) up++;
+    if (a > 64 && r - g > 60) down++;
+  }
+  return up && down ? "mixed" : up ? "up" : down ? "down" : "none";
 }
+
+async function tints(page: Page, x: number, y: number) {
+  return { above: tintOf(await pixels(page, x - 30, y - 30, 60, 24)), below: tintOf(await pixels(page, x - 30, y + 6, 60, 24)) };
+}
+
+const cursorLineOpacity = (page: Page) => hero(page).locator("canvas + div").evaluate((line) => Number(getComputedStyle(line).opacity));
 
 test.beforeEach(async ({ page }) => {
   await page.goto("/");
@@ -179,19 +182,7 @@ test("every funding chain shows a loaded logo", async ({ page }) => {
   }
 });
 
-test("hero dots turn Up above the cursor and Down below it, and fade when it leaves", async ({ page }) => {
-  test.skip(test.info().project.use.isMobile === true, "needs a hovering pointer");
-  const spot = { x: 40, y: 320 };
-  expect(await tints(page, spot.x, spot.y)).toEqual({ above: "none", below: "none" });
-  await page.mouse.move(spot.x, spot.y);
-  await expect.poll(() => tints(page, spot.x, spot.y)).toEqual({ above: "up", below: "down" });
-  const nav = await page.getByRole("navigation", { name: "Main" }).boundingBox();
-  if (!nav) throw new Error("no nav");
-  await page.mouse.move(nav.x + nav.width / 2, nav.y + nav.height / 2);
-  await expect.poll(() => tints(page, spot.x, spot.y)).toEqual({ above: "none", below: "none" });
-});
-
-test("hero dots stop drawing once they settle and repaint when the theme changes", async ({ page }) => {
+test("hero dots split Up and Down around the cursor, fade when it leaves, then idle and follow the theme", async ({ page }) => {
   test.skip(test.info().project.use.isMobile === true, "needs a hovering pointer");
   const canvas = hero(page).locator("canvas");
   await canvas.evaluate((element: HTMLCanvasElement) => {
@@ -208,8 +199,10 @@ test("hero dots stop drawing once they settle and repaint when the theme changes
     return Number(await canvas.getAttribute("data-draws")) - before;
   };
   const spot = { x: 40, y: 320 };
+  expect(await tints(page, spot.x, spot.y)).toEqual({ above: "none", below: "none" });
   await page.mouse.move(spot.x, spot.y);
   await expect.poll(() => tints(page, spot.x, spot.y)).toEqual({ above: "up", below: "down" });
+  await expect.poll(() => cursorLineOpacity(page)).toBeGreaterThan(0.8);
   await expect.poll(drawsWhileWaiting).toBe(0);
 
   const nav = page.getByRole("navigation", { name: "Main" });
@@ -217,6 +210,7 @@ test("hero dots stop drawing once they settle and repaint when the theme changes
   if (!box) throw new Error("no nav");
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
   await expect.poll(() => tints(page, spot.x, spot.y)).toEqual({ above: "none", below: "none" });
+  await expect.poll(() => cursorLineOpacity(page)).toBeLessThan(0.01);
   await expect.poll(drawsWhileWaiting).toBe(0);
 
   const dark = test.info().project.use.colorScheme === "dark";
@@ -243,6 +237,16 @@ test("touch leaves the hero dots alone", async ({ page, context }) => {
   await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x, y }] });
   for (let i = 1; i <= 10; i++) await cdp.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [{ x, y: y - i * 12 }] });
   await page.waitForTimeout(500);
-  expect(await tints(page, x, y - 120)).toEqual({ above: "none", below: "none" });
+  expect(tintOf(await pixels(page, x - 150, y - 270, 300, 300))).toBe("none");
   await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+});
+
+test("with reduced motion the hero dots still color but the cursor line stays hidden", async ({ page }) => {
+  test.skip(test.info().project.use.isMobile === true, "needs a hovering pointer");
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.reload();
+  await settle(handleOf(page));
+  await page.mouse.move(40, 320);
+  await expect.poll(() => tints(page, 40, 320)).toEqual({ above: "up", below: "down" });
+  expect(await cursorLineOpacity(page)).toBe(0);
 });
