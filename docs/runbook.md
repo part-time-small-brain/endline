@@ -7,12 +7,13 @@ The hosted testnet stack: what's running, how to deploy, and what to do when an 
 | What | Where |
 |---|---|
 | Server | A Docker host (Docker Desktop on Windows, PowerShell) reached over SSH: `ssh <server>` |
-| Compose dir | `<deploy-dir>` on the server (`compose.yaml`, `.env`). Run every server command below from here: `cd <deploy-dir>` |
+| Compose dir | `deploy` in the server's clone of this repo, `<repo-dir>` (`compose.yaml`, `.env`). Run every server command below from here: `cd <repo-dir>\deploy` |
+| Deploys | Scheduled task `endline-autodeploy` deploys `main` every 5 min ([below](#deploy)). Log: `endline-deploy.log` next to `<repo-dir>` |
 | Public URLs | `api.endline.trade`: the relay, through the named tunnel. Landing, app and docs are on Cloudflare Pages, not on the server ([system.md](system.md#hosting)) |
 | Alerts | `monitor` logs, plus `ALERT_WEBHOOK_URL` when set |
 | Ids | `deploy/testnet.json`. Owner, oracle and relayer: `near-options-dev.testnet`. MM and lister: `near-options-funder-1.testnet` |
 
-From the Mac, run any server command in one go: `ssh <server> "cd <deploy-dir>; docker compose ps"`.
+From the Mac, run any server command in one go: `ssh <server> "cd <repo-dir>\deploy; docker compose ps"`.
 
 ## Status and logs
 
@@ -38,19 +39,21 @@ Name the services every time: `docker compose down` or a bare `restart` stops tr
 
 ## Deploy
 
-Build on the Mac (OrbStack); the server never builds or pulls. Images go over as tarballs.
+Merge to `main`; the server deploys itself. Every 5 min the scheduled task `endline-autodeploy` runs `deploy/autodeploy.ps1`: it fetches `main`, and if `main` moved past the clone's `deployed` tag and anything outside `apps/web`, `apps/docs`, `docs/` and Markdown changed, it builds the images on the server and runs `docker compose up -d --remove-orphans`, which recreates only the services whose image or config changed. The tag moves only after a deploy succeeds.
 
-```bash
-docker compose -f deploy/compose.yaml --env-file deploy/env.example build
-docker save --platform linux/amd64 near-options-app near-options-web | ssh <server> docker load
-scp deploy/compose.yaml <server>:<deploy-dir>/   # only if it changed
-ssh <server> "cd <deploy-dir>; docker compose up -d --no-build --pull never relay mm lister monitor proposer web"
-```
+| Task | Command |
+|---|---|
+| Last deploys | `Get-Content <repo-dir>\..\endline-deploy.log -Tail 10` |
+| Deploy now | `schtasks /Run /TN endline-autodeploy` |
+| Redeploy the same commit | `git -C <repo-dir> tag -d deployed`, then `schtasks /Run /TN endline-autodeploy` |
+| A deploy failed | The log says `FAILED` and why, and every run retries until it works or a fix lands on `main` |
 
-- The landing, app and docs deploy themselves: Cloudflare Pages builds `main` on every merge ([system.md](system.md#hosting)). Their testnet ids live in the `endline-web` project's env, not in an image.
-- `near-options-web` is Caddy with the `Caddyfile` baked in: a change to the relay's public routes ships with that image. No secrets go into an image.
+- The task runs in the logged-in user's session (`schtasks … /IT`): Docker Desktop's credential helper only works there, so a build over plain SSH can't pull the base images. Run builds through the task, not over SSH.
+- Every deploy that changes the `endline-app` image restarts relay, mm, lister, monitor and proposer: quotes in flight fail and need a new quote; trades that settled stay on-chain.
+- Setup, once per server: a read-only deploy key (`ssh-keygen -t ed25519 -N '""' -f $HOME\.ssh\endline_deploy`, public half added to the repo's deploy keys); `git clone -c core.sshCommand="ssh -i ~/.ssh/endline_deploy -o IdentitiesOnly=yes" git@github.com:part-time-small-brain/endline.git <repo-dir>`; `.env` into `deploy/`; then `schtasks /Create /TN endline-autodeploy /SC MINUTE /MO 5 /IT /TR "conhost.exe --headless powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"<repo-dir>\deploy\autodeploy.ps1\""`. The first run deploys, since there is no `deployed` tag yet.
+- The landing, app and docs deploy themselves: the `endline-web` and `endline-docs` Pages projects build `main` on every merge ([system.md](system.md#hosting)). Their testnet ids live in the `endline-web` project's env, not in an image.
+- The `endline-web` image is Caddy with the `Caddyfile` baked in: a change to the relay's public routes ships with that image. No secrets go into an image.
 - `.env` lives only on the server. Edit it there; never copy it.
-- App containers run as the `node` user. A `relay-data` volume created before that is owned by root: once, before the first deploy that switches, run `docker compose run --rm --no-deps --user root --entrypoint chown relay -R node:node /data` on the server.
 - Base images are pinned by tag and digest (`deploy/Dockerfile`, `compose.yaml`) and wasmtime by `WASMTIME` and `WASMTIME_SHA256`. To bump, take the new tag's digest from `docker buildx imagetools inspect <image>:<tag>` and the tarball's `sha256sum`.
 - Restarting `relay` or `mm` may fire `uptime` or `quotes` once if a check lands in the gap: it resolves on the next check.
 
