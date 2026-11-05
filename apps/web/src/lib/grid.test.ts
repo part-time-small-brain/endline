@@ -62,6 +62,10 @@ describe("tap grid", () => {
     const both = new Set([call, put]);
     expect(buildGrid(series, 80_000n * USD, 25n * USD, marked(series), both).cells[1]?.[0]).toMatchObject({ series: series[1], winning: true });
     expect(buildGrid(series, 82_000n * USD, 25n * USD, marked(series), both).cells[1]?.[0]).toMatchObject({ series: series[0], winning: true });
+    const closingAt = (price: bigint) => buildGrid(series, 80_000n * USD, 25n * USD, marked(series), both, () => price).cells[1]?.[0]?.series;
+    expect(closingAt(82_500n * USD)).toBe(series[0]);
+    expect(closingAt(80_500n * USD)).toBe(series[1]);
+    expect(closingAt(81_000n * USD)).toBe(series[0]);
   });
 
   it("shows the gross multiple rounded down, and none for a stake below one contract or a series without a mark", () => {

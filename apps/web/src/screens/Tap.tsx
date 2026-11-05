@@ -1,4 +1,4 @@
-import { type Call, callMultiple, callPoints, FREE_CALLS_PER_ROUND, longPayout, roundOf, termsOf, TWAP_WINDOW_SEC } from "@endline/sdk";
+import { callMultiple, FREE_CALLS_PER_ROUND, roundOf, termsOf, TWAP_WINDOW_SEC } from "@endline/sdk";
 import { useState } from "react";
 import { settlementKey } from "../app/data.tsx";
 import type { useTicket } from "../app/useTicket.ts";
@@ -17,8 +17,8 @@ import { useTaps } from "../hooks/useTaps.ts";
 import { PriceLine } from "../components/tap/PriceLine.tsx";
 import { AssetPicker } from "../components/trade/AssetPicker.tsx";
 import { MarketStats } from "../components/trade/MarketStats.tsx";
-import { buildGrid, type GridCell, rowOf, winningAt } from "../lib/grid.ts";
-import { averageEstimate, callVerdict, closingOf, isEstimate, type Phase, PHASE_TITLES, pointsSays, revealSays, verdictOf } from "../lib/reveal.ts";
+import { buildGrid, type GridCell, rowOf } from "../lib/grid.ts";
+import { averageEstimate, closingOf, PHASE_TITLES } from "../lib/reveal.ts";
 import { formatMultiple, formatPct, formatPrice, formatUsd, toNumber, toUnits } from "../lib/money.ts";
 import { seriesTitle } from "../lib/labels.ts";
 import { dayLabel, formatClock, formatUtc } from "../lib/time.ts";
@@ -78,31 +78,23 @@ export function Tap({ state, nowSec, views, onConnect, onAddFunds, onQuote }: Pr
   const here = data.listing?.series.filter((s) => s.underlying === symbol) ?? [];
   const nextRound = (data.listing?.series ?? []).filter((s) => s.quotable && nowSec < s.expiry - TWAP_WINDOW_SEC).map((s) => roundOf(s.expiry)).sort()[0];
   const left = FREE_CALLS_PER_ROUND - (data.calls ?? []).filter((c) => roundOf(c.terms.expiry) === nextRound).length;
-  const myCalls = (data.calls ?? []).filter((c) => c.terms.underlying === symbol);
-  const calledHere = new Map(myCalls.map((c) => [c.series_id, c]));
+  const calledHere = new Map((data.calls ?? []).filter((c) => c.terms.underlying === symbol).map((c) => [c.series_id, c]));
   const settlementOf = (expiry: number) => data.settlements[settlementKey({ underlying: symbol, expiry })] ?? null;
-  const staking = (expiry: number) => yours.some((v) => v.series.expiry === expiry) || myCalls.some((c) => c.terms.expiry === expiry);
-  const closing = closingOf([...here, ...yours.map((v) => v.series)].map((s) => s.expiry), staking, settlementOf, nowSec);
+  const closing = closingOf(here.map((s) => s.expiry), [...yours.map((v) => v.series.expiry), ...[...calledHere.values()].map((c) => c.terms.expiry)], settlementOf, nowSec);
   const stakes = closing ? yours.filter((v) => v.series.expiry === closing.expiry) : [];
-  const closingCalls = closing ? myCalls.filter((c) => c.terms.expiry === closing.expiry) : [];
-  const settlement = closing ? settlementOf(closing.expiry) : null;
+  const closingCalls = [...calledHere.values()].filter((c) => c.terms.expiry === closing?.expiry);
   const average = closing && spotNumber !== undefined ? averageEstimate(data.minutes?.[symbol] ?? [], closing.expiry, nowSec * 1000, spotNumber) : undefined;
-  const closingPrice = settlement?.price ?? (average === undefined ? undefined : toUnits(average, quoteDecimals));
+  const closingPrice = closing?.settlement?.price ?? (average === undefined ? undefined : toUnits(average, quoteDecimals));
   const active = yours.filter((v) => v.status === "active");
-  const open = active.filter((v) => v.series.expiry !== closing?.expiry);
   const mine = active.filter((v) => v.tap);
-  const bothSides = (v: PositionView) => stakes.some((o) => o.series.strike === v.series.strike && o.series.kind !== v.series.kind);
-  const shownStakes = stakes.filter((v) => !bothSides(v) || (closingPrice !== undefined && winningAt(v.series, closingPrice)));
-  const owned = new Set([...open, ...shownStakes].map((v) => v.series.id));
-  const calledSeries = here.filter((s) => calledHere.has(s.id) && (s.expiry === closing?.expiry || roundOf(s.expiry) === nextRound));
-  const held = new Set([...owned, ...calledSeries.map((s) => s.id)]);
-  const listed = [
-    ...priced.filter((s) => s.underlying === symbol && s.expiry !== closing?.expiry && !held.has(s.id)),
-    ...here.filter((s) => s.expiry === closing?.expiry && !held.has(s.id)),
-    ...[...open, ...shownStakes].map((v) => v.series),
-    ...calledSeries,
-  ];
-  const grid = spot === undefined ? undefined : buildGrid(listed, spot, budget, data.marks, held);
+  const kept = yours.filter((v) => v.status === "active" || v.series.expiry === closing?.expiry);
+  const owned = new Set(kept.map((v) => v.series.id));
+  const called = here.filter((s) => calledHere.has(s.id) && (s.expiry === closing?.expiry || roundOf(s.expiry) === nextRound));
+  const held = new Set([...owned, ...called.map((s) => s.id)]);
+  const open = priced.filter((s) => s.underlying === symbol && s.expiry !== closing?.expiry && !held.has(s.id));
+  const rowsElsewhere = new Set([...open, ...kept.map((v) => v.series), ...called].map((s) => s.strike));
+  const listed = [...open, ...here.filter((s) => s.expiry === closing?.expiry && !held.has(s.id) && rowsElsewhere.has(s.strike)), ...kept.map((v) => v.series), ...called];
+  const grid = spot === undefined ? undefined : buildGrid(listed, spot, budget, data.marks, held, (expiry) => (expiry === closing?.expiry ? (closingPrice ?? spot) : spot));
   const closingColumn = closing && grid ? grid.expiries.indexOf(closing.expiry) : -1;
   const staked = (seriesId: string) => stakes.filter((v) => v.series.id === seriesId).reduce((total, v) => total + v.amount, 0n);
   const rows = grid?.strikes.length ?? 0;
@@ -112,23 +104,18 @@ export function Tap({ state, nowSec, views, onConnect, onAddFunds, onQuote }: Pr
     const up = cell.series.kind === "call";
     return `${up ? "Up" : "Down"} · ${symbol} ends ${up ? "above" : "below"} ${formatPrice(strike, quoteDecimals)}`;
   };
-  const reveal = (cell: GridCell, strike: bigint, phase: Phase, price: bigint, amount: bigint) => {
-    const verdict = verdictOf(cell.series, phase, price);
-    const usd = formatUsd(longPayout(termsOf(cell.series), amount, price), quoteDecimals);
-    return { kind: cell.series.kind, verdict, amount: `${isEstimate(phase) ? "≈ " : ""}${usd}`, label: `${where(cell, strike)} · ${PHASE_TITLES[phase].toLowerCase()} · ${revealSays(phase, verdict, usd)} · you hold this` };
+  const freeMultiple = (cell: GridCell) => {
+    const ask = calledHere.get(cell.series.id)?.ask ?? data.marks?.[cell.series.id]?.ask;
+    return ask === undefined ? undefined : callMultiple(termsOf(cell.series), BigInt(ask));
   };
-  const revealCall = (cell: GridCell, strike: bigint, phase: Phase, price: bigint, call: Call) => {
-    const points = callPoints(termsOf(call.terms), BigInt(call.ask), price);
-    const verdict = callVerdict(cell.series, phase, price, points);
-    const pts = `${points > 0 ? "+" : ""}${points} pts`;
-    return { kind: cell.series.kind, verdict, amount: `${isEstimate(phase) ? "≈ " : ""}${pts}`, label: `${where(cell, strike)} · ${PHASE_TITLES[phase].toLowerCase()} · free call · ${pointsSays(phase, verdict, pts)}` };
-  };
+  const shownMultiple = (cell: GridCell) => (free || (calledHere.has(cell.series.id) && !owned.has(cell.series.id)) ? freeMultiple(cell) : cell.multiple);
   const label = (cell: GridCell, strike: bigint, expiry: number, own: Holding | undefined) => {
-    const pays = cell.multiple === undefined ? "no price right now" : `pays up to ${formatMultiple(cell.multiple)}`;
+    const multiple = shownMultiple(cell);
+    const pays = multiple === undefined ? "no price right now" : `pays up to ${formatMultiple(multiple)}`;
     const worth = own?.value === undefined ? "" : ` · worth ${formatUsd(own.value, quoteDecimals)}`;
     const pnl = own?.pnl === undefined ? "" : own.pnl > 0n ? ` · up ${formatUsd(own.pnl, quoteDecimals)}` : own.pnl < 0n ? ` · down ${formatUsd(-own.pnl, quoteDecimals)}` : " · even";
-    const mine = owned.has(cell.series.id) ? " · you hold this" : calledHere.has(cell.series.id) ? " · you called this" : "";
-    return `${where(cell, strike)} · ${dayLabel(expiry, nowSec)} ${formatClock(expiry)} · ${pays}${worth}${pnl}${cell.winning ? " · winning now" : ""}${mine}`;
+    const yoursHere = owned.has(cell.series.id) ? " · you hold this" : calledHere.has(cell.series.id) ? " · you called this" : "";
+    return `${where(cell, strike)} · ${dayLabel(expiry, nowSec)} ${formatClock(expiry)} · ${pays}${worth}${pnl}${cell.winning ? " · winning now" : ""}${yoursHere}`;
   };
 
   return (
@@ -180,21 +167,27 @@ export function Tap({ state, nowSec, views, onConnect, onAddFunds, onQuote }: Pr
                     )}
                     {grid.cells[r]?.map((cell, c) => {
                       const expiry = grid.expiries[c] ?? 0;
-                      if (c === closingColumn && closing) {
+                      if (closing && expiry === closing.expiry) {
                         return (
                           <td key={cell?.series.id ?? expiry} className="h-[var(--row)] p-0.5">
-                            {cell && closingPrice !== undefined && staked(cell.series.id) > 0n ? (
-                              <RevealCell {...reveal(cell, strike, closing.phase, closingPrice, staked(cell.series.id))} />
-                            ) : cell && closingPrice !== undefined && calledHere.has(cell.series.id) ? (
-                              <RevealCell {...revealCall(cell, strike, closing.phase, closingPrice, calledHere.get(cell.series.id)!)} />
+                            {cell && (owned.has(cell.series.id) || calledHere.has(cell.series.id)) ? (
+                              <RevealCell
+                                series={cell.series}
+                                phase={closing.phase}
+                                price={closingPrice}
+                                amount={staked(cell.series.id)}
+                                call={owned.has(cell.series.id) ? undefined : calledHere.get(cell.series.id)}
+                                where={where(cell, strike)}
+                                quoteDecimals={quoteDecimals}
+                              />
                             ) : (
                               <span className="block size-full rounded-md border border-rule/40" aria-hidden="true" />
                             )}
                           </td>
                         );
                       }
-                      const own = cell && owned.has(cell.series.id) ? holding(open, cell.series.id) : undefined;
-                      const call = cell && calledHere.get(cell.series.id);
+                      const own = cell && owned.has(cell.series.id) ? holding(active, cell.series.id) : undefined;
+                      const multiple = cell && shownMultiple(cell);
                       return (
                         <td key={cell?.series.id ?? expiry} className="h-[var(--row)] p-0.5">
                           <Cell
@@ -202,8 +195,9 @@ export function Tap({ state, nowSec, views, onConnect, onAddFunds, onQuote }: Pr
                             label={cell ? label(cell, strike, expiry, own) : ""}
                             value={formatMoney(own?.value)}
                             change={own?.change}
-                            called={call && !own ? formatMultiple(callMultiple(termsOf(call.terms), BigInt(call.ask))) : undefined}
-                            blocked={free && (roundOf(expiry) !== nextRound || call !== undefined)}
+                            called={cell !== undefined && calledHere.has(cell.series.id) && !own}
+                            pays={multiple === undefined ? undefined : formatMultiple(multiple)}
+                            blocked={free && (roundOf(expiry) !== nextRound || (cell !== undefined && calledHere.has(cell.series.id)))}
                             state={cell && (free ? calls.states : taps.states)[cell.series.id]}
                             onTap={onTap}
                           />
@@ -236,7 +230,7 @@ export function Tap({ state, nowSec, views, onConnect, onAddFunds, onQuote }: Pr
             {spot !== undefined && !loading ? "No prices right now" : empty}
           </p>
         )}
-        {closing && closingPrice !== undefined && <RevealNote phase={closing.phase} price={closingPrice} settlement={settlement} stakes={stakes} calls={closingCalls} quoteDecimals={quoteDecimals} />}
+        {closing && <RevealNote closing={closing} price={closingPrice} stakes={stakes} calls={closingCalls} quoteDecimals={quoteDecimals} />}
         <p role="status" className={`min-h-5 px-1 pt-2 text-sm ${unlockError || (free ? calls : taps).notice?.failed ? "text-danger" : "text-ink-2"}`}>
           {unlockError ?? (free ? calls : taps).notice?.text}
         </p>

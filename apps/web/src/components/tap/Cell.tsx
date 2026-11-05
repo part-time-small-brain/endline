@@ -25,13 +25,14 @@ interface Props {
   label: string;
   value: string | undefined;
   change: number | undefined;
-  called: string | undefined;
+  called: boolean;
+  pays: string | undefined;
   blocked: boolean;
   state: TapState | undefined;
   onTap: (cell: GridCell) => void;
 }
 
-export function Cell({ cell, label, value, change, called, blocked, state, onTap }: Props) {
+export function Cell({ cell, label, value, change, called, pays: shown, blocked, state, onTap }: Props) {
   const winning = cell?.winning ?? false;
   const last = useRef(winning);
   const [flips, setFlips] = useState(0);
@@ -43,9 +44,9 @@ export function Cell({ cell, label, value, change, called, blocked, state, onTap
 
   if (!cell) return <span className="block size-full rounded-md border border-rule/60" aria-hidden="true" />;
   const { series, multiple, held } = cell;
-  const pays = multiple === undefined ? "—" : formatMultiple(multiple);
+  const pays = shown ?? (multiple === undefined ? "—" : formatMultiple(multiple));
   const pct = change === undefined ? undefined : Math.round(change * 100);
-  const text = pct === undefined ? (called ?? pays) : `${pct > 0 ? "+" : ""}${pct}%`;
+  const text = pct === undefined ? pays : `${pct > 0 ? "+" : ""}${pct}%`;
   const look = LOOK[series.kind][winning ? "winning" : held ? "held" : "open"];
   return (
     <m.button
@@ -68,7 +69,7 @@ export function Cell({ cell, label, value, change, called, blocked, state, onTap
       )}
       {value !== undefined ? (
         <span className="text-[0.6875rem] leading-none font-semibold">{value}</span>
-      ) : called !== undefined ? (
+      ) : called ? (
         <span className="text-[0.5625rem] leading-none font-semibold tracking-[0.1em] uppercase">Called</span>
       ) : (
         <SideGlyph kind={series.kind} size={14} />

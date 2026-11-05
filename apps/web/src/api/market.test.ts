@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { deribitMarket } from "./market.ts";
+import { chartPoints, deribitMarket } from "./market.ts";
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -11,6 +11,16 @@ const serve = (body: (url: string) => unknown) => {
   vi.stubGlobal("fetch", fetch);
   return fetch;
 };
+
+describe("chartPoints", () => {
+  it("keeps a point every 5 minutes and always the latest, whatever the spacing it gets", () => {
+    const minutes = Array.from({ length: 12 }, (_, i): [number, number] => [i * 60_000, 80_000 + i]);
+    expect(chartPoints(minutes).map(([t]) => t / 60_000)).toEqual([0, 5, 10, 11]);
+    const fives = Array.from({ length: 4 }, (_, i): [number, number] => [i * 300_000, 80_000 + i]);
+    expect(chartPoints(fives)).toEqual(fives);
+    expect(chartPoints([])).toEqual([]);
+  });
+});
 
 describe("history", () => {
   it("keeps every minute, since the final-round average needs them, asking for the right index", async () => {

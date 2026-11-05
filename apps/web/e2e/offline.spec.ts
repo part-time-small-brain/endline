@@ -1,4 +1,4 @@
-import { type Mark, toSign, type QuoteRequest, type StatusUpdate } from "@endline/sdk";
+import { listedWidth, type Mark, seriesId, toSign, type QuoteRequest, type StatusUpdate } from "@endline/sdk";
 import type { Page, Route } from "@playwright/test";
 import { expect, handleOf, money, term, test } from "./fixtures.ts";
 
@@ -696,7 +696,18 @@ test.describe("Tap", () => {
     await page.route("**/fills/*", (route) =>
       route.fulfill({ json: [{ quote_id: "q", series_id: "BTC-5NOV26-81000_83000-C", side: "buy", account_id: "0x1111111111111111111111111111111111111111", size: "2000000", premium: String(5 * USD), tx_hash: "tx", at_ms: NOW_MS - 3_600_000 }] }),
     );
-    await live(page, () => [{ series_id: "BTC-5NOV26-81000_83000-C", ask: String(400 * USD), bid: String(380 * USD), vol: 0.4 }], () => world.index);
+    await live(
+      page,
+      () => [
+        { series_id: "BTC-5NOV26-81000_83000-C", ask: String(400 * USD), bid: String(380 * USD), vol: 0.4 },
+        { series_id: "BTC-6NOV26-82000_84000-C", ask: String(400 * USD), vol: 0.4 },
+      ],
+      () => world.index,
+    );
+    const junkStrike = 500_000n * BigInt(USD);
+    const junkWidth = listedWidth(junkStrike, 6);
+    const junk = { ...listed[0]!, id: seriesId({ underlying: "BTC", expiry, strike: junkStrike, width: junkWidth, quoteDecimals: 6, kind: "call" }), strike: String(junkStrike), width: String(junkWidth), kind: "call" as const };
+    await page.route("**/series", (route) => route.fulfill({ json: { quote_asset: "nep141:usdc.demo.testnet", quote_decimals: 6, series: [...listed, junk] } }));
     await page.route("https://www.deribit.com/**", (route) =>
       route.fulfill({
         json: route.request().url().includes("chart")
@@ -718,15 +729,17 @@ test.describe("Tap", () => {
   }
 
   test("a held bet keeps its column through the final round, then shows the estimate, the proposed price, the result and a card to share", async ({ page }) => {
+    await page.addInitScript(() => Object.assign(navigator, { canShare: undefined }));
     const { expiry, world, until } = await heldThroughTheEnd(page);
     const group = (name: RegExp) => page.getByRole("table").getByRole("group", { name });
     await until(expiry - 29 * 60);
-    await expect(group(/^Up · BTC ends above \$81,000 · final round · on track to win about \$10\.00 · you hold this$/)).toBeVisible();
+    await expect(group(/^Up · BTC ends above \$81,000 · final round · on track to pay about \$10\.00 · you hold this$/)).toBeVisible();
     await expect(page.getByRole("columnheader", { name: /^Final round/ })).toBeVisible();
+    await expect(page.getByRole("table").getByRole("rowheader")).toHaveText([/^\$82,000/, /^\$81,000/]);
     await expect(page.getByText("Final round · average so far ≈ $81,500. Estimate from Deribit's index; the final price is the median of 7 exchanges.")).toBeVisible();
-    await expect(page.getByRole("table").getByRole("button", { name: /\$81,000 · Tomorrow/ })).toHaveCount(0);
+    await expect(page.getByRole("table").getByRole("button", { name: /^Up · BTC ends above \$81,000 · / })).toHaveCount(0);
     await until(expiry + 60);
-    await expect(group(/· ended · looks like a win, about \$10\.00 · you hold this$/)).toBeVisible();
+    await expect(group(/· ended · looks like it pays about \$10\.00 · you hold this$/)).toBeVisible();
     world.settlement = { price: String(81_400 * USD), final_at: expiry + 3_900 };
     await page.clock.fastForward(15_000);
     await expect(group(/· ended · pays \$8\.00 if the proposed price stands · you hold this$/)).toBeVisible();
@@ -741,6 +754,7 @@ test.describe("Tap", () => {
     const bytes = await (await import("node:fs/promises")).readFile(await file.path());
     expect([...bytes.subarray(0, 4)]).toEqual([0x89, 0x50, 0x4e, 0x47]);
     await until(expiry + 3 * 3_600);
+    await expect(page.getByRole("table").getByRole("button", { name: /^Up · BTC ends above \$82,000 · / })).toBeVisible();
     await expect(page.getByRole("table").getByRole("group")).toHaveCount(0);
     await expect(page.getByRole("columnheader", { name: /^(Final round|Ended|Result)/ })).toHaveCount(0);
   });
@@ -765,7 +779,7 @@ test.describe("Tap", () => {
     const { expiry, world, until } = await heldThroughTheEnd(page);
     world.index = 80_000;
     await until(expiry - 10 * 60);
-    await expect(page.getByRole("table").getByRole("group", { name: /· final round · on track to lose · you hold this$/ })).toBeVisible();
+    await expect(page.getByRole("table").getByRole("group", { name: /· final round · on track to pay nothing · you hold this$/ })).toBeVisible();
     world.settlement = { price: String(80_000 * USD), final_at: expiry + 3_900 };
     await until(expiry + 3_900);
     await expect(page.getByRole("table").getByRole("group", { name: /· result · lost · you hold this$/ })).toBeVisible();

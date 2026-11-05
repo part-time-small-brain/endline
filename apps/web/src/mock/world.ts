@@ -96,5 +96,5 @@ export function createWorld() {
   }
   const spot: Record<Underlying, number> = { BTC: UNDERLYINGS.BTC.spot, ETH: UNDERLYINGS.ETH.spot };
   const history: Record<Underlying, PricePoint[]> = { BTC: walk(spot.BTC, UNDERLYINGS.BTC.vol, now), ETH: walk(spot.ETH, UNDERLYINGS.ETH.vol, now) };
-  return { series, settlements, holdings, spot, history };
+  return { series, settlements, holdings, spot, history, start: now };
 }

@@ -153,9 +153,12 @@ test("a bought cell rides into its column's final round, read-only, with the ave
   await page.getByRole("radio", { name: "$10", exact: true }).click();
   await cells(page).filter({ hasText: /^[1-9]\.\d×$/ }).and(page.getByRole("button", { name: / · Tomorrow / })).first().click();
   await expect(page.getByRole("status").filter({ hasText: /^Bought BTC (Up|Down) \$[\d,]+ for \$/ })).toBeVisible({ timeout: 10_000 });
-  await page.clock.fastForward("19:31:00");
+  const now = await page.evaluate(() => Date.now());
+  const day = 86_400_000;
+  const expiry = Math.floor((now + 1_800_000 - 8 * 3_600_000) / day) * day + 8 * 3_600_000 + day;
+  await page.clock.fastForward(expiry - 29 * 60_000 - now);
   await expect(page.getByText(/^Final round · average so far ≈ \$[\d,]+\. /)).toBeVisible();
-  await expect(grid(page).getByRole("group", { name: /· final round · (on track to win about \$[\d,.]+|on track to lose|too close to call) · you hold this$/ })).toBeVisible();
+  await expect(grid(page).getByRole("group", { name: /· final round · (on track to pay about \$[\d,.]+|on track to pay nothing|too close to call) · you hold this$/ })).toBeVisible();
   await expect(grid(page).getByRole("button", { name: / · Today / })).toHaveCount(0);
 });
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { defaultExpiry, isListed, listedWidth, TWAP_WINDOW_SEC, twapPoints } from "./series.ts";
+import { defaultExpiry, isListed, listedWidth, twapPoints } from "./series.ts";
 
 const USD = 1_000_000n;
 
@@ -33,7 +33,6 @@ describe("twapPoints", () => {
     const expiry = 1_800_000_000;
     const minute = (offset: number): [number, number] => [(expiry + offset * 60) * 1000, 80_000 + offset];
     const points = [minute(-31), minute(-30), minute(-29), minute(-1), minute(0), minute(1)];
-    expect(TWAP_WINDOW_SEC).toBe(1_800);
     expect(twapPoints(points, expiry)).toEqual([79_971, 79_999, 80_000]);
     expect(twapPoints(points, expiry, (expiry - 60) * 1000 - 1)).toEqual([79_971]);
     expect(twapPoints(points, expiry, (expiry - 60) * 1000)).toEqual([79_971, 79_999]);
