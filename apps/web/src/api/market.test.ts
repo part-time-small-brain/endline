@@ -19,6 +19,8 @@ describe("chartPoints", () => {
     const fives = Array.from({ length: 4 }, (_, i): [number, number] => [i * 300_000, 80_000 + i]);
     expect(chartPoints(fives)).toEqual(fives);
     expect(chartPoints([])).toEqual([]);
+    const later = minutes.map(([t, p]): [number, number] => [t + 60_000, p]);
+    expect(chartPoints(later).map(([t]) => t / 60_000)).toEqual([1, 5, 10, 12]);
   });
 });
 

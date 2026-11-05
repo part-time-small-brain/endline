@@ -50,7 +50,7 @@ function download(file: File) {
   setTimeout(() => URL.revokeObjectURL(url), KEEP_URL_MS);
 }
 
-export function ShareButton({ card }: { card: Card }) {
+export function ShareButton({ card, className }: { card: Card; className?: string }) {
   const [file, setFile] = useState<File | null>();
   const { title, result, detail, footer, text } = card;
   // drawn before the click: an await inside the click handler uses up the user activation navigator.share needs on iOS
@@ -75,7 +75,7 @@ export function ShareButton({ card }: { card: Card }) {
 
   if (file === null) return null;
   return (
-    <Button tone="ghost" disabled={!file} onClick={share}>
+    <Button tone="ghost" disabled={!file} onClick={share} className={className}>
       <ShareNetwork size={16} weight="bold" aria-hidden="true" />
       Share
     </Button>

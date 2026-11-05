@@ -76,11 +76,7 @@ export function PositionCard({ view, quoteDecimals, nowSec, onSellBack }: Props)
       </dl>
 
       <SettlementNote view={view} quoteDecimals={quoteDecimals} nowSec={nowSec} />
-      {card && (
-        <div className="mt-3">
-          <ShareButton card={card} />
-        </div>
-      )}
+      {card && <ShareButton card={card} className="mt-3" />}
 
       {(view.status === "active" || view.status === "closed") && (
         <Button tone="ghost" size="lg" disabled={!sellable} onClick={() => onSellBack(view)}>
