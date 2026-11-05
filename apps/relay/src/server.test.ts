@@ -7,6 +7,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { WebSocket } from "ws";
 import { Auctions } from "./auction.ts";
 import { checkBid } from "./bid.ts";
+import { Calls } from "./calls.ts";
 import { Claims } from "./claims.ts";
 import { Collector } from "./collect.ts";
 import { Faucet } from "./faucet.ts";
@@ -25,7 +26,8 @@ const hub = new MmHub([KEY], (mmId, response) => auctions.respond(mmId, response
 const relay = new Relay({ config: { INTENTS_ID: INTENTS, OPTIONS_ID: OPTIONS, QUOTE_ASSET: USDC }, chain, fills, auctions, mms: hub });
 const collector = new Collector(chain, { INTENTS_ID: INTENTS, OPTIONS_ID: OPTIONS, QUOTE_ASSET: USDC, RELAYER_ACCOUNT_ID: "relayer.test" }, new Claims(mkdtempSync(join(tmpdir(), "relay-"))), fills);
 const oneClick = new OneClick(DEPOSIT.destinationAsset, "jwt");
-const server = createRelayServer(relay, fills, hub, collector, oneClick);
+const calls = new Calls(chain, relay.sessions, () => hub.marks.best(Date.now()), mkdtempSync(join(tmpdir(), "relay-")));
+const server = createRelayServer(relay, fills, hub, collector, oneClick, calls);
 let base = "";
 const sockets: WebSocket[] = [];
 
@@ -90,7 +92,7 @@ describe("http", () => {
   });
 
   it("rate limits quote, execute, transfer and claims per IP in a fixed window", async () => {
-    const limited = createRelayServer(relay, fills, hub, collector, oneClick);
+    const limited = createRelayServer(relay, fills, hub, collector, oneClick, calls);
     await new Promise<void>((resolve) => limited.listen(0, "127.0.0.1", resolve));
     const url = `http://127.0.0.1:${(limited.address() as AddressInfo).port}`;
     const statusOf = async (path: string) => (await fetch(`${url}${path}`, { method: "POST", body: "{" })).status;
@@ -99,6 +101,7 @@ describe("http", () => {
       for (let i = 0; i < 30; i++) expect(await statusOf(paths[i % paths.length]!)).toBe(400);
       expect(await statusOf("/quote")).toBe(429);
       expect(await statusOf("/transfer")).toBe(429);
+      expect(await statusOf("/calls")).toBe(429);
       expect(await statusOf("/faucet")).toBe(429);
       expect(await statusOf("/deposit-quote")).toBe(429);
       expect(await statusOf("/publish")).toBe(400);
@@ -131,6 +134,20 @@ describe("http", () => {
     }
   });
 
+  it("serves free calls and the leaderboard, refusing bad account ids", async () => {
+    const get = async (path: string) => {
+      const response = await fetch(`http://${base}${path}`);
+      return [response.status, await response.json()];
+    };
+    expect(await get("/calls/bad!id")).toEqual([400, { error: "invalid account id" }]);
+    expect(await get("/leaderboard/bad!id")).toEqual([400, { error: "invalid account id" }]);
+    expect(await get("/calls/alice.near")).toEqual([200, []]);
+    expect(await get("/leaderboard")).toEqual([200, { round: null, today: [], week: [] }]);
+    expect(await get("/leaderboard/alice.near")).toEqual([200, { round: null, today: [], week: [], you: { today: null, week: null } }]);
+    const call = await post("/calls", JSON.stringify({ series_id: SERIES.id, signer: { standard: "nep413", signer_id: "alice.near" }, session: session("alice.near") }));
+    expect([call.status, await call.json()]).toEqual([503, { error: "no price for this cell right now" }]);
+  });
+
   it("answers 403 on /faucet when the faucet is off", async () => {
     expect((await post("/faucet", JSON.stringify({ account_id: "alice.testnet" }))).status).toBe(403);
   });
@@ -141,7 +158,7 @@ describe("http", () => {
       sent.push(accountId);
       return "tx";
     }, mkdtempSync(join(tmpdir(), "relay-")));
-    const withFaucet = createRelayServer(relay, fills, hub, collector, oneClick, faucet, true);
+    const withFaucet = createRelayServer(relay, fills, hub, collector, oneClick, calls, faucet, true);
     await new Promise<void>((resolve) => withFaucet.listen(0, "127.0.0.1", resolve));
     const at = `http://127.0.0.1:${(withFaucet.address() as AddressInfo).port}`;
     const drip = (accountId: string, ip: string, contentType = "application/json") =>
@@ -174,7 +191,7 @@ describe("http", () => {
 
   it.each(["/faucet", "/deposit-quote"])("opens %s to the listed app origins only", async (path) => {
     const app = "https://app.example.com";
-    const listed = createRelayServer(relay, fills, hub, collector, oneClick, undefined, false, new Set([app]));
+    const listed = createRelayServer(relay, fills, hub, collector, oneClick, calls, undefined, false, new Set([app]));
     await new Promise<void>((resolve) => listed.listen(0, "127.0.0.1", resolve));
     const url = `http://127.0.0.1:${(listed.address() as AddressInfo).port}${path}`;
     try {
