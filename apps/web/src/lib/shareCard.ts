@@ -23,6 +23,7 @@ interface Total {
   paid: bigint;
   received: bigint;
   payout: bigint;
+  costed: boolean;
 }
 
 const finalAt = (series: Pick<Series, "expiry">, price: bigint, quoteDecimals: number) => `Final price ${formatPrice(price, quoteDecimals)} · ${formatUtcDay(series.expiry)} ${formatUtc(series.expiry)}`;
@@ -30,11 +31,11 @@ const finalAt = (series: Pick<Series, "expiry">, price: bigint, quoteDecimals: n
 export function bestWin(stakes: Stake[], price: bigint, quoteDecimals: number): Card | undefined {
   const bySeries = new Map<string, Total>();
   for (const s of stakes) {
-    const sum = bySeries.get(s.series.id) ?? { series: s.series, paid: 0n, received: 0n, payout: 0n };
-    bySeries.set(s.series.id, { series: s.series, paid: sum.paid + s.paid, received: sum.received + s.received, payout: sum.payout + longPayout(termsOf(s.series), s.amount, price) });
+    const sum = bySeries.get(s.series.id) ?? { series: s.series, paid: 0n, received: 0n, payout: 0n, costed: true };
+    bySeries.set(s.series.id, { series: s.series, paid: sum.paid + s.paid, received: sum.received + s.received, payout: sum.payout + longPayout(termsOf(s.series), s.amount, price), costed: sum.costed && s.paid > 0n });
   }
   const profit = (s: Total) => s.payout + s.received - s.paid;
-  const best = [...bySeries.values()].filter((s) => s.paid > 0n && s.payout > 0n && profit(s) > 0n).reduce<Total | undefined>((top, s) => (!top || profit(s) > profit(top) ? s : top), undefined);
+  const best = [...bySeries.values()].filter((s) => s.costed && s.payout > 0n && profit(s) > 0n).reduce<Total | undefined>((top, s) => (!top || profit(s) > profit(top) ? s : top), undefined);
   if (!best) return undefined;
   const usd = (value: bigint, rounding?: "up") => formatUsd(value, quoteDecimals, rounding);
   const title = seriesTitle(best.series, quoteDecimals);

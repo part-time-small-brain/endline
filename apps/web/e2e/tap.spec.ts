@@ -151,7 +151,8 @@ test("a bought cell rides into its column's final round, read-only, with the ave
   await openTap(page);
   await setUpTapBalance(page);
   await page.getByRole("radio", { name: "$10", exact: true }).click();
-  await cells(page).filter({ hasText: /^[1-9]\.\d×$/ }).and(page.getByRole("button", { name: / · Tomorrow / })).first().click();
+  const first = (await page.getByRole("columnheader").nth(1).innerText()).split("\n")[0]!;
+  await cells(page).filter({ hasText: /^[1-9]\.\d×$/ }).and(page.getByRole("button", { name: new RegExp(` · ${first} `, "i") })).first().click();
   await expect(page.getByRole("status").filter({ hasText: /^Bought BTC (Up|Down) \$[\d,]+ for \$/ })).toBeVisible({ timeout: 10_000 });
   const now = await page.evaluate(() => Date.now());
   const day = 86_400_000;
@@ -160,6 +161,9 @@ test("a bought cell rides into its column's final round, read-only, with the ave
   await expect(page.getByText(/^Final round · average so far ≈ \$[\d,]+\. /)).toBeVisible();
   await expect(grid(page).getByRole("group", { name: /· final round · (on track to pay about \$[\d,.]+|on track to pay nothing|too close to call) · you hold this$/ })).toBeVisible();
   await expect(grid(page).getByRole("button", { name: / · Today / })).toHaveCount(0);
+  await page.clock.fastForward(30 * 60_000);
+  await expect(grid(page).getByRole("group", { name: /· ended · waiting for the final price · you hold this$/ })).toBeVisible();
+  await expect(page.getByText("Ended · waiting for the final price.", { exact: true })).toBeVisible();
 });
 
 test("free calls with the demo wallet: call a cell of the next round, see it called and counted, and the board", async ({ page }) => {

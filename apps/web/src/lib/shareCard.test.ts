@@ -38,6 +38,7 @@ describe("bestWin", () => {
     expect(bestWin([stake(UNIT / 100n, 10n * USD)], 81_400n * USD, 6)).toBeUndefined();
     expect(bestWin([stake(UNIT, 10n * USD, 20n * USD)], 80_000n * USD, 6)).toBeUndefined();
     expect(bestWin([stake(UNIT, 0n)], 83_000n * USD, 6)).toBeUndefined();
+    expect(bestWin([stake(UNIT, 0n), stake(UNIT / 100n, 1n * USD)], 83_000n * USD, 6)).toBeUndefined();
     const both = [stake(UNIT / 100n, 1n * USD), stake(UNIT / 50n, 1n * USD, 0n, put)];
     expect(bestWin(both, 81_400n * USD, 6)?.title).toBe("BTC Up $81,000");
     expect(bestWin(both, 80_000n * USD, 6)?.title).toBe("BTC Down $81,000");

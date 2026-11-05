@@ -681,9 +681,9 @@ test.describe("Tap", () => {
     await expect(unpriced).toHaveCSS("opacity", "1");
   });
 
-  async function heldThroughTheEnd(page: Page) {
+  async function heldThroughTheEnd(page: Page, { bothSides = false } = {}) {
     const expiry = Date.UTC(2026, 10, 5, 8) / 1000;
-    const token = "nep245:opt.demo.testnet:BTC-5NOV26-81000_83000-C";
+    const tokens = ["nep245:opt.demo.testnet:BTC-5NOV26-81000_83000-C", ...(bothSides ? ["nep245:opt.demo.testnet:BTC-5NOV26-81000_79000-P"] : [])];
     const world = { index: 81_500, settlement: null as null | { price: string; final_at: number } };
     await page.addInitScript(() => {
       (window as unknown as { ethereum: object }).ethereum = {
@@ -718,7 +718,7 @@ test.describe("Tap", () => {
     await page.route("**/rpc", (route) => {
       const params = route.request().postDataJSON().params;
       const args = JSON.parse(Buffer.from(params.args_base64, "base64").toString());
-      const value = params.method_name === "mt_batch_balance_of" ? args.token_ids.map((id: string) => (id === token ? "2000000" : "0")) : params.method_name === "get_settlement" ? world.settlement : view[params.method_name];
+      const value = params.method_name === "mt_batch_balance_of" ? args.token_ids.map((id: string) => (tokens.includes(id) ? "2000000" : "0")) : params.method_name === "get_settlement" ? world.settlement : view[params.method_name];
       route.fulfill({ json: { jsonrpc: "2.0", id: "web", ...(value === undefined ? { error: { message: "unknown" } } : { result: { result: [...Buffer.from(JSON.stringify(value))] } }) } });
     });
     await page.getByRole("button", { name: "Connect", exact: true }).click();
@@ -730,7 +730,7 @@ test.describe("Tap", () => {
 
   test("a held bet keeps its column through the final round, then shows the estimate, the proposed price, the result and a card to share", async ({ page }) => {
     await page.addInitScript(() => Object.assign(navigator, { canShare: undefined }));
-    const { expiry, world, until } = await heldThroughTheEnd(page);
+    const { expiry, world, until } = await heldThroughTheEnd(page, { bothSides: true });
     const group = (name: RegExp) => page.getByRole("table").getByRole("group", { name });
     await until(expiry - 29 * 60);
     await expect(group(/^Up · BTC ends above \$81,000 · final round · on track to pay about \$10\.00 · you hold this$/)).toBeVisible();
@@ -745,8 +745,11 @@ test.describe("Tap", () => {
     await expect(group(/· ended · pays \$8\.00 if the proposed price stands · you hold this$/)).toBeVisible();
     await expect(page.getByText(/^Proposed final price \$81,400, final at /)).toBeVisible();
     await until(expiry + 3_900);
-    await expect(group(/· result · pays \$8\.00 · you hold this$/)).toBeVisible();
+    await expect(group(/^Up · BTC ends above \$81,000 · result · pays \$8\.00 · you hold this$/)).toBeVisible();
     await expect(page.getByText("Final price $81,400. You get $8.00 back.")).toBeVisible();
+    world.index = 80_000;
+    await page.clock.fastForward(5_000);
+    await expect(group(/^Up · BTC ends above \$81,000 · result · pays \$8\.00 · you hold this$/)).toBeVisible();
     const download = page.waitForEvent("download");
     await page.getByRole("button", { name: "Share" }).click();
     const file = await download;
@@ -774,6 +777,22 @@ test.describe("Tap", () => {
     await page.getByRole("button", { name: "Share" }).click();
     await expect.poll(() => page.evaluate(() => (window as unknown as { shared: unknown[] }).shared)).toEqual([{ type: "image/png", name: "endline-win.png", text: "BTC Up $81,000: Won $8.00 on Endline" }]);
   });
+
+  for (const [refusal, downloads] of [["NotAllowedError", 1], ["AbortError", 0]] as const) {
+    test(`a share sheet that throws ${refusal} ${downloads ? "falls back to a download" : "is left alone"}`, async ({ page }) => {
+      await page.addInitScript((name) => {
+        Object.assign(navigator, { canShare: () => true, share: async () => Promise.reject(new DOMException("no", name)) });
+      }, refusal);
+      const { expiry, world, until } = await heldThroughTheEnd(page);
+      world.settlement = { price: String(81_400 * USD), final_at: expiry + 3_900 };
+      await until(expiry + 3_900);
+      let downloaded = 0;
+      page.on("download", () => downloaded++);
+      await page.getByRole("button", { name: "Share" }).click();
+      await page.waitForTimeout(500);
+      expect(downloaded).toBe(downloads);
+    });
+  }
 
   test("a bet that ends short of its price to beat says so and offers nothing to share", async ({ page }) => {
     const { expiry, world, until } = await heldThroughTheEnd(page);

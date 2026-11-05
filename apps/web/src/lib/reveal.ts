@@ -9,7 +9,7 @@ const KEEP_SEC = 3 * 3_600;
 const TOO_CLOSE_BPS = 10n;
 
 export type Phase = Exclude<SeriesStatus, "active">;
-export type Verdict = "win" | "lose" | "close";
+type Verdict = "win" | "lose" | "close";
 
 export interface Closing {
   expiry: number;

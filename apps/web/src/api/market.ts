@@ -9,12 +9,8 @@ export type PricePoint = [ms: number, price: number];
 const CHART_STEP_MS = 300_000;
 
 export function chartPoints(points: PricePoint[]): PricePoint[] {
-  let last = -Infinity;
-  return points.filter(([ms], i) => {
-    if (ms - last < CHART_STEP_MS && i < points.length - 1) return false;
-    last = ms;
-    return true;
-  });
+  const bucket = (ms: number) => Math.floor(ms / CHART_STEP_MS);
+  return points.filter(([ms], i) => i === 0 || i === points.length - 1 || bucket(ms) !== bucket(points[i - 1]![0]));
 }
 
 export interface Market {
