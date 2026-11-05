@@ -4,6 +4,7 @@ import { m, useReducedMotion, useSpring } from "motion/react";
 import { type ReactNode, useLayoutEffect, useRef, useState } from "react";
 import { useApp } from "../../app/context.ts";
 import { Link } from "../../app/router.tsx";
+import { HeroDots } from "./HeroDots.tsx";
 import { HeroWidget, PLOT_HEIGHT } from "./HeroWidget.tsx";
 import { jump } from "./jump.ts";
 import { EASE_DRAWER, EASE_OUT, SPRING } from "./motion.ts";
@@ -77,6 +78,7 @@ export function Hero({ market, nowSec }: { market: DemoMarket | undefined; nowSe
           />
         </m.div>
       )}
+      <HeroDots still={reduce === true} />
 
       <div className="relative mx-auto grid max-w-7xl grid-cols-1 gap-8 px-4 pt-24 pb-12 lg:grid-cols-[minmax(0,1fr)_584px] lg:items-start lg:gap-12 lg:px-12 lg:pt-32 lg:pb-16">
         <m.div style={{ y: seat }} className="lg:pt-6">

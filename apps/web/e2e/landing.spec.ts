@@ -13,6 +13,32 @@ async function horizon(page: Page) {
   });
 }
 
+async function tints(page: Page, x: number, y: number) {
+  return hero(page)
+    .locator("canvas")
+    .evaluate((canvas: HTMLCanvasElement, { x, y }) => {
+      const box = canvas.getBoundingClientRect();
+      const scale = canvas.width / box.width;
+      const copy = document.createElement("canvas");
+      copy.width = canvas.width;
+      copy.height = canvas.height;
+      const ctx = copy.getContext("2d", { willReadFrequently: true }) as CanvasRenderingContext2D;
+      ctx.drawImage(canvas, 0, 0);
+      const tint = (top: number) => {
+        const { data } = ctx.getImageData((x - box.left - 30) * scale, (top - box.top) * scale, 60 * scale, 24 * scale);
+        let up = 0;
+        let down = 0;
+        for (let i = 0; i < data.length; i += 4) {
+          const [r = 0, g = 0, , a = 0] = data.subarray(i, i + 4);
+          if (a > 64 && g - r > 60) up++;
+          if (a > 64 && r - g > 60) down++;
+        }
+        return up && down ? "mixed" : up ? "up" : down ? "down" : "none";
+      };
+      return { above: tint(y - 30), below: tint(y + 6) };
+    }, { x, y });
+}
+
 test.beforeEach(async ({ page }) => {
   await page.goto("/");
   await settle(handleOf(page));
@@ -145,4 +171,16 @@ test("every funding chain shows a loaded logo", async ({ page }) => {
   for (const chain of await chains.all()) {
     await expect.poll(() => chain.locator("img").evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth)).toBeGreaterThan(0);
   }
+});
+
+test("hero dots turn Up above the cursor and Down below it, and fade when it leaves", async ({ page }) => {
+  test.skip(test.info().project.use.isMobile === true, "needs a hovering pointer");
+  const spot = { x: 40, y: 320 };
+  expect(await tints(page, spot.x, spot.y)).toEqual({ above: "none", below: "none" });
+  await page.mouse.move(spot.x, spot.y);
+  await expect.poll(() => tints(page, spot.x, spot.y)).toEqual({ above: "up", below: "down" });
+  const nav = await page.getByRole("navigation", { name: "Main" }).boundingBox();
+  if (!nav) throw new Error("no nav");
+  await page.mouse.move(nav.x + nav.width / 2, nav.y + nav.height / 2);
+  await expect.poll(() => tints(page, spot.x, spot.y)).toEqual({ above: "none", below: "none" });
 });
