@@ -1,6 +1,6 @@
 # RFQ relay
 
-Runs the RFQ auction between users and market makers, settles trades with `intents.near::execute_intents([mm, user])`, and submits collects gaslessly. How a trade works: [docs/rfq.md](../../docs/rfq.md). Wire types: `packages/sdk/src/protocol.ts`.
+Runs the RFQ auction between users and market makers, settles trades with `intents.near::execute_intents([mm, user])`, and submits collects gaslessly. How a trade works: [Relay API](https://docs.endline.trade/developers/relay-api). Wire types: `packages/sdk/src/protocol.ts`.
 
 ## Run
 
@@ -10,7 +10,7 @@ pnpm --filter @endline/relay test
 pnpm --filter @endline/relay typecheck
 ```
 
-At startup the relay checks that the RPC is on `NETWORK_ID` and that `OPTIONS_ID`'s `get_config` uses `INTENTS_ID` and `QUOTE_ASSET`, and exits otherwise. Testnet values and a full-stack run: [docs/system.md](../../docs/system.md#testnet-from-scratch).
+At startup the relay checks that the RPC is on `NETWORK_ID` and that `OPTIONS_ID`'s `get_config` uses `INTENTS_ID` and `QUOTE_ASSET`, and exits otherwise. Testnet values and a full-stack run: [Running locally](https://docs.endline.trade/developers/running-locally#full-stack-on-testnet).
 
 ## Env
 
@@ -39,8 +39,8 @@ Read from the process environment (no `.env` loading).
 |---|---|
 | `GET /health` | `{ok, market_makers, relayer_id}`. `relayer_id` receives the `/transfer` fee |
 | `GET /series` | `{quote_asset, quote_decimals, series: [Series + option_asset + quotable]}`. `quotable` is false from `expiry − timing.write_cutoff_sec`, and for a width other than the lister's (`listedWidth` in the SDK), since anyone can create the same strike with another width and no market maker stocks it. Only series that expired less than 7 days ago or later (`CLAIM_WINDOW_SEC`, also the auto-collect deadline) |
-| `GET /marks` | `[{series_id, ask, bid?, vol}]` per series: the lowest ask (with that MM's `vol`) and highest bid across connected MMs, from marks received in the last 10 s. An MM's marks go when it disconnects ([rfq.md](../../docs/rfq.md#marks)) |
-| `POST /quote` | `QuoteRequest` (with a signed `session`) → `Quote`. A buy must be at least the underlying's `min_write` (smaller sizes can't be collected gaslessly); sells of any size. A new quote expires the signer's earlier unsigned one; their quotes in auction or settling must fit their intents balance ([rfq.md](../../docs/rfq.md#sessions-and-open-quotes)) |
+| `GET /marks` | `[{series_id, ask, bid?, vol}]` per series: the lowest ask (with that MM's `vol`) and highest bid across connected MMs, from marks received in the last 10 s. An MM's marks go when it disconnects ([Relay API](https://docs.endline.trade/developers/relay-api)) |
+| `POST /quote` | `QuoteRequest` (with a signed `session`) → `Quote`. A buy must be at least the underlying's `min_write` (smaller sizes can't be collected gaslessly); sells of any size. A new quote expires the signer's earlier unsigned one; their quotes in auction or settling must fit their intents balance ([Relay API](https://docs.endline.trade/developers/relay-api#open-quotes)) |
 | `POST /publish` | `PublishRequest` → `StatusUpdate` (200 settled, 422 failed) |
 | `GET /status/:quote_id` | `StatusUpdate`. `expired` from `sign_by_ms`; forgotten after an hour (then `404`) |
 | `GET /fills/:account_id` | `Fill[]` for that signer |
@@ -60,7 +60,7 @@ Errors: `400` bad input or a deposit quote 1Click refused, tampered or non-canon
 
 ## Collect (`/execute` and `/claims`)
 
-Both take only an exercise, exactly as the SDK's `exerciseOptions` builds and `toSign` encodes it: one `transfer` to `OPTIONS_ID` with `msg` `{"action":"exercise"}`, `min_gas` 100 TGas, 1–10 long tokens of series in the `GET /series` listing, each at least the underlying's `min_write`. Redeem and burn_pair are MM-only, and the MM pays its own gas. Anything else is refused before any gas is spent. A relay process sends a `(signer_id, nonce)` on-chain once. If `/execute` or `/transfer` errors, the relay polls `is_nonce_used` at `final` like a [trade](../../docs/rfq.md): used answers `200` with `tx_hash` `""`, and only a final block more than 5 s past the deadline with the nonce unused answers `500`. A claim whose send errors is resent only if the nonce is still unused. It sends one payload per signer at a time, exercise or transfer (a second gets `409` until the first lands or is settled by its nonce), so concurrent payloads over the same tokens don't each cost a failed transaction. Every payload it sends must still have 2 minutes left right after the relay's simulation: intents checks the deadline again on-chain, sending retries for up to ~85 s, and one that lapses first fails there on the relayer's gas. A claim with less left is dropped. The deadline must be written exactly as the SDK writes it (`toISOString`), so padding can't make the relayer pay for extra bytes.
+Both take only an exercise, exactly as the SDK's `exerciseOptions` builds and `toSign` encodes it: one `transfer` to `OPTIONS_ID` with `msg` `{"action":"exercise"}`, `min_gas` 100 TGas, 1–10 long tokens of series in the `GET /series` listing, each at least the underlying's `min_write`. Redeem and burn_pair are MM-only, and the MM pays its own gas. Anything else is refused before any gas is spent. A relay process sends a `(signer_id, nonce)` on-chain once. If `/execute` or `/transfer` errors, the relay polls `is_nonce_used` at `final` like a [trade](https://docs.endline.trade/developers/relay-api): used answers `200` with `tx_hash` `""`, and only a final block more than 5 s past the deadline with the nonce unused answers `500`. A claim whose send errors is resent only if the nonce is still unused. It sends one payload per signer at a time, exercise or transfer (a second gets `409` until the first lands or is settled by its nonce), so concurrent payloads over the same tokens don't each cost a failed transaction. Every payload it sends must still have 2 minutes left right after the relay's simulation: intents checks the deadline again on-chain, sending retries for up to ~85 s, and one that lapses first fails there on the relayer's gas. A claim with less left is dropped. The deadline must be written exactly as the SDK writes it (`toISOString`), so padding can't make the relayer pay for extra bytes.
 
 - `/execute`: the payload must expire between 2 and 10 minutes from now (the app signs for 7); needs a final price (`now ≥ final_at + 60 s`) and a total payout of at least $1 (one quote-asset unit times `10^quote_decimals`), so splitting a win into tiny exercises can't burn the relayer's gas. Simulated, then executed.
 - `/claims`: only for options the signer bought through this relay (net of sells, from `fills.jsonl`), one open claim per buy of that series, with a max payout of at least $1, so filling the queue costs one real trade per claim. A signer's open claims on a token can't add up to more than that or their intents balance of it; 1,000 claims in total. Simulated, then stored in `DATA_DIR/claims.json`. Every minute the relay re-simulates every claim, drops the ones the verifier now refuses (tokens sold or already collected, deadline passed, nonce used), drops final ones that pay under $1 without sending them, and submits the rest once final (same rule).
@@ -75,7 +75,7 @@ Moves USDC between intents accounts, e.g. a user's main balance and their Tap ba
 |---|---|
 | Relay → MM | `{"method":"quote","params":QuoteEvent}`. `side` is the user's side. `deadline_ms` is when the auction closes; later answers are dropped |
 | MM → relay | `{"method":"quote_response","params":{quote_id, premium, signed}}`. One answer per quote per connection |
-| MM → relay | `{"method":"marks","params":[{series_id, ask, bid?, vol}]}`. Replaces that MM's previous marks ([rfq.md](../../docs/rfq.md#marks)) |
+| MM → relay | `{"method":"marks","params":[{series_id, ask, bid?, vol}]}`. Replaces that MM's previous marks ([Relay API](https://docs.endline.trade/developers/relay-api)) |
 | Relay → MM | `{"method":"quote_status","params":StatusUpdate}` to the winner after a publish (`settled` with `tx_hash`, or `failed` with `reason`), or `expired` at `sign_by_ms` if the user never published, when the same signer asks for a new quote, or right after the auction if the user's balance no longer covers the quote |
 
-Which answers count and who wins: [docs/rfq.md](../../docs/rfq.md#a-trade-end-to-end), steps 3–4.
+Which answers count and who wins: [Relay API](https://docs.endline.trade/developers/relay-api#a-trade).

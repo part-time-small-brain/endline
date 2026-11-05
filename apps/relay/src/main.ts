@@ -18,7 +18,7 @@ const FAUCET_TOKENS = 100n;
 const config = loadConfig(process.env);
 await mkdir(config.DATA_DIR, { recursive: true });
 await access(config.DATA_DIR, constants.W_OK).catch(() => {
-  throw new Error(`DATA_DIR ${config.DATA_DIR} is not writable: fills and claims would be lost (docs/runbook.md, Deploy)`);
+  throw new Error(`DATA_DIR ${config.DATA_DIR} is not writable: fills and claims would be lost (see apps/relay/README.md, DATA_DIR)`);
 });
 const chain = nearChain(config);
 

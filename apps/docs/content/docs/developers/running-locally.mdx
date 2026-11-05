@@ -74,7 +74,7 @@ pnpm --filter @endline/mm start positions           # market maker balances, gre
 
 ## Docker
 
-`deploy/` has the Dockerfile and compose file for the hosted testnet stack: `web` (Caddy serving the relay's public routes), `relay`, `mm`, `monitor`, `proposer` and a Cloudflare tunnel. The landing, the app and these docs are static sites on Cloudflare Pages. Each container reads only its own variables from `deploy/.env` (template: `deploy/env.example`).
+`deploy/` has the Dockerfile and compose file for the hosted testnet stack: `web` (Caddy serving the relay's public routes), `relay`, `mm`, `lister`, `monitor`, `proposer` and a Cloudflare tunnel. The landing, the app and these docs are static sites on Cloudflare Pages. Each container reads only its own variables from `deploy/.env` (template: `deploy/env.example`).
 
 ```bash
 docker compose -f deploy/compose.yaml --env-file deploy/.env build

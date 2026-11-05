@@ -13,7 +13,7 @@ Shared TypeScript for relay, MM and web. Source only, no build step: import `@en
 | `protocol.ts` | Wire and contract-view schemas (zod) |
 | `black76.ts` | Black-76 price, delta, vega |
 
-Series ids and payout math are tested against `testdata/vectors.json`, shared with the Rust contract. Signing is tested byte for byte against `@defuse-protocol/intents-sdk`. Trade flow: [docs/rfq.md](../../docs/rfq.md).
+Series ids and payout math are tested against `testdata/vectors.json`, shared with the Rust contract. Signing is tested byte for byte against `@defuse-protocol/intents-sdk`. Trade flow: [Relay API](https://docs.endline.trade/developers/relay-api).
 
 ```bash
 pnpm --filter @endline/sdk test

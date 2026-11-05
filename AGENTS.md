@@ -4,7 +4,7 @@ Rules for every human and AI agent working in this repo. Short on purpose. Read 
 
 ## What this is
 
-Endline: cross-chain crypto options settled through NEAR Intents. European, cash-settled BTC/ETH calls and puts with a capped payout, fully collateralized in USDC. Option series are NEP-245 tokens that trade inside `intents.near` via `token_diff`. Start with `docs/README.md`, then `docs/system.md`.
+Endline: cross-chain crypto options settled through NEAR Intents. European, cash-settled BTC/ETH calls and puts with a capped payout, fully collateralized in USDC. Option series are NEP-245 tokens that trade inside `intents.near` via `token_diff`. Start with `apps/docs/content/docs/index.mdx`, then `apps/docs/content/docs/developers/architecture.mdx`.
 
 ## Layout
 
@@ -19,10 +19,9 @@ Endline: cross-chain crypto options settled through NEAR Intents. European, cash
 | `apps/relay` | RFQ relay: auction, trade settlement, gasless collect | TypeScript, Node |
 | `apps/mm` | Market maker bot plus `write` / `positions` / `monitor` / `propose` / `settle` CLIs | TypeScript, Node |
 | `apps/web` | Consumer app | TypeScript, React, Vite |
-| `apps/docs` | Public docs site at `docs.endline.trade` ([maintaining](docs/system.md#maintaining-the-public-docs)) | MDX, Fumadocs, Next.js static export |
+| `apps/docs` | Public user and developer docs at `docs.endline.trade` ([maintaining](apps/docs/content/docs/developers/running-locally.mdx#these-docs)) | MDX, Fumadocs, Next.js static export |
 | `testdata/` | Cross-language test vectors. Rust and TS both test against them | JSON |
-| `docs/` | What is built or being built. Source of truth for behaviour | Markdown |
-| `docs/ideas/` | Future features. Not scope until moved into `docs/` | Markdown |
+| `.docs/` | Private planning, decisions and operating notes. Local only, gitignored | Markdown |
 | `.research/` | Raw research notes with sources. Input, not truth. Local only, gitignored | Markdown |
 
 ## Commands
@@ -38,7 +37,6 @@ pnpm --filter @endline/docs build
 
 (cd contracts/options && cargo near build non-reproducible-wasm)
 cargo build -p oracle --target wasm32-wasip2 --release
-echo '{"index":"btc_usd","expiry":1792742400,"quote_decimals":6,"max_dev_bps":50}' | wasmtime run -S http target/wasm32-wasip2/release/oracle.wasm
 
 scripts/fetch-sandbox-wasms.sh
 cargo test -p sandbox-tests
@@ -49,7 +47,7 @@ scripts/deploy-testnet.sh <your-account>.testnet
 
 `cargo build` on the contract fails by design (near-sdk guard). Sandbox tests need the contract wasm built first and the fetched wasms in `tests/sandbox/res/`.
 
-Testnet scripts sign with the near CLI legacy keychain (`~/.near-credentials`). `oracle-smoke.sh` also needs a Pinata JWT: [docs/oracle.md](docs/oracle.md#hosting-a-new-wasm). Running relay + MM + web: [docs/system.md](docs/system.md#testnet-from-scratch).
+Testnet scripts sign with the near CLI legacy keychain (`~/.near-credentials`). `oracle-smoke.sh` also needs a Pinata JWT: [Oracle WASM](apps/docs/content/docs/developers/oracle.mdx#pinning-a-new-wasm). Running relay + MM + web: [Running locally](apps/docs/content/docs/developers/running-locally.mdx#full-stack-on-testnet).
 
 Toolchain: Rust 1.95 with `wasm32-unknown-unknown` and `wasm32-wasip2`, `cargo-near` 0.22, `near` (near-cli-rs), `outlayer` (outlayer-cli), `wasmtime`, Node 24, pnpm.
 
@@ -59,7 +57,7 @@ Toolchain: Rust 1.95 with `wasm32-unknown-unknown` and `wasm32-wasip2`, `cargo-n
 - No comments. Only exception: one short line where another agent or reviewer would otherwise make a mistake (a unit, a non-obvious invariant, an external quirk). If code needs explaining, rename or restructure it instead. Delete every comment you added before showing a diff.
 - Small files with one job. Match the neighbouring file's structure and naming.
 - Reuse before adding. No new dependency, abstraction, util or file without a concrete second use.
-- No speculative features, flags or config. Build what `docs/` says, nothing more.
+- No speculative features, flags or config. Build only agreed scope; public docs describe current behaviour.
 - Read the code and the docs before changing behaviour. Never assume an API exists: check docs.rs, the NEAR docs or the source.
 - Every behaviour change ships with a test that fails before and passes after.
 - Tests exist to break things: wrong caller, wrong asset, bad msg, replays, rounding edges, failed callbacks, time boundaries, invariants under random input. Don't write tests that only confirm the obvious happy path or a getter.
@@ -69,10 +67,10 @@ Toolchain: Rust 1.95 with `wasm32-unknown-unknown` and `wasm32-wasip2`, `cargo-n
 
 1. Collateral and options live inside `intents.near`. Users reach us only through a signed intents `transfer` with `msg`, which calls our `mt_on_transfer`. We pay out with `intents.near::mt_transfer`. No `ft_on_transfer`, no withdraw-with-msg paths.
 2. `mt_on_transfer` accepts calls only from `intents.near`. Amounts and `sender_id` come from intents, never from `msg`. A panic there is safe: intents refunds the signer.
-3. `mt_on_transfer` always returns a plain value, never a promise. Follow-up calls (delivering options, payouts) are detached and have their own callback. This is the exact bug behind the Oct 2026 $3.8M Intents exploit.
+3. `mt_on_transfer` always returns a plain value, never a promise. Follow-up calls (delivering options, payouts) are detached and have their own callback.
 4. Payouts never exceed collateral. Holder payouts round down, protocol keeps the dust. `collateral_locked` is checked before every payout.
 5. Settlement uses only the oracle's price for that exact `(underlying, expiry)`, final after the dispute window. Never a spot price, never a pool price, never "latest".
-6. Series ids come from their parameters (`BTC-27NOV26-110000_112000-C`). Expiry is always 08:00 UTC.
+6. Series ids come from their parameters (`BTC-27NOV26-110000_112000-C`). Mainnet expiry is 08:00 UTC; testnet follows its configured minute grid.
 7. Every cross-contract call has a callback that handles failure explicitly. Don't change state after scheduling a promise in a way the callback can't undo.
 8. Math uses u128 with U256 intermediates. Overflow panics, it never wraps. Release builds keep `overflow-checks = true`.
 9. Admin can pause writes and override a settlement inside the dispute window. Admin can never move user collateral or block exits.
@@ -91,10 +89,9 @@ Then get a fresh-context review of the whole package with the same questions. Fi
 ## Docs rules
 
 - Same bar as code: short, decisive, for a purpose. Tables and bullets over prose. No filler, no repeating other docs; link instead.
-- `docs/` describes what exists or is being built right now. Change code and its doc in the same change.
-- New feature idea → `docs/ideas/<name>.md`. Move it into `docs/` only once we commit to building it.
-- Decisions go in `docs/decisions.md`, one entry each: date, decision, why.
-- No status logs, meeting notes or research dumps in `docs/`. Research goes in `.research/`.
+- `apps/docs/content/docs/` describes current behaviour. Change code and its public doc in the same change.
+- Plans, ideas, decisions and operating notes stay in ignored `.docs/`. Research stays in ignored `.research/`.
+- Never publish private notes through tracked files, generated docs or build contexts.
 
 ## Safety
 

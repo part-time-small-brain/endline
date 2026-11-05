@@ -69,7 +69,7 @@ export function Safety({ nowSec }: { nowSec: number }) {
             );
           })}
         </ul>
-        <p className="mt-3 text-xs text-ink-2">BTC on 23 Oct 2026, one real oracle run</p>
+        <p className="mt-3 text-xs text-ink-2">BTC, one recorded oracle run</p>
       </Row>
 
       <Row title="Time to catch a wrong price" line="A monitor checks every proposed price. The owner can override a wrong one before it's final.">

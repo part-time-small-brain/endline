@@ -11,7 +11,7 @@ Crypto options trade on centralized venues or inside one chain's DeFi, and an op
 | Piece | What it does |
 |---|---|
 | NEAR Intents (`intents.near`) | Holds every balance: users' USDC, the collateral, and the option tokens. A buy or sell-back is one signed `token_diff` intent matched against the market maker; payouts are intents transfers. Nothing is bridged. Intents has no testnet, so testnet runs a copy of the exact mainnet wasm |
-| NEP-245 option tokens | Each series (`BTC-30OCT26-81000_83000-C`: strike, cap, Up) is a multi-token minted by our options contract against USDC locked in full |
+| NEP-245 option tokens | Each series (`BTC-27NOV26-81000_83000-C`: strike, cap, Up) is a multi-token minted by our options contract against USDC locked in full |
 | RFQ relay + market maker | The app asks the relay for a quote, the house market maker answers with a firm price from Deribit's volatility, the user signs, the relay submits |
 | Oracle WASM on OutLayer | The settlement price is the median of 7 exchanges' 30-minute averages, computed by our WASM, proposed on-chain and final after a dispute window. Mainnet runs it in an OutLayer TEE; testnet runs the same pinned WASM through our proposer as a manual oracle |
 | 1Click | Deposits from other chains land as USDC in the user's intents balance (mainnet only, so not live yet) |
@@ -32,7 +32,7 @@ Live app: https://app.endline.trade (landing: https://endline.trade, docs: https
 3. Click Add funds → "Get 100 test USDC". The balance goes up by $100 within seconds. Once per account and IP per 24 h.
 4. Tap the sentence slots: Tomorrow, BTC, above, a price to beat and $25. Check the full-payout threshold and Max loss, then click "Buy Up · $25". The first time, your wallet asks for one signature that lets you get prices for 24 h (no funds move). The confirm sheet then shows the firm price, the exact swap you'll sign and a countdown. Click "Buy for $X" and sign. You see "You're in" and can turn on auto-collect (one more signature).
 5. Open Positions. The position shows Paid, Value now and P&L. Click "Sell back", then "Sell back for $X", and sign: the USDC lands in your balance.
-6. Settlement: "Today" with a clock time in the end-date list is an option ending within ~4 h (quoting stops 60 s before the end). About 10 minutes after the end the price is proposed (median of 7 exchanges) and it is final 2 minutes later. A win of $1 or more with auto-collect is then paid into your balance within a minute; otherwise the position shows Collect.
+6. Settlement: "Today" means the option ends on your current local calendar day; the list shows its end time (quoting stops 60 s before the end). About 10 minutes after the end the price is proposed (median of 7 exchanges) and it is final 2 minutes later. A win of $1 or more with auto-collect is paid into your balance 1 to 2 minutes after final; otherwise the position shows Collect.
 
 Without a wallet: `pnpm install && VITE_MOCK=1 pnpm --filter @endline/web dev`, open http://localhost:5173/app, Connect → Demo wallet: the whole app against mock services with a $250 balance.
 
@@ -45,7 +45,7 @@ Without a wallet: `pnpm install && VITE_MOCK=1 pnpm --filter @endline/web dev`, 
 | USDC (mock, 6 decimals) | `usdc.near-options-dev.testnet` |
 | Oracle WASM | pinned by sha256 on the contract (`get_oracle_wasm`); the testnet proposer runs it as the manual oracle `near-options-dev.testnet` |
 
-Mainnet: not deployed yet ([plan](docs/mainnet.md)).
+Mainnet: not deployed yet.
 
 ## Repo
 
@@ -58,7 +58,7 @@ Mainnet: not deployed yet ([plan](docs/mainnet.md)).
 | `apps/mm` | Market maker, lister, settlement monitor, proposer |
 | `packages/sdk` | Shared ids, payout math, intent payloads, signing |
 | `tests/sandbox` | Integration tests against the real `intents.near` wasm |
-| `docs/` | How it works and why: start at [docs/README.md](docs/README.md) |
+| `apps/docs` | Public user and developer docs at [docs.endline.trade](https://docs.endline.trade) |
 
 Built with near-sdk-rs, near-workspaces, NEAR Connect, near-api-js, viem, zod, React, Vite, Fumadocs, wasmtime and the NEAR Intents verifier and 1Click APIs.
 
@@ -66,6 +66,6 @@ Built with near-sdk-rs, near-workspaces, NEAR Connect, near-api-js, viem, zod, R
 cargo test -p options -p oracle && pnpm -r test
 ```
 
-Contributors and agents: read [AGENTS.md](AGENTS.md) first. Full stack on testnet: [docs/system.md](docs/system.md#testnet-from-scratch).
+Contributors and agents: read [AGENTS.md](AGENTS.md) first. Full stack on testnet: [Running locally](https://docs.endline.trade/developers/running-locally#full-stack-on-testnet).
 
 License: [MIT](LICENSE).

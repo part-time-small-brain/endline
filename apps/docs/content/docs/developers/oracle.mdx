@@ -7,8 +7,7 @@ One price per `(underlying, expiry)`: the median of 7 exchanges' 30-minute TWAPs
 
 ## Why this design
 
-- Pyth dropped NEAR, `priceoracle.near` returns `null` prices, Switchboard shut down, and RedStone and Chainlink have no NEAR feeds.
-- OutLayer's `price-oracle.near` is spot-only: no fixing at a past timestamp.
+- Settlement needs a reproducible price for an exact expiry. A latest spot price is not a historical fixing.
 - OutLayer runs a pinned WASM in Intel TDX and returns the result in the same transaction (yield/resume).
 - The TEE isn't enforced on-chain: OutLayer's operator holds full-access keys and attestation is checked off-chain. A wrong price is possible, so the dispute window is required.
 
@@ -18,7 +17,7 @@ One price per `(underlying, expiry)`: the median of 7 exchanges' 30-minute TWAPs
 {"index":"btc_usd","expiry":1792742400,"quote_decimals":6,"max_dev_bps":50}
 ```
 
-Output for 2026-10-23 (about 370 bytes; OutLayer's limit is 900):
+Recorded example output (about 370 bytes; OutLayer's limit is 900):
 
 ```json
 {"ok":true,"index":"btc_usd","expiry":1792742400,"price":"81593524333","source":"cex_twap_median",
@@ -47,18 +46,17 @@ Output for 2026-10-23 (about 370 bytes; OutLayer's limit is 900):
 | OKX | BTC-USDT / ETH-USDT | USDT |
 | Bybit | BTCUSDT / ETHUSDT | USDT |
 
-On 2026-10-23 the BTC median was 0.1 bp from Deribit. Bitfinex sat +12.7 bp (its USD trades at a premium) and the median ignored it.
-
 ## Build and run
 
 ```bash
 cargo test -p oracle
 cargo build -p oracle --target wasm32-wasip2 --release
-echo '{"index":"btc_usd","expiry":1792742400,"quote_decimals":6,"max_dev_bps":50}' \
+expiry=$(node -p 'Math.floor((Date.now() / 1000 - 8 * 3600 - 60) / 86400) * 86400 + 8 * 3600')
+printf '{"index":"btc_usd","expiry":%s,"quote_decimals":6,"max_dev_bps":50}\n' "$expiry" \
   | wasmtime run -S http target/wasm32-wasip2/release/oracle.wasm
 ```
 
-Logic is tested natively on recorded exchange responses in `oracle/tests/fixtures`.
+The run uses the latest 08:00 UTC fixing at least one minute in the past. Logic is tested natively on recorded exchange responses in `oracle/tests/fixtures`.
 
 ## Contract integration
 
@@ -79,6 +77,6 @@ Logic is tested natively on recorded exchange responses in `oracle/tests/fixture
 
 | Item | State |
 |---|---|
-| Pinned WASM | `bafybeihm4qbofrnolgcyxle75u3rqv3pjn5vev5cgjezag7ng42dr6jxw4` (sha256 `259a7937…8340`) on `opt3.near-options-dev.testnet` |
-| OutLayer testnet | Stalled from 2026-10-24, working again by 2026-10-29: the pinned WASM runs there with all 7 venues reachable. Mainnet `outlayer.near` is live. Testnet still settles through the proposer |
+| Pinned WASM | Read the current `url`, `sha256` and `outlayer_id` from `get_oracle_wasm` on `opt3.near-options-dev.testnet` |
+| Execution | Testnet uses the proposer below. Mainnet settlement is designed to run through `outlayer.near` |
 | Testnet proposer | `pnpm --filter @endline/mm start propose`: refuses a mainnet RPC, downloads the pinned WASM, checks its sha256 every minute before running it, runs it in wasmtime and calls `propose_settlement` once `oracle_window_sec` has passed. Same code and sources, no TEE attestation |

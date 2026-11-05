@@ -6,3 +6,5 @@ playwright-report/
 .env*
 *.wasm
 .research/
+.docs/
+.worktrees/

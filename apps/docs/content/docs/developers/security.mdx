@@ -7,7 +7,7 @@ description: The rules every change keeps, what each actor can do, and the gaps 
 
 1. Collateral and options live inside `intents.near`. Users reach the contract only through a signed intents `transfer` with `msg`, which calls `mt_on_transfer`. Payouts go out with `intents.near::mt_transfer`.
 2. `mt_on_transfer` accepts calls only from `intents.near`. Amounts and `sender_id` come from intents, never from `msg`. A panic there is safe: intents refunds the signer.
-3. `mt_on_transfer` always returns a plain value, never a promise. Follow-up calls are detached with their own callbacks. The Oct 2026 $3.8M Intents exploit came from a returned promise an attacker could force to fail.
+3. `mt_on_transfer` always returns a plain value, never a promise. Follow-up calls are detached with their own callbacks.
 4. Payouts never exceed collateral. Holder payouts round down; the contract keeps the dust. `collateral_locked` is checked before every payout.
 5. Settlement uses only the oracle's price for that exact `(underlying, expiry)`, final after the dispute window. Never a spot price, a pool price or "latest".
 6. Every cross-contract call has a callback that handles failure explicitly, and acts only on an explicit failure.
@@ -66,7 +66,7 @@ description: The rules every change keeps, what each actor can do, and the gaps 
 | Not upgradeable | Fixes ship as a new deployment; old series stay redeemable |
 | Vendor-hosted wallet scripts | Wallets that serve their own script (Intear, NEAR Mobile, Trezu, EVM-on-NEAR) can change it, as in any dapp. near-connect also caches scripts in the browser, and its popup lets a user add a debug wallet |
 | Unsigned 1Click fields | 1Click doesn't sign `appFees` (nor a few other request fields), so a compromised relay could add a fee under the 3% cap, shown in the amount that arrives |
-| Non-reproducible wasm | Nobody else can rebuild the deployed contract to its hash until the repository is public |
+| Non-reproducible wasm | The build uses `cargo near build non-reproducible-wasm`; matching the deployed bytecode hash is not guaranteed |
 | Contract account keys | Every full-access key on the contract account must be deleted after deploy |
 
 ## Monitoring
