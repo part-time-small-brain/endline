@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { defaultExpiry, isListed, listedWidth } from "./series.ts";
+import { defaultExpiry, isListed, listedWidth, TWAP_WINDOW_SEC, twapPoints } from "./series.ts";
 
 const USD = 1_000_000n;
 
@@ -25,5 +25,18 @@ describe("listedWidth", () => {
   it("lists only that width at a strike", () => {
     expect(isListed({ strike: (110_000n * USD).toString(), width: (2_000n * USD).toString() }, 6)).toBe(true);
     expect(isListed({ strike: (110_000n * USD).toString(), width: (2_000n * USD + 10_000n).toString() }, 6)).toBe(false);
+  });
+});
+
+describe("twapPoints", () => {
+  it("keeps the minutes that end inside the 30 minutes before expiry, and only those closed by the given time", () => {
+    const expiry = 1_800_000_000;
+    const minute = (offset: number): [number, number] => [(expiry + offset * 60) * 1000, 80_000 + offset];
+    const points = [minute(-31), minute(-30), minute(-29), minute(-1), minute(0), minute(1)];
+    expect(TWAP_WINDOW_SEC).toBe(1_800);
+    expect(twapPoints(points, expiry)).toEqual([79_971, 79_999, 80_000]);
+    expect(twapPoints(points, expiry, (expiry - 60) * 1000 - 1)).toEqual([79_971]);
+    expect(twapPoints(points, expiry, (expiry - 60) * 1000)).toEqual([79_971, 79_999]);
+    expect(twapPoints([], expiry)).toEqual([]);
   });
 });

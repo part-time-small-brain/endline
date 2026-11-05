@@ -13,13 +13,12 @@ const serve = (body: (url: string) => unknown) => {
 };
 
 describe("history", () => {
-  it("keeps every 5th point and always the latest, asking for the right index", async () => {
+  it("keeps every minute, since the final-round average needs them, asking for the right index", async () => {
     const points = Array.from({ length: 12 }, (_, i) => [i * 60_000, 80_000 + i]);
     const fetch = serve(() => ({ result: points }));
     const history = await deribitMarket().history("BTC");
     expect(fetch.mock.calls[0]?.[0]).toContain("index_name=btc_usd&range=1d");
-    expect(history.map(([t]) => t / 60_000)).toEqual([0, 5, 10, 11]);
-    expect(history.at(-1)).toEqual([660_000, 80_011]);
+    expect(history).toEqual(points);
   });
 
   it("returns a single point once, and nothing for an empty chart", async () => {
