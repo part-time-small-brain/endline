@@ -106,6 +106,7 @@ export function HeroDots({ still }: { still: boolean }) {
       draw();
     };
     const move = (event: PointerEvent) => {
+      if (event.pointerType !== "mouse") return;
       const box = canvas.getBoundingClientRect();
       cursor = { x: event.clientX - box.left, y: event.clientY - box.top };
       wake();

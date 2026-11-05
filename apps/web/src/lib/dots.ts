@@ -1,4 +1,4 @@
-export interface Pull {
+interface Pull {
   strength: number;
   up: boolean;
   lift: number;

@@ -1,4 +1,4 @@
-import type { Page } from "@playwright/test";
+import type { CDPSession, Page } from "@playwright/test";
 import { expect, handleOf, money, settle, sideways, test, valueOf } from "./fixtures.ts";
 
 const hero = (page: Page) => page.locator("#top");
@@ -21,11 +21,11 @@ async function pixels(page: Page, x: number, y: number, width: number, height: n
         const box = canvas.getBoundingClientRect();
         const scale = canvas.width / box.width;
         const copy = document.createElement("canvas");
-        copy.width = canvas.width;
-        copy.height = canvas.height;
+        copy.width = area.width * scale;
+        copy.height = area.height * scale;
         const ctx = copy.getContext("2d", { willReadFrequently: true }) as CanvasRenderingContext2D;
-        ctx.drawImage(canvas, 0, 0);
-        return Array.from(ctx.getImageData((area.x - box.left) * scale, (area.y - box.top) * scale, area.width * scale, area.height * scale).data);
+        ctx.drawImage(canvas, (area.x - box.left) * scale, (area.y - box.top) * scale, copy.width, copy.height, 0, 0, copy.width, copy.height);
+        return Array.from(ctx.getImageData(0, 0, copy.width, copy.height).data);
       },
       { x, y, width, height },
     );
@@ -220,8 +220,29 @@ test("hero dots stop drawing once they settle and repaint when the theme changes
   await expect.poll(drawsWhileWaiting).toBe(0);
 
   const dark = test.info().project.use.colorScheme === "dark";
-  const whiteDots = async () => ((await pixels(page, 9, 9, 1, 1))[0] ?? 0) > 128;
+  const corner = await canvas.boundingBox();
+  if (!corner) throw new Error("no canvas");
+  const whiteDots = async () => {
+    const data = await pixels(page, corner.x, corner.y, 18, 18);
+    let solidest = 0;
+    for (let i = 4; i < data.length; i += 4) if ((data[i + 3] ?? 0) > (data[solidest + 3] ?? 0)) solidest = i;
+    return (data[solidest] ?? 0) > 128;
+  };
   expect(await whiteDots()).toBe(dark);
   await nav.getByTitle(dark ? "Light" : "Dark").click();
   await expect.poll(whiteDots).toBe(!dark);
+});
+
+test("touch leaves the hero dots alone", async ({ page, context }) => {
+  test.skip(test.info().project.use.hasTouch !== true, "touch only");
+  const box = await handleOf(page).boundingBox();
+  if (!box) throw new Error("no handle");
+  const cdp: CDPSession = await context.newCDPSession(page);
+  const x = box.x + box.width / 2;
+  const y = box.y + box.height / 2;
+  await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x, y }] });
+  for (let i = 1; i <= 10; i++) await cdp.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [{ x, y: y - i * 12 }] });
+  await page.waitForTimeout(500);
+  expect(await tints(page, x, y - 120)).toEqual({ above: "none", below: "none" });
+  await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
 });
