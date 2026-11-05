@@ -19,7 +19,7 @@ interface Props {
 export function RevealCell({ kind, verdict, amount, label }: Props) {
   const Icon = ICON[verdict];
   return (
-    <div role="group" aria-label={label} title={label} className={`flex size-full flex-col items-center justify-center gap-1 rounded-md border font-mono inset-ring-[1.5px] inset-ring-current ${LOOK[kind][verdict]}`}>
+    <div role="group" aria-label={label} title={label} className={`flex size-full flex-col items-center justify-center gap-1 rounded-md border font-mono inset-ring-[1.5px] ${LOOK[kind][verdict]}`}>
       <Icon size={14} weight="bold" aria-hidden="true" />
       <span className="text-[0.6875rem] leading-none font-semibold sm:text-sm">{amount}</span>
     </div>
