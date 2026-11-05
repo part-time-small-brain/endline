@@ -5,7 +5,7 @@ import { useCollect } from "../hooks/useCollect.ts";
 import { capLabel, seriesTitle } from "../lib/labels.ts";
 import { formatPct, formatUsd, toNumber } from "../lib/money.ts";
 import type { PositionStatus } from "../lib/status.ts";
-import { winCard } from "../lib/shareCard.ts";
+import { bestWin } from "../lib/shareCard.ts";
 import { countdown, formatEnds, formatUtc } from "../lib/time.ts";
 import { Button } from "./Button.tsx";
 import { SettlementNote } from "./SettlementNote.tsx";
@@ -36,6 +36,7 @@ export function PositionCard({ view, quoteDecimals, nowSec, onSellBack }: Props)
   const pnl = pnlOf(view);
   const ended = series.expiry <= nowSec;
   const pill = PILLS[view.status];
+  const card = (view.status === "collect" || view.status === "paid") && view.settlement ? bestWin([view], view.settlement.price, quoteDecimals) : undefined;
   const sellable = view.status === "active" && series.quotable;
   const valueLabel = view.status === "active" ? "Value now" : view.status === "paid" ? "Collected" : "Payout";
 
@@ -75,9 +76,9 @@ export function PositionCard({ view, quoteDecimals, nowSec, onSellBack }: Props)
       </dl>
 
       <SettlementNote view={view} quoteDecimals={quoteDecimals} nowSec={nowSec} />
-      {(view.status === "collect" || view.status === "paid") && view.settlement && view.payout > view.paid && (
+      {card && (
         <div className="mt-3">
-          <ShareButton card={winCard(series, view.payout, view.paid, view.settlement.price, quoteDecimals)} />
+          <ShareButton card={card} />
         </div>
       )}
 

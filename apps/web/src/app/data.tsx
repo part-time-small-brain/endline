@@ -17,6 +17,7 @@ export interface AppData {
   marks: Record<string, Mark> | undefined;
   marksError: string | undefined;
   history: Record<string, PricePoint[]> | undefined;
+  minutes: Record<string, PricePoint[]> | undefined;
   timing: Timing | undefined;
   balances: Record<string, bigint> | undefined;
   balance: bigint | undefined;
@@ -28,6 +29,9 @@ export interface AppData {
   optionAsset(seriesId: string): string;
   reload(): void;
 }
+
+const CHART_EVERY = 5;
+const thin = (points: PricePoint[]) => points.filter((_, i) => i % CHART_EVERY === 0 || i === points.length - 1);
 
 export const settlementKey = (s: Pick<ListedSeries, "underlying" | "expiry">) => `${s.underlying}:${s.expiry}`;
 
@@ -55,6 +59,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     underlyings.join(),
   );
 
+  const charts = useMemo(() => history.data && Object.fromEntries(Object.entries(history.data).map(([u, points]) => [u, thin(points)])), [history.data]);
   const optionAsset = useCallback((seriesId: string) => intentsAssetId(config.optionsId, seriesId), [config.optionsId]);
   const assets = useMemo(
     () => [config.quoteAsset, ...(listing?.series.map((s) => optionAsset(s.id)) ?? [])],
@@ -107,7 +112,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
     marketError: market.error,
     marks: marks.error ? undefined : marksById,
     marksError: marks.error,
-    history: history.data,
+    history: charts,
+    minutes: history.data,
     timing: contract.data?.timing,
     balances: balances.data,
     balance: balances.data?.[config.quoteAsset],

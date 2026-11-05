@@ -15,8 +15,8 @@ import { PriceLine } from "../components/tap/PriceLine.tsx";
 import { AmountPicker } from "../components/trade/AmountPicker.tsx";
 import { AssetPicker } from "../components/trade/AssetPicker.tsx";
 import { MarketStats } from "../components/trade/MarketStats.tsx";
-import { buildGrid, type GridCell, rowOf } from "../lib/grid.ts";
-import { averageEstimate, closingOf, type Phase, PHASE_TITLES, revealSays, verdictOf } from "../lib/reveal.ts";
+import { buildGrid, type GridCell, rowOf, winningAt } from "../lib/grid.ts";
+import { averageEstimate, closingOf, isEstimate, type Phase, PHASE_TITLES, revealSays, verdictOf } from "../lib/reveal.ts";
 import { maxLossOf } from "../lib/tap.ts";
 import { formatMultiple, formatPct, formatPrice, formatUsd, toNumber, toUnits } from "../lib/money.ts";
 import { seriesTitle } from "../lib/labels.ts";
@@ -60,16 +60,18 @@ export function Tap({ state, nowSec, views, onConnect, onAddFunds, onQuote }: Pr
   const closing = closingOf([...here, ...yours.map((v) => v.series)].map((s) => s.expiry), (expiry) => yours.some((v) => v.series.expiry === expiry), settlementOf, nowSec);
   const stakes = closing ? yours.filter((v) => v.series.expiry === closing.expiry) : [];
   const settlement = closing ? settlementOf(closing.expiry) : null;
-  const average = closing && spotNumber !== undefined ? averageEstimate(history, closing.expiry, nowSec * 1000, spotNumber) : undefined;
+  const average = closing && spotNumber !== undefined ? averageEstimate(data.minutes?.[symbol] ?? [], closing.expiry, nowSec * 1000, spotNumber) : undefined;
   const closingPrice = settlement?.price ?? (average === undefined ? undefined : toUnits(average, quoteDecimals));
   const active = yours.filter((v) => v.status === "active");
   const open = active.filter((v) => v.series.expiry !== closing?.expiry);
   const mine = active.filter((v) => v.tap);
-  const held = new Set([...open, ...stakes].map((v) => v.series.id));
+  const bothSides = (v: PositionView) => stakes.some((o) => o.series.strike === v.series.strike && o.series.kind !== v.series.kind);
+  const shownStakes = stakes.filter((v) => !bothSides(v) || (closingPrice !== undefined && winningAt(v.series, closingPrice)));
+  const held = new Set([...open, ...shownStakes].map((v) => v.series.id));
   const listed = [
     ...priced.filter((s) => s.underlying === symbol && s.expiry !== closing?.expiry && !held.has(s.id)),
     ...here.filter((s) => s.expiry === closing?.expiry && !held.has(s.id)),
-    ...[...open, ...stakes].map((v) => v.series),
+    ...[...open, ...shownStakes].map((v) => v.series),
   ];
   const grid = spot === undefined ? undefined : buildGrid(listed, spot, budget, data.marks, held);
   const closingColumn = closing && grid ? grid.expiries.indexOf(closing.expiry) : -1;
@@ -77,20 +79,20 @@ export function Tap({ state, nowSec, views, onConnect, onAddFunds, onQuote }: Pr
   const rows = grid?.strikes.length ?? 0;
   const formatMoney = (value: bigint | undefined) => (value === undefined ? undefined : formatUsd(value, quoteDecimals));
   const move = (strike: bigint) => (spotNumber ? formatPct(toNumber(strike, quoteDecimals) / spotNumber - 1) : "");
-  const reveal = (cell: GridCell, strike: bigint, phase: Phase, price: bigint, amount: bigint) => {
+  const where = (cell: GridCell, strike: bigint) => {
     const up = cell.series.kind === "call";
+    return `${up ? "Up" : "Down"} · ${symbol} ends ${up ? "above" : "below"} ${formatPrice(strike, quoteDecimals)}`;
+  };
+  const reveal = (cell: GridCell, strike: bigint, phase: Phase, price: bigint, amount: bigint) => {
     const verdict = verdictOf(cell.series, phase, price);
     const usd = formatUsd(longPayout(termsOf(cell.series), amount, price), quoteDecimals);
-    const estimate = phase === "final_round" || phase === "ended" ? "≈ " : "";
-    const where = `${up ? "Up" : "Down"} · ${symbol} ends ${up ? "above" : "below"} ${formatPrice(strike, quoteDecimals)}`;
-    return { kind: cell.series.kind, verdict, amount: `${estimate}${usd}`, label: `${where} · ${PHASE_TITLES[phase].toLowerCase()} · ${revealSays(phase, verdict, usd)} · you hold this` };
+    return { kind: cell.series.kind, verdict, amount: `${isEstimate(phase) ? "≈ " : ""}${usd}`, label: `${where(cell, strike)} · ${PHASE_TITLES[phase].toLowerCase()} · ${revealSays(phase, verdict, usd)} · you hold this` };
   };
   const label = (cell: GridCell, strike: bigint, expiry: number, own: Holding | undefined) => {
-    const up = cell.series.kind === "call";
     const pays = cell.multiple === undefined ? "no price right now" : `pays up to ${formatMultiple(cell.multiple)}`;
     const worth = own?.value === undefined ? "" : ` · worth ${formatUsd(own.value, quoteDecimals)}`;
     const pnl = own?.pnl === undefined ? "" : own.pnl > 0n ? ` · up ${formatUsd(own.pnl, quoteDecimals)}` : own.pnl < 0n ? ` · down ${formatUsd(-own.pnl, quoteDecimals)}` : " · even";
-    return `${up ? "Up" : "Down"} · ${symbol} ends ${up ? "above" : "below"} ${formatPrice(strike, quoteDecimals)} · ${dayLabel(expiry, nowSec)} ${formatClock(expiry)} · ${pays}${worth}${pnl}${cell.winning ? " · winning now" : ""}${cell.held ? " · you hold this" : ""}`;
+    return `${where(cell, strike)} · ${dayLabel(expiry, nowSec)} ${formatClock(expiry)} · ${pays}${worth}${pnl}${cell.winning ? " · winning now" : ""}${cell.held ? " · you hold this" : ""}`;
   };
 
   return (

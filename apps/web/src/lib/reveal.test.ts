@@ -38,9 +38,9 @@ describe("phaseOf", () => {
   it("opens the final round with the averaging window, not the trading cutoff, and drops the column 3 h after the end", () => {
     const proposed = { price: 81_400n * USD, finalAt: E + 3_900 };
     expect(phaseOf(E, null, E - 1_801)).toBeUndefined();
-    expect(phaseOf(E, null, E - 1_800)).toBe("final_round");
-    expect(phaseOf(E, null, E - 1)).toBe("final_round");
-    expect(phaseOf(E, null, E)).toBe("ended");
+    expect(phaseOf(E, null, E - 1_800)).toBe("close_only");
+    expect(phaseOf(E, null, E - 1)).toBe("close_only");
+    expect(phaseOf(E, null, E)).toBe("awaiting_price");
     expect(phaseOf(E, proposed, E + 300)).toBe("proposed");
     expect(phaseOf(E, proposed, E + 3_900)).toBe("final");
     expect(phaseOf(E, proposed, E + 10_799)).toBe("final");
@@ -65,9 +65,9 @@ describe("closingOf", () => {
   it("keeps a column in its final round for everyone, but after the end only while you have a stake in it", () => {
     const next = E + 86_400;
     const none = () => null;
-    expect(closingOf([next, E], () => false, none, E - 600)).toEqual({ expiry: E, phase: "final_round" });
+    expect(closingOf([next, E], () => false, none, E - 600)).toEqual({ expiry: E, phase: "close_only" });
     expect(closingOf([next, E], () => false, none, E + 60)).toBeUndefined();
-    expect(closingOf([next, E, E], (e) => e === E, none, E + 60)).toEqual({ expiry: E, phase: "ended" });
+    expect(closingOf([next, E, E], (e) => e === E, none, E + 60)).toEqual({ expiry: E, phase: "awaiting_price" });
     expect(closingOf([E, next], () => true, () => ({ price: 81_400n * USD, finalAt: E + 300 }), E + 600)).toEqual({ expiry: E, phase: "final" });
     expect(closingOf([E, next], () => true, none, E - 1_801)).toBeUndefined();
   });

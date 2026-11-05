@@ -40,14 +40,16 @@ async function drawCard(card: Card): Promise<File> {
   return new File([blob], "endline-win.png", { type: "image/png" });
 }
 
+const KEEP_URL_MS = 60_000;
+
 export function ShareButton({ card }: { card: Card }) {
-  const [file, setFile] = useState<File>();
+  const [file, setFile] = useState<File | null>();
   const key = JSON.stringify(card);
   useEffect(() => {
     let live = true;
     drawCard(JSON.parse(key) as Card).then(
       (drawn) => live && setFile(drawn),
-      () => undefined,
+      () => live && setFile(null),
     );
     return () => {
       live = false;
@@ -61,10 +63,13 @@ export function ShareButton({ card }: { card: Card }) {
       return;
     }
     const url = URL.createObjectURL(file);
-    Object.assign(document.createElement("a"), { href: url, download: file.name }).click();
-    setTimeout(() => URL.revokeObjectURL(url));
+    const link = document.body.appendChild(Object.assign(document.createElement("a"), { href: url, download: file.name }));
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), KEEP_URL_MS);
   };
 
+  if (file === null) return null;
   return (
     <Button tone="ghost" disabled={!file} onClick={share}>
       <ShareNetwork size={16} weight="bold" aria-hidden="true" />
