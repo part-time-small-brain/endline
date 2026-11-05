@@ -14,7 +14,7 @@ Each exchange's 1-minute closing prices are averaged over the 30 minutes before 
 
 - An exchange counts only with at least 25 of its 30 one-minute prices, and at least 3 exchanges must count, so one bad exchange can't move the median.
 - If the two USDT/USD rates are missing, more than 0.2% (20 bps) apart, or outside 0.97 to 1.03, the USDT exchanges drop out.
-- On 08:00 UTC markets, no price is set if Deribit's delivery price is more than 0.5% (50 bps) from the median, or if Deribit doesn't answer (we retry every 10 minutes). Deribit alone never sets the price. On 23 Oct 2026 the BTC median was 0.1 bp from it.
+- On 08:00 UTC markets, no price is set if Deribit's delivery price is more than 0.5% (50 bps) from the median, or if Deribit doesn't answer (we retry every 10 minutes). Deribit alone never sets the price.
 - Selling back and new options stop 30 minutes before the end, when the averaging window opens.
 
 Exact rules: [Oracle WASM](./developers/oracle.mdx).
@@ -36,7 +36,7 @@ The app shows "Waiting for the final price, usually about 1 h", then the propose
 
 [OutLayer](https://outlayer.fastnear.com/docs/getting-started) runs the oracle WASM pinned in the contract by sha256, inside a TEE (Intel TDX), and the contract stores the price from OutLayer's callback. You also trust OutLayer's operator: the TEE is checked off-chain, not by the contract.
 
-Before mainnet launch, a proposer run by the team runs the same pinned WASM and proposes its result.
+On testnet, a proposer run by the team runs the same pinned WASM and proposes its result without a TEE.
 
 ## Dispute window
 

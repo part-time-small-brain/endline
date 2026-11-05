@@ -1,6 +1,6 @@
 # Market maker
 
-Quotes option series to the RFQ relay, signs its `token_diff` leg with NEP-413, tracks inventory and risk, and delta-hedges on Hyperliquid. Why it exists: [docs/system.md](../../docs/system.md#why-the-market-maker-exists). Trade protocol: [docs/rfq.md](../../docs/rfq.md).
+Quotes option series to the RFQ relay, signs its `token_diff` leg with NEP-413, tracks inventory and risk, and delta-hedges on Hyperliquid. Why it exists: [Architecture](https://docs.endline.trade/developers/architecture). Trade protocol: [Relay API](https://docs.endline.trade/developers/relay-api).
 
 ## Run
 
@@ -16,7 +16,7 @@ pnpm --filter @endline/mm test
 pnpm --filter @endline/mm typecheck
 ```
 
-Before quoting, the MM account needs its key registered on the verifier (`add_public_key`), USDC in its intents balance, and written inventory for each series it should quote. Steps: [docs/system.md](../../docs/system.md#testnet-from-scratch).
+Before quoting, the MM account needs its key registered on the verifier (`add_public_key`), USDC in its intents balance, and written inventory for each series it should quote. Steps: [Running locally](https://docs.endline.trade/developers/running-locally#full-stack-on-testnet).
 
 `write` signs a `transfer` intent that sends `<collateral>` (integer USDC units) to the options contract with `{"action":"write"}`, simulates it, and submits `execute_intents` from `MM_ACCOUNT_ID`, which pays the gas.
 
@@ -27,7 +27,7 @@ USER_ACCOUNT_ID=… USER_PRIVATE_KEY=ed25519:… NEAR_RPC_URL=… INTENTS_ID=…
   pnpm --filter @endline/mm exec tsx src/smoke.ts <relay-url> <series_id> buy|sell|collect|claim <size>
 ```
 
-All actions need `NEAR_RPC_URL` and `INTENTS_ID`: `buy` and `sell` sign a session first ([rfq.md](../../docs/rfq.md#sessions-and-open-quotes)). `collect` and `claim` also need `OPTIONS_ID`: `collect` sends an exercise to the relay's `/execute`, `claim` stores one valid for 7 days at its `/claims` for auto-collect.
+All actions need `NEAR_RPC_URL` and `INTENTS_ID`: `buy` and `sell` sign a session first ([Relay API](https://docs.endline.trade/developers/relay-api#a-trade)). `collect` and `claim` also need `OPTIONS_ID`: `collect` sends an exercise to the relay's `/execute`, `claim` stores one valid for 7 days at its `/claims` for auto-collect.
 
 ## Env
 
@@ -80,7 +80,7 @@ Pricing is Black-76 on Deribit's `underlying_price` and `mark_iv` (`get_book_sum
 - Ask = the highest scenario + 2 × hedge (now and the close at expiry) + carry, at least `MIN_PREMIUM_USD`, rounded up to quote units.
 - Bid = the lowest scenario − hedge, rounded down.
 
-After each Deribit refresh the bot sends the relay its [marks](../../docs/rfq.md#marks): the same ask and bid for one whole option, before the $1 minimum, and `σ`, for every series it holds long or short tokens of that passes the checks above that don't depend on the quote (kill switch, width, deadline before the write cutoff, fresh data) and whose ask converts to quote units below the width, ranked by what its tokens there are worth at that bid and ask and cut off under the relay's 64 KB frame limit, so tokens others send it can't push its own series out cheaply. It publishes after every refresh, also one that failed for some underlying, so the others keep their marks.
+After each Deribit refresh the bot sends the relay its [marks](https://docs.endline.trade/developers/relay-api): the same ask and bid for one whole option, before the $1 minimum, and `σ`, for every series it holds long or short tokens of that passes the checks above that don't depend on the quote (kill switch, width, deadline before the write cutoff, fresh data) and whose ask converts to quote units below the width, ranked by what its tokens there are worth at that bid and ask and cut off under the relay's 64 KB frame limit, so tokens others send it can't push its own series out cheaply. It publishes after every refresh, also one that failed for some underlying, so the others keep their marks.
 
 The leg comes from the SDK's `buyDiffs`/`sellDiffs`. The nonce is versioned, uses the verifier's `current_salt` and the same deadline.
 
@@ -124,7 +124,7 @@ Burn and redeem cover series that expired up to 7 days ago. Unpaired longs (boug
 
 | Alert | When | Prints |
 |---|---|---|
-| `settle` | Proposal before `final_at` that is off the reference (measured against the lower price) by more than 20 bps, well inside the oracle's 50 bps veto, so two tampered sources can't slip a price under it; or that has no reference (Deribit down or no data) | `override_settlement` with `<price>` to fill in (work it out per the [runbook](../../docs/runbook.md#alerts), never paste Deribit), signed by the owner |
+| `settle` | Proposal before `final_at` that is off the reference (measured against the lower price) by more than 20 bps, well inside the oracle's 50 bps veto, so two tampered sources can't slip a price under it; or that has no reference (Deribit down or no data) | `override_settlement` with `<price>` to fill in (derive it from the [oracle rules](https://docs.endline.trade/developers/oracle#what-it-computes), never paste Deribit), signed by the owner |
 | `missing` | No proposal at expiry + `oracle_window_sec` | `propose_settlement` with `<price>` to fill in, signed by the first `get_oracles` account |
 | `reserve <account>` | `amount − storage_usage × 10^19` yocto below 2 NEAR, for the options contract, `INTENTS_ID` and `RELAYER_ACCOUNT_ID` each | |
 | `uptime` | `HEALTH_URL` set and it doesn't answer `200` with `{"ok":true}` within 5 s | The URL and the error |

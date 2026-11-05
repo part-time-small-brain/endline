@@ -2,7 +2,7 @@
 set -euo pipefail
 
 root="${1:?usage: ORACLE_WASM_URL=… ORACLE_WASM_SHA256=… scripts/mainnet-plan.sh <owner>.near}"
-url="${ORACLE_WASM_URL:?set ORACLE_WASM_URL (docs/oracle.md#hosting-a-new-wasm)}"
+url="${ORACLE_WASM_URL:?set ORACLE_WASM_URL (https://docs.endline.trade/developers/oracle#pinning-a-new-wasm)}"
 sha="${ORACLE_WASM_SHA256:?set ORACLE_WASM_SHA256}"
 opt="${OPTIONS_ID:-opt.$root}"
 oracle="${ORACLE_ACCOUNT_ID:-$root}"
