@@ -10,7 +10,7 @@ wasm="$root/target/wasm32-wasip2/release/oracle.wasm"
 cargo build -p oracle --target wasm32-wasip2 --release --manifest-path "$root/Cargo.toml"
 hash="$(shasum -a 256 "$wasm" | cut -d' ' -f1)"
 
-jwt="${PINATA_JWT:-$(security find-generic-password -a near-options -s pinata-jwt -w)}"
+jwt="${PINATA_JWT:?set PINATA_JWT}"
 cid="$(curl -sf https://uploads.pinata.cloud/v3/files \
   -H "Authorization: Bearer $jwt" \
   -F network=public -F name="oracle-$hash.wasm" -F file=@"$wasm" \

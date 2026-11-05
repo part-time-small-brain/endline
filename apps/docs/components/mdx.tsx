@@ -3,7 +3,7 @@ import type { MDXComponents } from "mdx/types";
 import { sourceUrl } from "@/lib/layout";
 
 function Source() {
-  return sourceUrl ? <>Source: <a href={sourceUrl}>GitHub</a></> : <>Source: coming soon</>;
+  return <>Source: <a href={sourceUrl}>GitHub</a></>;
 }
 
 export function getMDXComponents(components?: MDXComponents) {

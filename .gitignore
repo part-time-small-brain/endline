@@ -8,3 +8,4 @@ playwright-report/
 .research/
 .docs/
 .worktrees/
+.serena/

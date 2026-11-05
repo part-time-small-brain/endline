@@ -70,7 +70,7 @@ The run uses the latest 08:00 UTC fixing at least one minute in the past. Logic 
 
 ## Pinning a new WASM
 
-1. `scripts/oracle-smoke.sh <you>.testnet` builds the WASM, uploads it to IPFS via Pinata, checks the gateway serves the exact bytes, prints `url` and `sha256`, and runs it once on `outlayer.testnet`. Needs a Pinata JWT and the account key in the near CLI legacy keychain.
+1. `scripts/oracle-smoke.sh <you>.testnet` builds the WASM, uploads it to IPFS via Pinata, checks the gateway serves the exact bytes, prints `url` and `sha256`, and runs it once on `outlayer.testnet`. Needs a Pinata JWT in `PINATA_JWT` and the account key in the near CLI legacy keychain.
 2. The owner pins it: `set_oracle_wasm({"oracle_wasm":{"outlayer_id":"outlayer.testnet","url":"…","sha256":"…"}})` with 1 yocto.
 
 ## Testnet status

@@ -18,7 +18,9 @@ export function Footer() {
           <a href="/docs" className={LINK}>
             Docs
           </a>
-          <span className="text-ink-3">GitHub, coming soon</span>
+          <a href="https://github.com/part-time-small-brain/endline" className={LINK}>
+            GitHub
+          </a>
         </nav>
         <ThemeSwitch />
       </div>

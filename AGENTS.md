@@ -21,8 +21,6 @@ Endline: cross-chain crypto options settled through NEAR Intents. European, cash
 | `apps/web` | Consumer app | TypeScript, React, Vite |
 | `apps/docs` | Public user and developer docs at `docs.endline.trade` ([maintaining](apps/docs/content/docs/developers/running-locally.mdx#these-docs)) | MDX, Fumadocs, Next.js static export |
 | `testdata/` | Cross-language test vectors. Rust and TS both test against them | JSON |
-| `.docs/` | Private planning, decisions and operating notes. Local only, gitignored | Markdown |
-| `.research/` | Raw research notes with sources. Input, not truth. Local only, gitignored | Markdown |
 
 ## Commands
 
@@ -90,16 +88,14 @@ Then get a fresh-context review of the whole package with the same questions. Fi
 
 - Same bar as code: short, decisive, for a purpose. Tables and bullets over prose. No filler, no repeating other docs; link instead.
 - `apps/docs/content/docs/` describes current behaviour. Change code and its public doc in the same change.
-- Plans, ideas, decisions and operating notes stay in ignored `.docs/`. Research stays in ignored `.research/`.
-- Never publish private notes through tracked files, generated docs or build contexts.
+- Local notes go in gitignored `.docs/`, research in gitignored `.research/`. Never publish them through tracked files, generated docs or build contexts.
 
 ## Safety
 
-- Never push to `main`, and never force-push. Work on a branch in its own worktree (`.worktrees/<name>`), commit with Conventional Commits, and open a PR to `main` (`--assignee @me`). Merge only after a fresh-context review, and only when nero merges or says an agent may.
-- Never create remotes or make the repo public. A human does that.
+- Never push to `main`, and never force-push. Work on a branch in its own worktree (`.worktrees/<name>`), commit with Conventional Commits, and open a PR to `main` (`--assignee @me`). Merge only after a fresh-context review, and only when a maintainer merges or says an agent may.
+- Never create remotes or change repo settings. A human does that.
 - Never sign transactions, deploy to mainnet or spend tokens. Testnet deploys only when a human asks.
 - No secrets in the repo. Keys come from env vars. Never read `.env*` files.
-- No employer or internal data in this repo.
 
 ## Before you say "done"
 
