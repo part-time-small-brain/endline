@@ -1,0 +1,47 @@
+---
+title: Safety and risks
+description: What protects your money, and what you still have to trust.
+---
+
+<Callout type="warn" title="Read this first">
+  The options contract has not been audited. It runs on NEAR testnet today, where tokens are test tokens with no value.
+</Callout>
+
+## What protects you
+
+| Protection | For you |
+|---|---|
+| You only buy options | Max loss is what you pay. No margin, no borrowing |
+| Full collateral | Every payout is locked before the option exists. No liquidations, no market maker default |
+| Funds stay in `intents.near` | We never hold your USDC, options or payouts |
+| Atomic trades | You pay and get the option in one step, or nothing happens |
+| You see what you sign | The app shows a card matching the exact trade your wallet signs, and rejects a quote that doesn't match |
+| 7-exchange final price | One exchange can't move it ([Settlement](./settlement.mdx)) |
+
+## What the owner can and can't do
+
+| Can | Can't |
+|---|---|
+| Pause new markets and new options | Pause selling back, collecting or any other exit |
+| Override a proposed price before it's final, which decides how a market's collateral is split | Move collateral out of a market |
+| Add assets, add or remove oracle accounts, pin a new oracle program (on mainnet, new accounts and programs take effect a day later) | Change the dispute window, or make a price final early or late |
+
+The owner controls the oracle accounts and the pinned oracle program, so it could stop a price from ever being set. Nothing pays out without a price.
+
+## Risks you take
+
+| Risk | What it means |
+|---|---|
+| You lose what you paid | Most options end at $0. A small or slow move your way can still lose |
+| Unaudited code | The options contract, relay and app haven't had an external audit. A bug could lose funds |
+| Oracle trust | The TEE is not checked on-chain, and the oracle account can propose any positive price. You trust the dispute window, our monitor and the owner's override to catch a wrong price in time |
+| Testnet oracle | Our proposer posts the price with our key, with no TEE. The same team account proposes and can override |
+| Relay | Collect and auto-collect go through our relay. If it's down, your payout is still owed, but you must send the exercise yourself and pay gas |
+| No upgrades | The contract can't be patched. A fix means a new deployment, and old markets still pay out |
+| Single market maker | Only ours quotes today. If it's offline you can't buy or sell back. Positions and payouts are unaffected |
+| NEAR Intents | Everything sits in `intents.near`, so its security is part of ours |
+| Capped payout | You get at most size × the width, however far past the cap the price ends |
+| Tap balance | Taps sign with a key your browser derives from one wallet signature. Anyone who gets that key, from that signature or from script on the page while it's open, can move your whole Tap balance. Never your main balance. Keep in it only what you're tapping with |
+| Public positions | Option balances on NEAR Intents are public. Funds in near.com Confidential Mode must move to the main balance before trading |
+
+Full threat model: [Security model](./developers/security.mdx).

@@ -1,0 +1,260 @@
+{
+  "series_ids": [
+    {
+      "underlying": "BTC",
+      "expiry": 1795766400,
+      "strike": "110000000000",
+      "width": "2000000000",
+      "quote_decimals": 6,
+      "kind": "call",
+      "id": "BTC-27NOV26-110000_112000-C"
+    },
+    {
+      "underlying": "BTC",
+      "expiry": 1795766400,
+      "strike": "110000000000",
+      "width": "4000000000",
+      "quote_decimals": 6,
+      "kind": "call",
+      "id": "BTC-27NOV26-110000_114000-C"
+    },
+    {
+      "underlying": "ETH",
+      "expiry": 1793952000,
+      "strike": "2650500000",
+      "width": "40000000",
+      "quote_decimals": 6,
+      "kind": "put",
+      "id": "ETH-6NOV26-2650d5_2610d5-P"
+    },
+    {
+      "underlying": "NEAR",
+      "expiry": 1798790400,
+      "strike": "3250000",
+      "width": "150000",
+      "quote_decimals": 6,
+      "kind": "call",
+      "id": "NEAR-1JAN27-3d25_3d4-C"
+    },
+    {
+      "underlying": "BTC",
+      "expiry": 1835424000,
+      "strike": "95000000000",
+      "width": "94999990000",
+      "quote_decimals": 6,
+      "kind": "put",
+      "id": "BTC-29FEB28-95000_0d01-P"
+    },
+    {
+      "underlying": "ZEC",
+      "expiry": 1798185600,
+      "strike": "412050000",
+      "width": "12050000",
+      "quote_decimals": 6,
+      "kind": "put",
+      "id": "ZEC-25DEC26-412d05_400-P"
+    },
+    {
+      "underlying": "BTC",
+      "expiry": 1794928500,
+      "strike": "110000000000",
+      "width": "2000000000",
+      "quote_decimals": 6,
+      "kind": "call",
+      "id": "BTC-17NOV26T1515-110000_112000-C"
+    },
+    {
+      "underlying": "ETH",
+      "expiry": 1794873660,
+      "strike": "2500000000",
+      "width": "40000000",
+      "quote_decimals": 6,
+      "kind": "put",
+      "id": "ETH-17NOV26T0001-2500_2460-P"
+    }
+  ],
+  "math": [
+    {
+      "kind": "call",
+      "strike": "110000000000",
+      "width": "2000000000",
+      "unit": "100000000",
+      "amount": "50000000",
+      "settlement": "125000000000",
+      "collateral": "1000000000",
+      "options_for_collateral": "50000000",
+      "pair_refund": "1000000000",
+      "long_payout": "1000000000",
+      "short_payout": "0"
+    },
+    {
+      "kind": "call",
+      "strike": "110000000000",
+      "width": "2000000000",
+      "unit": "100000000",
+      "amount": "50000000",
+      "settlement": "111000000000",
+      "collateral": "1000000000",
+      "options_for_collateral": "50000000",
+      "pair_refund": "1000000000",
+      "long_payout": "500000000",
+      "short_payout": "500000000"
+    },
+    {
+      "kind": "call",
+      "strike": "110000000000",
+      "width": "2000000000",
+      "unit": "100000000",
+      "amount": "50000000",
+      "settlement": "110000000000",
+      "collateral": "1000000000",
+      "options_for_collateral": "50000000",
+      "pair_refund": "1000000000",
+      "long_payout": "0",
+      "short_payout": "1000000000"
+    },
+    {
+      "kind": "call",
+      "strike": "110000000000",
+      "width": "2000000000",
+      "unit": "100000000",
+      "amount": "1",
+      "settlement": "110000000001",
+      "collateral": "20",
+      "options_for_collateral": "1",
+      "pair_refund": "20",
+      "long_payout": "0",
+      "short_payout": "19"
+    },
+    {
+      "kind": "call",
+      "strike": "110000000000",
+      "width": "2000000000",
+      "unit": "100000000",
+      "amount": "123456789",
+      "settlement": "112000000000",
+      "collateral": "2469135780",
+      "options_for_collateral": "123456789",
+      "pair_refund": "2469135780",
+      "long_payout": "2469135780",
+      "short_payout": "0"
+    },
+    {
+      "kind": "call",
+      "strike": "110000000000",
+      "width": "2000000000",
+      "unit": "100000000",
+      "amount": "123456789",
+      "settlement": "111999999999",
+      "collateral": "2469135780",
+      "options_for_collateral": "123456789",
+      "pair_refund": "2469135780",
+      "long_payout": "2469135778",
+      "short_payout": "1"
+    },
+    {
+      "kind": "put",
+      "strike": "2650500000",
+      "width": "40000000",
+      "unit": "1000000000000000000",
+      "amount": "1000000000000000000",
+      "settlement": "2000000000",
+      "collateral": "40000000",
+      "options_for_collateral": "1000000000000000000",
+      "pair_refund": "40000000",
+      "long_payout": "40000000",
+      "short_payout": "0"
+    },
+    {
+      "kind": "put",
+      "strike": "2650500000",
+      "width": "40000000",
+      "unit": "1000000000000000000",
+      "amount": "333333333333333333",
+      "settlement": "2650500000",
+      "collateral": "13333334",
+      "options_for_collateral": "333333350000000000",
+      "pair_refund": "13333333",
+      "long_payout": "0",
+      "short_payout": "13333333"
+    },
+    {
+      "kind": "put",
+      "strike": "95000000000",
+      "width": "94999990000",
+      "unit": "100000000",
+      "amount": "7",
+      "settlement": "94999990000",
+      "collateral": "6650",
+      "options_for_collateral": "7",
+      "pair_refund": "6649",
+      "long_payout": "0",
+      "short_payout": "6648"
+    },
+    {
+      "kind": "put",
+      "strike": "95000000000",
+      "width": "2000000000",
+      "unit": "100000000",
+      "amount": "123456789",
+      "settlement": "1000000",
+      "collateral": "2469135780",
+      "options_for_collateral": "123456789",
+      "pair_refund": "2469135780",
+      "long_payout": "2469135780",
+      "short_payout": "0"
+    },
+    {
+      "kind": "call",
+      "strike": "3250000",
+      "width": "150000",
+      "unit": "1000000000000000000000000",
+      "amount": "5000000000000000000000007",
+      "settlement": "3250001",
+      "collateral": "750001",
+      "options_for_collateral": "5000006666666666666666666",
+      "pair_refund": "750000",
+      "long_payout": "5",
+      "short_payout": "749994"
+    },
+    {
+      "kind": "put",
+      "strike": "412050000",
+      "width": "12050000",
+      "unit": "100000000",
+      "amount": "99999",
+      "settlement": "500000000",
+      "collateral": "12050",
+      "options_for_collateral": "100000",
+      "pair_refund": "12049",
+      "long_payout": "0",
+      "short_payout": "12049"
+    },
+    {
+      "kind": "put",
+      "strike": "2500000000",
+      "width": "40000000",
+      "unit": "1000000000000000000",
+      "amount": "333333333333333333",
+      "settlement": "2460000000",
+      "collateral": "13333334",
+      "options_for_collateral": "333333350000000000",
+      "pair_refund": "13333333",
+      "long_payout": "13333333",
+      "short_payout": "0"
+    },
+    {
+      "kind": "call",
+      "strike": "5000000",
+      "width": "10000",
+      "unit": "1000000",
+      "amount": "1234567",
+      "settlement": "7000000",
+      "collateral": "12346",
+      "options_for_collateral": "1234600",
+      "pair_refund": "12345",
+      "long_payout": "12345",
+      "short_payout": "0"
+    }
+  ]
+}

@@ -1,0 +1,260 @@
+@import "tailwindcss";
+@import "@fontsource-variable/funnel-sans/wght.css";
+@import "@fontsource-variable/funnel-display/wght.css";
+@import "@fontsource-variable/geist-mono/wght.css";
+@import "fumadocs-ui/css/preset.css";
+
+/* Horizon tokens, mirrored from apps/web/src/index.css. Fumadocs toggles `.dark` on <html>. */
+:root {
+  color-scheme: light;
+  --page: #dee3ea;
+  --surface: #f4f6f9;
+  --well: #dee3ea;
+  --well-hover: #d2d9e2;
+  --paper: #ffffff;
+  --ink: #0e1420;
+  --ink-2: #475163;
+  --ink-3: #5a6577;
+  --on-ink: #ffffff;
+  --rule: #c3cbd6;
+  --rule-soft: #d9dfe7;
+  --scrim: rgb(14 20 32 / 0.45);
+  --danger: #b3261e;
+  --up: #12b886;
+  --up-ink: #0b6e50;
+  --up-field: #bee7dd;
+  --up-soft: #dbefec;
+  --down: #f0506e;
+  --down-ink: #9e3549;
+  --down-field: #f3ced8;
+  --down-soft: #f4e4ea;
+}
+
+.dark {
+  color-scheme: dark;
+  --page: #000000;
+  --surface: #0e0e10;
+  --well: #18181b;
+  --well-hover: #212125;
+  --paper: #27272b;
+  --ink: #f2f2f3;
+  --ink-2: #a1a1a7;
+  --ink-3: #8b8b92;
+  --on-ink: #000000;
+  --rule: #26262b;
+  --rule-soft: #1c1c20;
+  --scrim: rgb(0 0 0 / 0.7);
+  --danger: #ff8a80;
+  --up: #12b886;
+  --up-ink: #20bc8d;
+  --up-field: #0e221e;
+  --up-soft: #0e1616;
+  --down: #f15e7a;
+  --down-ink: #f47e95;
+  --down-field: #29181d;
+  --down-soft: #191215;
+}
+
+@theme static {
+  --color-fd-background: var(--page);
+  --color-fd-foreground: var(--ink);
+  --color-fd-muted: var(--well);
+  --color-fd-muted-foreground: var(--ink-2);
+  --color-fd-popover: var(--surface);
+  --color-fd-popover-foreground: var(--ink);
+  --color-fd-card: var(--surface);
+  --color-fd-card-foreground: var(--ink);
+  --color-fd-border: var(--rule-soft);
+  --color-fd-primary: var(--ink);
+  --color-fd-primary-foreground: var(--on-ink);
+  --color-fd-secondary: var(--surface);
+  --color-fd-secondary-foreground: var(--ink);
+  --color-fd-accent: var(--well-hover);
+  --color-fd-accent-foreground: var(--ink);
+  --color-fd-ring: var(--ink-3);
+  --color-fd-overlay: var(--scrim);
+
+  --color-fd-info: var(--ink-3);
+  --color-fd-warning: var(--down);
+  --color-fd-error: var(--danger);
+  --color-fd-success: var(--up);
+  --color-fd-idea: var(--ink-3);
+  --color-fd-diff-remove: color-mix(in oklab, var(--danger) 14%, transparent);
+  --color-fd-diff-remove-symbol: var(--danger);
+  --color-fd-diff-add: color-mix(in oklab, var(--up) 14%, transparent);
+  --color-fd-diff-add-symbol: var(--up-ink);
+
+  --font-sans: "Funnel Sans Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Funnel Display Variable", "Funnel Sans Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Geist Mono Variable", ui-monospace, monospace;
+}
+
+html {
+  scrollbar-gutter: stable;
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+html > body[data-scroll-locked] {
+  margin-right: 0px !important;
+  --removed-body-scroll-bar-size: 0px !important;
+}
+
+h1,
+h2,
+h3,
+.prose :where(h4) {
+  font-family: var(--font-display);
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+
+:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+::selection {
+  background: var(--up-field);
+  color: var(--ink);
+}
+
+/* Prose */
+.prose {
+  --tw-prose-body: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.prose :where(a):not(:where(.not-prose, .not-prose *)) {
+  text-decoration-color: var(--up);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+  transition: text-decoration-color 150ms;
+}
+
+.prose :where(a):not(:where(.not-prose, .not-prose *)):hover {
+  text-decoration-color: var(--ink);
+}
+
+.prose :where(code):not(:where(pre *, .not-prose, .not-prose *)) {
+  background: var(--surface);
+  border-color: var(--rule-soft);
+}
+
+.prose :where(table):not(:where(.not-prose, .not-prose *)) {
+  background: var(--surface);
+  border-color: var(--rule-soft);
+}
+
+.prose :where(th):not(:where(.not-prose, .not-prose *)) {
+  background: var(--surface);
+  color: var(--ink-2);
+  font-weight: 600;
+  border-bottom-color: var(--rule);
+}
+
+/* Callouts: warn sits on the Down tint, the rest on Chalk. */
+[style*="--color-fd-warning"] {
+  background: var(--down-soft);
+  border-color: var(--down-field);
+}
+
+[style*="--color-fd-warning"] > [role="none"] {
+  background: var(--down);
+}
+
+[style*="--color-fd-warning"] [class*="text-fd-muted-foreground"] {
+  color: var(--ink);
+}
+
+/* Sidebar sits on the page like the app's header; the active page is a Paper pill like the app's selected tab. */
+#nd-sidebar {
+  background: var(--page);
+  border-color: var(--rule-soft);
+}
+
+#nd-sidebar a[data-active="true"] {
+  background: var(--paper);
+  box-shadow: 0 1px 2px rgb(14 20 32 / 0.06);
+  color: var(--ink);
+  font-weight: 600;
+}
+
+#nd-sidebar a[data-active="false"]:hover {
+  background: var(--well-hover);
+}
+
+/* Wordmark */
+.wordmark {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.125rem;
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+}
+
+.wordmark svg {
+  margin-inline: 0.125rem;
+  flex-shrink: 0;
+}
+
+.open-app {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: 0.75rem;
+  background: var(--ink);
+  color: var(--on-ink);
+  padding: 0.5rem 0.875rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  transition: opacity 150ms;
+}
+
+.open-app:hover {
+  opacity: 0.88;
+}
+
+/* Code: Geist Mono on Chalk. github-light/dark tokens remapped where they miss AA or leave the palette. */
+figure.shiki {
+  border-radius: 1rem;
+  border-color: var(--rule-soft);
+  font-family: var(--font-mono);
+}
+
+.prose :where(table):not(:where(.not-prose, .not-prose *)),
+[data-card],
+[style*="--callout-color"] {
+  border-radius: 1rem;
+}
+
+.shiki span[style*="--shiki-light:#6A737D" i] {
+  --shiki-light: var(--ink-3) !important;
+  --shiki-dark: var(--ink-3) !important;
+}
+
+.shiki span[style*="--shiki-light:#D73A49" i] {
+  --shiki-light: var(--ink) !important;
+  --shiki-dark: var(--ink) !important;
+  font-weight: 600;
+}
+
+.shiki span[style*="--shiki-light:#005CC5" i] {
+  --shiki-light: var(--ink-2) !important;
+  --shiki-dark: var(--ink-2) !important;
+}
+
+.shiki span[style*="--shiki-light:#6F42C1" i] {
+  --shiki-light: var(--ink) !important;
+  --shiki-dark: var(--ink) !important;
+}
+
+/* Search dialog: the input already sits in a framed header. */
+[role="dialog"] input:focus-visible {
+  outline: none;
+}

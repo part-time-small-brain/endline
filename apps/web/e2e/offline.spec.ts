@@ -1,0 +1,631 @@
+import { toSign, type QuoteRequest, type StatusUpdate } from "@near-options/sdk";
+import type { Page, Route } from "@playwright/test";
+import { expect, handleOf, money, term, test } from "./fixtures.ts";
+
+const USD = 1_000_000;
+const NOW_MS = Date.parse(process.env.E2E_NOW ?? "2026-11-04T12:00:00Z");
+const listed = [5, 6].flatMap((day) =>
+  [78_000, 79_000, 80_000, 81_000, 82_000, 83_000].flatMap((strike) =>
+    (["call", "put"] as const).map((kind) => ({
+      id: `BTC-${day}NOV26-${strike}_${kind === "call" ? strike + 2_000 : strike - 2_000}-${kind === "call" ? "C" : "P"}`,
+      underlying: "BTC",
+      kind,
+      strike: String(strike * USD),
+      width: String(2_000 * USD),
+      expiry: Date.UTC(2026, 10, day, 8) / 1000,
+      underlying_decimals: 8,
+      option_asset: "nep245:opt.demo.testnet:x",
+      quotable: true,
+    })),
+  ),
+);
+const view: Record<string, unknown> = {
+  get_config: { intents_id: "intents.demo.testnet", quote_asset: "nep141:usdc.demo.testnet", quote_decimals: 6, timing: { write_cutoff_sec: 1_800 } },
+  get_underlyings: [["BTC", { decimals: 8 }]],
+};
+
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem("trade-mode", "pro"));
+});
+
+async function live(page: Page, marks: () => unknown[] | undefined | "hang", index = () => 80_650) {
+  await page.route("**/rpc", (route) => {
+    const value = view[route.request().postDataJSON().params.method_name];
+    route.fulfill({ json: { jsonrpc: "2.0", id: "web", ...(value === undefined ? { error: { message: "unknown" } } : { result: { result: [...Buffer.from(JSON.stringify(value))] } }) } });
+  });
+  await page.route("**/series", (route) => route.fulfill({ json: { quote_asset: "nep141:usdc.demo.testnet", quote_decimals: 6, series: listed } }));
+  await page.route("**/marks", (route) => {
+    const answer = marks();
+    if (answer !== "hang") route.fulfill({ json: answer ?? { error: "no market makers" } });
+  });
+  await page.route("https://www.deribit.com/**", (route) =>
+    route.fulfill({
+      json: route.request().url().includes("chart")
+        ? { result: Array.from({ length: 48 }, (_, i) => [NOW_MS - (48 - i) * 1_800_000, 80_000 + i * 10]) }
+        : { result: { index_price: index() } },
+    }),
+  );
+  await page.goto("/app");
+}
+
+async function quoteFlow(page: Page, open = true) {
+  const state = {
+    quotes: 0,
+    premium: 25,
+    hangPublish: false,
+    signed: [] as string[],
+    published: [] as string[],
+    checked: [] as string[],
+    balanceReads: 0,
+    quote: async (route: Route, json: unknown) => { await route.fulfill({ json }); },
+    status: (): StatusUpdate["status"] | number | "hang" => "settled",
+  };
+  await page.exposeFunction("tradeSigned", (message: string) => state.signed.push(message));
+  await page.addInitScript(() => {
+    const w = window as unknown as {
+      ethereum: object;
+      tradeSigned(message: string): Promise<void>;
+      releaseTrade?: () => void;
+      holdTrade?: boolean;
+      losePublish?: boolean;
+      publishHttpError?: number;
+    };
+    w.ethereum = {
+      async request({ method, params }: { method: string; params: string[] }) {
+        if (method === "eth_requestAccounts") return ["0x1111111111111111111111111111111111111111"];
+        if (method !== "personal_sign") throw new Error(method);
+        const message = new TextDecoder().decode(Uint8Array.from((params[0]!.slice(2).match(/../g) ?? []), (byte) => parseInt(byte, 16)));
+        if (message.includes("token_diff")) {
+          await w.tradeSigned(message);
+          if (w.holdTrade) await new Promise<void>((resolve) => { w.releaseTrade = resolve; });
+        }
+        return `0x${"11".repeat(64)}1b`;
+      },
+    };
+    const fetch = window.fetch.bind(window);
+    window.fetch = async (...args) => {
+      const response = await fetch(...args);
+      const url = String(args[0]);
+      if (url.endsWith("/publish")) {
+        if (w.losePublish) throw new TypeError("Failed to fetch");
+        if (w.publishHttpError) return new Response(JSON.stringify({ error: "quote is already settled" }), { status: w.publishHttpError });
+      }
+      if (url.includes("/status/")) return new Response(await response.text(), { status: Number(response.headers.get("x-status") ?? 200) });
+      return response;
+    };
+  });
+  await page.route("**/fills/*", (route) => route.fulfill({ json: [] }));
+  await page.route("**/quote", async (route) => {
+    const request = route.request().postDataJSON() as QuoteRequest;
+    const signBy = await page.evaluate(() => Date.now() + 20_000);
+    const quoteId = `quote-${++state.quotes}`;
+    const premium = String(state.premium * USD);
+    const cash = { asset: "nep141:usdc.demo.testnet", amount: premium };
+    const option = { asset: `nep245:opt.demo.testnet:${request.series_id}`, amount: request.size };
+    const [pay, receive] = request.side === "buy" ? [cash, option] : [option, cash];
+    await state.quote(route, {
+      quote_id: quoteId, series_id: request.series_id, side: request.side, size: request.size,
+      premium, pay, receive, sign_by_ms: signBy,
+      payload: toSign(request.signer.standard, {
+        signer_id: request.signer.signer_id, verifying_contract: "intents.demo.testnet", deadline: new Date(signBy + 3_000).toISOString(), nonce: "AA==",
+        intents: [{ intent: "token_diff", diff: { [pay.asset]: `-${pay.amount}`, [receive.asset]: receive.amount } }],
+      }),
+    });
+  });
+  await page.route("**/publish", async (route) => {
+    const id = route.request().postDataJSON().quote_id as string;
+    state.published.push(id);
+    if (state.hangPublish) return;
+    await route.fulfill({ json: { quote_id: id, status: "settling" } });
+  });
+  await page.route("**/status/*", async (route) => {
+    const id = route.request().url().split("/").at(-1)!;
+    state.checked.push(id);
+    const status = state.status();
+    if (status === "hang") return;
+    await route.fulfill(typeof status === "number"
+      ? { headers: { "x-status": String(status) }, json: { error: "status unavailable" } }
+      : { json: { quote_id: id, status, tx_hash: status === "settled" ? "original-fill" : undefined } });
+  });
+  await live(page, () => [{ series_id: "BTC-5NOV26-81000_83000-C", ask: String(400 * USD), bid: String(380 * USD), vol: 0.4 }]);
+  await page.route("**/rpc", async (route) => {
+    const params = route.request().postDataJSON().params;
+    const args = JSON.parse(Buffer.from(params.args_base64, "base64").toString());
+    const value = params.method_name === "current_salt" ? "00000000"
+      : params.method_name === "mt_batch_balance_of" ? (state.balanceReads++, args.token_ids.map(() => String(250 * USD)))
+      : view[params.method_name];
+    await route.fulfill({ json: { jsonrpc: "2.0", id: "web", result: { result: [...Buffer.from(JSON.stringify(value))] } } });
+  });
+  await page.getByRole("button", { name: "Connect", exact: true }).click();
+  await page.getByRole("button", { name: /Ethereum wallet/ }).click();
+  await page.evaluate(() => {
+    history.replaceState(null, "", "/");
+    history.pushState(null, "", "/app");
+  });
+  if (open) {
+    await page.getByRole("button", { name: "Buy Up · $25" }).click();
+    await expect(page.getByRole("button", { name: "Buy for $25" })).toBeVisible();
+  }
+  return state;
+}
+
+for (const phase of ["loading", "refreshing"] as const) {
+  test(`a delayed ${phase} quote cannot be abandoned or duplicated across SPA navigation`, async ({ page }) => {
+    const state = await quoteFlow(page, phase === "refreshing");
+    let release!: () => void;
+    state.quote = async (route, json) => {
+      await new Promise<void>((resolve) => { release = resolve; });
+      await route.fulfill({ json });
+    };
+    if (phase === "loading") await page.getByRole("button", { name: "Buy Up · $25" }).click();
+    else await page.clock.fastForward(15_000);
+    const count = phase === "loading" ? 1 : 2;
+    await expect.poll(() => state.quotes).toBe(count);
+    const dialog = page.getByRole("dialog", { name: "Confirm" });
+    await expect(dialog.getByRole("button", { name: "Close", exact: true })).toBeDisabled();
+    await dialog.getByRole("button", { name: "Close", exact: true }).click({ force: true });
+    await page.mouse.click(5, 5);
+    await page.keyboard.press("Escape");
+    await page.keyboard.press("Tab");
+    await expect(dialog).toBeFocused();
+    await page.goBack();
+    await expect(page).toHaveURL(/\/$/);
+    await expect(dialog).toBeVisible();
+    await page.goForward();
+    await expect(page).toHaveURL(/\/app$/);
+    await expect(dialog).toBeVisible();
+    expect(state.quotes).toBe(count);
+    release();
+    await page.evaluate(() => { (window as unknown as { holdTrade: boolean }).holdTrade = true; });
+    await page.getByRole("button", { name: "Buy for $25" }).click();
+    await expect.poll(() => state.signed.length).toBe(1);
+    await page.goBack();
+    await expect(dialog).toBeVisible();
+    await page.clock.fastForward(2_000);
+    expect(state.quotes).toBe(count);
+    await page.evaluate(() => { (window as unknown as { releaseTrade: () => void }).releaseTrade(); });
+    await page.clock.runFor(1_100);
+    await expect(page.getByText("You're in")).toBeVisible();
+    expect(state.quotes).toBe(count);
+    expect(state.published).toEqual([`quote-${count}`]);
+  });
+}
+
+for (const side of ["buy", "sell"] as const) {
+  test(`an unknown ${side} retains its modal and quote through keyboard cycles and Back to trade and landing`, async ({ page }) => {
+    const state = await quoteFlow(page, false);
+    await page.getByRole("link", { name: /Positions/ }).click();
+    if (side === "buy") {
+      await page.getByRole("link", { name: "Trade", exact: true }).click();
+      await page.getByRole("button", { name: "Buy Up · $25" }).click();
+    } else await page.getByRole("button", { name: "Sell back", exact: true }).first().click();
+    state.status = () => "settling";
+    await page.getByRole("button", { name: `${side === "buy" ? "Buy" : "Sell back"} for $25` }).click();
+    await expect.poll(() => state.published.length).toBe(1);
+    await page.clock.runFor(1_100);
+    await page.clock.fastForward(60_000);
+    const dialog = page.getByRole("dialog", { name: side === "buy" ? "Confirm" : "Sell back", exact: true });
+    const check = dialog.getByRole("button", { name: "Check status", exact: true });
+    await expect(check).toBeVisible();
+    await dialog.evaluate((element) => { element.setAttribute("data-original", "yes"); });
+    if (side === "buy") await page.goBack();
+    await page.goBack();
+    await expect(page).toHaveURL(/\/app$/);
+    await expect(dialog).toHaveAttribute("data-original", "yes");
+    await page.goBack();
+    await expect(page).toHaveURL(/\/$/);
+    await expect(dialog).toHaveAttribute("data-original", "yes");
+    await check.focus();
+    for (const key of ["Tab", "Shift+Tab", "Tab", "Tab", "Shift+Tab"]) {
+      await page.keyboard.press(key);
+      await expect(check).toBeFocused();
+    }
+    expect(state.quotes).toBe(1);
+    state.status = () => "settled";
+    await check.click();
+    await expect(page.getByText(side === "buy" ? "You're in" : "Sold", { exact: true })).toBeVisible();
+    expect(new Set(state.checked)).toEqual(new Set(["quote-1"]));
+    expect(state.published).toEqual(["quote-1"]);
+  });
+}
+
+test("the NEAR provider popup owns focus without dismissing the underlying sheet", async ({ page }) => {
+  await live(page, () => []);
+  await page.getByRole("button", { name: "Connect", exact: true }).click();
+  const sheet = page.getByRole("dialog", { name: "Connect", exact: true });
+  await page.evaluate(() => {
+    const popup = document.createElement("div");
+    popup.className = "hot-connector-popup";
+    popup.innerHTML = '<button type="button">Wallet settings</button><textarea aria-label="Wallet manifest"></textarea>';
+    document.body.append(popup);
+    popup.querySelector("textarea")?.focus();
+  });
+  const manifest = page.getByRole("textbox", { name: "Wallet manifest" });
+  await expect(manifest).toBeFocused();
+  await page.keyboard.type("manifest");
+  await expect(manifest).toHaveValue("manifest");
+  await page.keyboard.press("Tab");
+  await expect(page.getByRole("button", { name: "Wallet settings" })).toBeFocused();
+  await page.keyboard.press("Shift+Tab");
+  await expect(manifest).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(sheet).toBeVisible();
+  await page.evaluate(() => document.querySelector(".hot-connector-popup")?.remove());
+  await page.keyboard.press("Tab");
+  await expect(sheet.getByRole("button", { name: "Close", exact: true })).toBeFocused();
+});
+
+test("quote renewal blocks the old price, requires acceptance and never races a delayed wallet", async ({ page }) => {
+  const state = await quoteFlow(page);
+  const original = state.quotes;
+  state.premium = 26;
+  let release!: () => void;
+  state.quote = async (route, json) => {
+    await new Promise<void>((resolve) => { release = resolve; });
+    await route.fulfill({ json });
+  };
+  await page.clock.fastForward(15_000);
+  await expect.poll(() => state.quotes).toBe(original + 1);
+  await expect(page.getByRole("button", { name: "Refreshing price…" })).toBeDisabled();
+  await expect(page.getByRole("button", { name: /^Buy for/ })).toHaveCount(0);
+  await page.getByRole("button", { name: "Refreshing price…" }).click({ force: true });
+  expect(state.signed).toEqual([]);
+  release();
+  await expect(page.getByRole("button", { name: "Accept new price" })).toBeVisible();
+  await expect(page.getByRole("button", { name: /^Buy for/ })).toHaveCount(0);
+  await page.getByRole("button", { name: "Accept new price" }).click();
+  await page.evaluate(() => { (window as unknown as { holdTrade: boolean }).holdTrade = true; });
+  await page.getByRole("button", { name: "Buy for $26" }).click();
+  await expect.poll(() => state.signed.length).toBe(1);
+  await page.clock.fastForward(15_000);
+  expect(state.quotes).toBe(original + 1);
+  await page.evaluate(() => { (window as unknown as { releaseTrade: () => void }).releaseTrade(); });
+  await page.clock.runFor(1_100);
+  await expect(page.getByText("You're in")).toBeVisible();
+  expect(state.published).toEqual([`quote-${original + 1}`]);
+});
+
+test("signing just before renewal blocks background quote requests until the wallet finishes", async ({ page }) => {
+  const state = await quoteFlow(page);
+  const original = state.quotes;
+  await page.evaluate(() => { (window as unknown as { holdTrade: boolean }).holdTrade = true; });
+  await page.clock.fastForward(14_000);
+  await page.getByRole("button", { name: "Buy for $25" }).click();
+  await expect.poll(() => state.signed.length).toBe(1);
+  await page.clock.fastForward(2_000);
+  expect(state.quotes).toBe(original);
+  await expect(page.getByRole("button", { name: "Close", exact: true })).toBeDisabled();
+  await page.evaluate(() => { (window as unknown as { releaseTrade: () => void }).releaseTrade(); });
+  await page.clock.runFor(1_100);
+  await expect(page.getByText("You're in")).toBeVisible();
+  expect(state.published).toEqual([`quote-${original}`]);
+});
+
+test("a failed quote renewal never restores the old signable price", async ({ page }) => {
+  const state = await quoteFlow(page);
+  state.quote = async (route) => { await route.fulfill({ json: { error: "refresh failed" } }); };
+  await page.clock.fastForward(15_000);
+  await expect(page.getByText("No price right now", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: /^Buy for/ })).toHaveCount(0);
+  expect(state.signed).toEqual([]);
+});
+
+for (const error of ["transport", 409] as const) {
+  test(`a publish ${error} error reconciles the original fill and reloads balances`, async ({ page }) => {
+    const state = await quoteFlow(page);
+    await page.evaluate((error) => {
+      const w = window as unknown as { losePublish: boolean; publishHttpError: number };
+      if (error === "transport") w.losePublish = true;
+      else w.publishHttpError = error;
+    }, error);
+    const reads = state.balanceReads;
+    const id = `quote-${state.quotes}`;
+    await page.getByRole("button", { name: "Buy for $25" }).click();
+    await page.clock.runFor(1_100);
+    await expect(page.getByText("You're in")).toBeVisible();
+    await expect(page.getByRole("button", { name: /auto-collect/i })).toBeVisible();
+    await expect.poll(() => state.balanceReads).toBeGreaterThan(reads);
+    expect(state.published).toEqual([id]);
+    expect(state.checked).toEqual([id]);
+  });
+}
+
+test("status polling retries temporary errors including HTTP errors on the same quote", async ({ page }) => {
+  const state = await quoteFlow(page);
+  const id = `quote-${state.quotes}`;
+  const replies = [503, 404, "settling", "settled"] as const;
+  state.status = () => replies[Math.min(state.checked.length - 1, replies.length - 1)]!;
+  await page.getByRole("button", { name: "Buy for $25" }).click();
+  for (let i = 1; i <= replies.length; i++) {
+    await page.clock.runFor(1_100);
+    await expect.poll(() => state.checked.length).toBe(i);
+  }
+  await expect(page.getByText("You're in")).toBeVisible();
+  expect(state.checked).toEqual(replies.map(() => id));
+});
+
+for (const status of ["settling", 404, "hang"] as const) {
+  test(`unresolved settlement (${status}) checks only the original quote, never a fresh buy`, async ({ page }) => {
+    const state = await quoteFlow(page);
+    const original = state.quotes;
+    const id = `quote-${original}`;
+    state.status = () => status;
+    await page.getByRole("button", { name: "Buy for $25" }).click();
+    await expect.poll(() => state.published.length).toBe(1);
+    await page.clock.runFor(1_100);
+    await expect.poll(() => state.checked.length).toBe(1);
+    await page.clock.fastForward(60_000);
+    await expect(page.getByRole("button", { name: "Check status", exact: true })).toBeVisible();
+    await expect(page.getByText(/nothing was charged/i)).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Get new price" })).toHaveCount(0);
+    const close = page.getByRole("button", { name: "Close", exact: true });
+    await expect(close).toBeDisabled();
+    await close.click({ force: true });
+    await page.mouse.click(5, 5);
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("dialog", { name: "Confirm" })).toBeVisible();
+    expect(state.quotes).toBe(original);
+    state.status = () => "settled";
+    await page.getByRole("button", { name: "Check status", exact: true }).click();
+    await expect(page.getByText("You're in")).toBeVisible();
+    expect(new Set(state.checked)).toEqual(new Set([id]));
+    expect(state.published).toEqual([id]);
+  });
+}
+
+test("a hanging publish becomes unknown without resubmitting or claiming no charge", async ({ page }) => {
+  const state = await quoteFlow(page);
+  const id = `quote-${state.quotes}`;
+  state.hangPublish = true;
+  await page.getByRole("button", { name: "Buy for $25" }).click();
+  await expect.poll(() => state.published.length).toBe(1);
+  await page.clock.fastForward(60_000);
+  await expect(page.getByRole("button", { name: "Check status", exact: true })).toBeVisible();
+  await expect(page.getByText(/nothing was charged/i)).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Get new price" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Check status", exact: true }).click();
+  await expect(page.getByText("You're in")).toBeVisible();
+  expect(state.published).toEqual([id]);
+  expect(state.checked).toEqual([id]);
+});
+
+for (const status of ["failed", "expired"] as const) {
+  test(`only known ${status} status offers no-fill and a new price`, async ({ page }) => {
+    const state = await quoteFlow(page);
+    state.status = () => status;
+    await page.getByRole("button", { name: "Buy for $25" }).click();
+    await page.clock.runFor(1_100);
+    await expect(page.getByText("Not filled, nothing was charged", { exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Get new price" })).toBeVisible();
+  });
+}
+
+test("with no relay the hero waits for live prices and never links a series", async ({ page }) => {
+  await page.route("**/rpc", (route) => route.fulfill({ json: { jsonrpc: "2.0", id: "web", error: { message: "offline" } } }));
+  await page.goto("/");
+  await page.clock.fastForward(10_000);
+  const hero = page.locator("#top");
+  await expect(hero.getByLabel("Loading prices")).toBeVisible();
+  await expect(hero.getByRole("link", { name: /^Try / })).toHaveCount(0);
+  await expect(page.locator('a[href*="series="]')).toHaveCount(0);
+});
+
+test("without marks from a market maker nothing is offered", async ({ page }) => {
+  await live(page, () => []);
+  await expect(page.getByText("No prices right now")).toBeVisible();
+  await expect(handleOf(page)).toHaveCount(0);
+  await expect(term(page, "Max loss")).toHaveCount(0);
+});
+
+test("offers only marked strikes, sizes at the mark's ask and takes the chance from its vol", async ({ page }) => {
+  let vol = 0.2;
+  const mark = (strike: number) => ({ series_id: `BTC-5NOV26-${strike}_${strike + 2_000}-C`, ask: String(400 * USD), bid: String(380 * USD), vol });
+  await live(page, () => [mark(81_000), mark(82_000)]);
+  const handle = handleOf(page);
+  await expect(handle).toHaveAttribute("aria-valuemin", "81000");
+  await expect(handle).toHaveAttribute("aria-valuemax", "82000");
+  await expect(handle).toHaveAttribute("aria-valuenow", "81000");
+  await expect.poll(() => money(term(page, "Max loss"))).toBe(25);
+  await expect.poll(() => money(term(page, /^If BTC ends above /))).toBe(125);
+  const up = page.getByRole("radiogroup", { name: "Direction" }).getByRole("radio", { name: /^Up/ });
+  await expect(up).toContainText("32%");
+  vol = 0.8;
+  await page.clock.fastForward(5_000);
+  await expect(up).toContainText("45%");
+  await page.getByRole("radiogroup", { name: "Direction" }).getByRole("radio", { name: /^Down/ }).click();
+  await expect(page.getByText("No prices right now")).toBeVisible();
+});
+
+test("offers only dates with prices it can sell at and opens on the first of them", async ({ page }) => {
+  await live(page, () => [
+    { series_id: "BTC-5NOV26-81000_83000-C", ask: String(2_000 * USD), vol: 0.4 },
+    { series_id: "BTC-6NOV26-81000_83000-C", ask: String(400 * USD), vol: 0.4 },
+  ]);
+  await expect(handleOf(page)).toHaveAttribute("aria-valuenow", "81000");
+  await expect(page.getByRole("radiogroup", { name: "Ends" }).getByRole("radio")).toHaveCount(1);
+});
+
+test("stops showing the last prices once the relay's marks hang", async ({ page }) => {
+  let hang = false;
+  await live(page, () => (hang ? "hang" : [{ series_id: "BTC-5NOV26-81000_83000-C", ask: String(400 * USD), vol: 0.4 }]));
+  await expect(handleOf(page)).toBeVisible();
+  hang = true;
+  await page.clock.fastForward(5_000);
+  await expect(page.getByText("No prices right now")).toBeVisible({ timeout: 10_000 });
+});
+
+test("Lite hides stale payouts and offers no unpriced dates or prices", async ({ page }) => {
+  let priced = true;
+  await live(page, () => priced ? [{ series_id: "BTC-5NOV26-81000_83000-C", ask: String(400 * USD), bid: String(380 * USD), vol: 0.4 }] : []);
+  await page.getByRole("button", { name: "Lite", exact: true }).click();
+  await expect(page.getByLabel("Maximum payout")).toHaveText("$125");
+  await expect(page.getByText("Full payout if BTC ends above $83,000", { exact: true })).toBeVisible();
+  priced = false;
+  await page.clock.fastForward(5_000);
+  await expect(page.getByRole("status").filter({ hasText: "No prices right now" })).toBeVisible();
+  await expect(page.getByLabel("Maximum payout")).toHaveText("—");
+  await expect(page.getByText(/^Full payout if/)).toHaveCount(0);
+  await page.getByRole("button", { name: "End date", exact: true }).click();
+  await expect(page.getByRole("radiogroup", { name: "End date options" }).getByRole("radio")).toHaveCount(0);
+  await page.keyboard.press("Escape");
+  await page.getByRole("button", { name: "Price to beat", exact: true }).click();
+  await expect(page.getByRole("radiogroup", { name: "Prices to beat" }).getByRole("radio")).toHaveCount(0);
+});
+
+test("Lite still shows exact gross payout when rounding leaves no profit", async ({ page }) => {
+  await live(page, () => [{ series_id: "BTC-5NOV26-81000_83000-C", ask: String(2_000 * USD - 1), vol: 0.2 }]);
+  await page.getByRole("button", { name: "Lite", exact: true }).click();
+  await expect(page.getByLabel("Maximum payout")).toHaveText("$25");
+  await expect(page.getByLabel("Trade ticket").getByText("1.0×", { exact: true })).toBeVisible();
+  await expect(page.getByText("Max loss $25", { exact: false })).toBeVisible();
+  await expect(page.getByText("Full payout if BTC ends above $83,000", { exact: true })).toBeVisible();
+});
+
+test("Lite date chances match the nearest marked price it selects", async ({ page }) => {
+  await live(page, () => [
+    { series_id: "BTC-5NOV26-81000_83000-C", ask: String(400 * USD), vol: 0.2 },
+    { series_id: "BTC-5NOV26-82000_84000-C", ask: String(2_000 * USD), vol: 0.2 },
+    { series_id: "BTC-6NOV26-82000_84000-C", ask: String(500 * USD), vol: 0.8 },
+    { series_id: "BTC-6NOV26-83000_85000-C", ask: String(100 * USD), vol: 0.8 },
+  ]);
+  await page.getByRole("button", { name: "Lite", exact: true }).click();
+  await expect(page.getByLabel("Maximum payout")).toHaveText("$125");
+  await page.getByRole("button", { name: "End date", exact: true }).click();
+  const dates = page.getByRole("radiogroup", { name: "End date options" }).getByRole("radio");
+  await expect(dates).toHaveCount(2);
+  const row = dates.last();
+  const chance = /[<>]?\d+%/.exec(await row.innerText())?.[0];
+  expect(chance).toBeTruthy();
+  await row.click();
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("button", { name: "Price to beat", exact: true })).toContainText("$82,000");
+  await expect(page.getByRole("button", { name: "About estimated chance" })).toHaveAccessibleDescription(`${chance} estimated chance`);
+  await expect(page.getByLabel("Maximum payout")).toHaveText("$100");
+  await expect(page.getByText("Full payout if BTC ends above $84,000", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Price to beat", exact: true }).click();
+  await expect(page.getByRole("radiogroup", { name: "Prices to beat" }).getByRole("radio")).toHaveCount(2);
+});
+
+test("stops showing the last prices once the relay's marks fail", async ({ page }) => {
+  let up = true;
+  await live(page, () => (up ? [{ series_id: "BTC-5NOV26-81000_83000-C", ask: String(400 * USD), vol: 0.4 }] : undefined));
+  await expect(handleOf(page)).toBeVisible();
+  up = false;
+  await page.clock.fastForward(5_000);
+  await expect(page.getByText("No prices right now")).toBeVisible();
+  await expect(handleOf(page)).toHaveCount(0);
+});
+
+test.describe("Tap", () => {
+  test.beforeEach(async ({ page }) => {
+    await page.addInitScript(() => localStorage.setItem("trade-mode", "tap"));
+  });
+
+  test("offers exactly the marked series on their own side of spot, at the gross multiple of the mark", async ({ page }) => {
+    await live(page, () => [
+      { series_id: "BTC-5NOV26-81000_83000-C", ask: String(400 * USD), vol: 0.4 },
+      { series_id: "BTC-5NOV26-80000_78000-P", ask: String(400 * USD), vol: 0.4 },
+      { series_id: "BTC-6NOV26-82000_84000-C", ask: String(500 * USD), vol: 0.4 },
+      { series_id: "BTC-6NOV26-81000_79000-P", ask: String(400 * USD), vol: 0.4 },
+    ]);
+    const grid = page.getByRole("table");
+    await expect(grid.getByRole("rowheader")).toHaveText([/^\$82,000/, /^\$81,000/, /^\$80,000/]);
+    const names = await grid.getByRole("button").evaluateAll((buttons) => buttons.map((b) => b.getAttribute("aria-label")));
+    expect(names).toEqual([
+      expect.stringMatching(/^Up · BTC ends above \$82,000 · .* · pays up to 4\.0×$/),
+      expect.stringMatching(/^Up · BTC ends above \$81,000 · .* · pays up to 5\.0×$/),
+      expect.stringMatching(/^Down · BTC ends below \$80,000 · .* · pays up to 5\.0×$/),
+    ]);
+  });
+
+  test("a press that spans a cell turning from Up to Down buys nothing", async ({ page }) => {
+    let index = 80_650;
+    await live(
+      page,
+      () => [
+        { series_id: "BTC-5NOV26-81000_83000-C", ask: String(400 * USD), vol: 0.4 },
+        { series_id: "BTC-5NOV26-81000_79000-P", ask: String(400 * USD), vol: 0.4 },
+      ],
+      () => index,
+    );
+    const box = (await page.getByRole("table").getByRole("button", { name: /^Up · BTC ends above \$81,000/ }).boundingBox())!;
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.down();
+    index = 81_200;
+    await page.clock.fastForward(5_000);
+    const down = page.getByRole("table").getByRole("button", { name: /^Down · BTC ends below \$81,000/ });
+    await expect(down).toBeVisible();
+    await page.mouse.up();
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    await down.click();
+    await expect(page.getByRole("dialog")).toBeVisible();
+  });
+
+  async function withTapBalance(page: Page) {
+    const state = await quoteFlow(page, false);
+    await page.route("**/claims", (route) => route.fulfill({ json: {} }));
+    await page.getByRole("button", { name: "Set up", exact: true }).click();
+    const sheet = page.getByRole("dialog", { name: "Tap balance" });
+    await sheet.getByRole("button", { name: "Set up with your wallet" }).click();
+    await sheet.getByRole("button", { name: "Sign once more to check" }).click();
+    await expect(sheet.getByText("In your Tap balance")).toBeVisible();
+    await page.keyboard.press("Escape");
+    return state;
+  }
+
+  test("a tap signs only while the firm quote still pays the multiple on the cell, and a refused one shows the new multiple at once", async ({ page }) => {
+    const state = await withTapBalance(page);
+    let ask = 400;
+    await page.route("**/marks", (route) => route.fulfill({ json: [{ series_id: "BTC-5NOV26-81000_83000-C", ask: String(ask * USD), bid: String(380 * USD), vol: 0.4 }] }));
+    const cell = page.getByRole("table").getByRole("button", { name: /^Up · BTC ends above \$81,000 · Tomorrow/ });
+    await expect(cell).toHaveAccessibleName(/· pays up to 5\.0×/);
+    await page.clock.pauseAt((await page.evaluate(() => Date.now())) + 1_000);
+    ask = 416;
+    state.premium = 26;
+    await cell.click();
+    await expect(page.getByRole("status").filter({ hasText: "The price moved. Tap again for the new one." })).toBeVisible();
+    await expect(cell).toHaveAccessibleName(/· pays up to 4\.8×/);
+    expect(state.published).toEqual([]);
+    await page.clock.resume();
+    state.premium = 25;
+    await cell.click();
+    await expect(page.getByRole("status").filter({ hasText: "Bought BTC Up $81,000 for $25.00." })).toBeVisible();
+    expect(state.published).toEqual(["quote-2"]);
+  });
+
+  test("a move the relay can't confirm never says nothing moved, and rereads both balances", async ({ page }) => {
+    const state = await withTapBalance(page);
+    await page.route("**/health", (route) => route.fulfill({ json: { ok: true, market_makers: 1, relayer_id: "relayer.demo.testnet" } }));
+    await page.evaluate(() => {
+      const fetch = window.fetch.bind(window);
+      window.fetch = (input, init) => (String(input).endsWith("/transfer") ? Promise.resolve(new Response("error code: 524", { status: 524 })) : fetch(input, init));
+    });
+    await page.getByRole("button", { name: "Top up or move" }).click();
+    const sheet = page.getByRole("dialog", { name: "Tap balance" });
+    const reads = state.balanceReads;
+    await sheet.getByRole("button", { name: "Move $25 in" }).click();
+    await expect(sheet.getByRole("alert")).toHaveText("We couldn't confirm this move. Check both balances before you try again.");
+    await expect.poll(() => state.balanceReads).toBeGreaterThan(reads);
+  });
+
+  test("Your taps never offers a bet without a price for $0, nor one the relay won't quote", async ({ page }) => {
+    await withTapBalance(page);
+    const mine = page.getByRole("region", { name: "Your taps" });
+    await expect(mine.getByRole("button", { name: /^Sell \$/ })).toHaveText([/^Sell \$[\d,.]+$/]);
+    await expect(mine.getByRole("button", { name: "Sell unavailable" }).first()).toBeDisabled();
+    const closed = listed.map((s) => (s.id === "BTC-5NOV26-81000_83000-C" ? { ...s, quotable: false } : s));
+    await page.route("**/series", (route) => route.fulfill({ json: { quote_asset: "nep141:usdc.demo.testnet", quote_decimals: 6, series: closed } }));
+    await page.clock.fastForward(15_000);
+    await expect(mine.getByRole("button", { name: /^Sell \$/ })).toHaveCount(0);
+  });
+
+  test("drops every cell once the relay's marks fail", async ({ page }) => {
+    let up = true;
+    await live(page, () => (up ? [{ series_id: "BTC-5NOV26-81000_83000-C", ask: String(400 * USD), vol: 0.4 }] : undefined));
+    await expect(page.getByRole("table").getByRole("button")).toHaveCount(1);
+    up = false;
+    await page.clock.fastForward(5_000);
+    await expect(page.getByRole("status").filter({ hasText: "No prices right now" })).toBeVisible();
+    await expect(page.getByRole("table")).toHaveCount(0);
+  });
+});

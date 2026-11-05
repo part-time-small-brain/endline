@@ -1,0 +1,84 @@
+---
+title: Security model
+description: The rules every change keeps, what each actor can do, and the gaps we know about.
+---
+
+## Contract rules
+
+1. Collateral and options live inside `intents.near`. Users reach the contract only through a signed intents `transfer` with `msg`, which calls `mt_on_transfer`. Payouts go out with `intents.near::mt_transfer`.
+2. `mt_on_transfer` accepts calls only from `intents.near`. Amounts and `sender_id` come from intents, never from `msg`. A panic there is safe: intents refunds the signer.
+3. `mt_on_transfer` always returns a plain value, never a promise. Follow-up calls are detached with their own callbacks. The Oct 2026 $3.8M Intents exploit came from a returned promise an attacker could force to fail.
+4. Payouts never exceed collateral. Holder payouts round down; the contract keeps the dust. `collateral_locked` is checked before every payout.
+5. Settlement uses only the oracle's price for that exact `(underlying, expiry)`, final after the dispute window. Never a spot price, a pool price or "latest".
+6. Every cross-contract call has a callback that handles failure explicitly, and acts only on an explicit failure.
+7. Math is u128 with U256 intermediates. Overflow panics; release builds keep `overflow-checks = true`.
+8. The owner can never move collateral out of a series or pause exits. Its other powers, including stalling settlement, are below.
+
+## Who can do what
+
+| Actor | Can | Can't |
+|---|---|---|
+| Owner | Pause writes and new series, override a price before `final_at` (which decides how a series' collateral is split), add assets, add or remove oracle accounts, pin the oracle WASM (adds and pins take effect after `oracle_delay_sec`, 1 day on mainnet), propose a new owner who must accept. Removing every oracle account and pinning a WASM that never returns a price stalls settlement forever | Move collateral out of a series, pause exits, change timing or the dispute window, move `final_at` |
+| Oracle account | Propose a price after `E + oracle_window_sec`, once per `(underlying, expiry)` | Propose early, change a proposal |
+| OutLayer | Return a result for a request the contract made | Write a price that fails `ok`, index, expiry and `price > 0` checks |
+| Relay | Submit signed payloads, refuse quotes | Change what users signed. It only submits byte-identical payloads |
+| Market maker | Quote, write, redeem its shorts | Pay out more than its locked collateral |
+
+## Main threats
+
+| Threat | Mitigation |
+|---|---|
+| Fake deposit notifications | `mt_on_transfer` only from `intents.near`; amounts and sender from intents |
+| Forced failure of a returned promise | Receivers return plain values; delivery and payouts are detached. Our own transfers into intents carry only a plain deposit `msg` |
+| Payout above collateral | Per-series `collateral_locked`; `long + short ≤ refund ≤ collateral` proven by tests |
+| Spot or pool price used for settlement | Price keyed by exact `(underlying, expiry)`, a 30-min TWAP median, never "latest" |
+| Wrong oracle price | Price > 0, dispute window, owner override, monitor (alerts at 20 bps); median of 7 with at least 3; Deribit 50 bps veto, and no price at all on an 08:00 market without Deribit; the USDT/USD rate needs both sources within 20 bps |
+| Forged or stale OutLayer result | WASM pinned by sha256; private callback with capped read; a stale callback can't release a newer lock |
+| Missing price | Market stays pending. No fallback payout formula. `burn_pair` always works |
+| Settlement-window games | Writes and quotes stop at the TWAP window start |
+| Double exercise | Ledger closes burn before paying; intents closes park tokens in the contract's intents balance |
+| Tampered deposit quote | The relay passes on a 1Click deposit quote, and the app shows it, only if 1Click's signature over the request the app sent and the quote verifies. The app also refuses quotes losing more than 3% or carrying a memo, and shows what arrives |
+| Relay or MM skewing the ticket's prices | The ticket's cost, size, chance and values come from the relay's `GET /marks`, so a lying relay or MM sets what it shows. Funds stay safe: the firm quote comes from the auction and the pre-sign card shows the exact `token_diff` the wallet signs |
+| Created series or sent tokens crowding out the market maker's prices | It prices only series it holds, ranked by what its tokens there are worth, within the relay's 64 KB message limit. Pushing a series out costs sending it tokens worth more than its position there |
+| Lying relay | The app takes USDC and option decimals from the contract and shows a series only if its id is rebuilt from its terms |
+| Swapped wallet scripts | The app ships the wallet list, with GitHub-hosted wallet scripts pinned to commits |
+| Relay as a free gas payer | `/execute` and `/claims` accept only a canonical exercise of our long tokens; `/transfer` only a plain USDC transfer that pays the relayer $0.01, more than its gas; each nonce sent once; rate limits |
+| Quote spam | Signed sessions, balance-backed quotes, one open quote per signer, rate limits |
+| Tampered user payload | Relay accepts only the byte-identical payload it issued, once, before expiry |
+| Unbounded loops | Batches capped at 10 tokens; views paginated (≤ 200) |
+| Owner key taken over or mistyped | New oracles and oracle WASMs take effect only `oracle_delay_sec` after the call (1 day on mainnet). Ownership moves only when the new owner calls `accept_owner`, so it can sit behind a multisig |
+
+## Known gaps
+
+| Gap | Detail |
+|---|---|
+| No audit | The contract, relay and app haven't had an external audit |
+| Contract NEAR reserve | If the contract's NEAR falls below its storage needs, failed payouts can't be recorded as claimable and new settlements can't be stored. The monitor alerts below 2 NEAR over storage |
+| `/deposit-quote` is an open on-ramp under our 1Click key | It has no session, so a bot can quote deposits into any intents account. Fees can't be redirected and a 60/min cap protects the key, but heavy use can block deposit quotes for everyone for up to a minute |
+| Quote spam is bounded | Someone holding enough premium can keep a series' inventory reserved without trading |
+| Sessions aren't bound to this app | A session is an empty intents payload, accepted by any service using the same scheme |
+| Removed keys | A removed key keeps quoting until its session deadline (≤ 7 days). Trades still need a fresh signature checked by intents |
+| Withdraw with `msg` | A user-made panic in `mt_batch_transfer_call` on an intents `mt_withdraw` with `msg` can burn that user's own options |
+| Oracle trust | A whitelisted oracle account or the OutLayer operator can propose any positive price. The defence is the dispute window, the monitor and an owner override in time |
+| Oracle timeouts | The WASM has only a connect timeout. A hanging exchange can push a run past its limit, and someone retries |
+| Owner can stall settlement | With no oracle account and a WASM that never returns a price, markets stay pending and nothing pays out. `burn_pair` still works |
+| A captured owner key still decides prices | `override_settlement` sets any price before the end of the dispute window, with no delay. The oracle delay only stops a slow takeover through a new oracle or WASM |
+| Not upgradeable | Fixes ship as a new deployment; old series stay redeemable |
+| Vendor-hosted wallet scripts | Wallets that serve their own script (Intear, NEAR Mobile, Trezu, EVM-on-NEAR) can change it, as in any dapp. near-connect also caches scripts in the browser, and its popup lets a user add a debug wallet |
+| Unsigned 1Click fields | 1Click doesn't sign `appFees` (nor a few other request fields), so a compromised relay could add a fee under the 3% cap, shown in the amount that arrives |
+| Non-reproducible wasm | Nobody else can rebuild the deployed contract to its hash until the repository is public |
+| Contract account keys | Every full-access key on the contract account must be deleted after deploy |
+
+## Monitoring
+
+`pnpm --filter @near-options/mm start monitor` checks every minute, logs alerts and can post them to a webhook:
+
+| Alert | When |
+|---|---|
+| `settle` | A proposal before `final_at` more than 20 bps from the Deribit reference, or with no reference. Prints the `override_settlement` command |
+| `missing` | No proposal by `E + oracle_window_sec`. Prints the `propose_settlement` command |
+| `reserve` | NEAR minus storage cost below 2 NEAR, for the options contract, the intents contract and the relayer |
+| `uptime`, `quotes` | With `HEALTH_URL` set: the relay's `/health` doesn't answer `{"ok":true}` within 5 s, or no market maker is connected |
+| `pending` | A pending oracle or oracle WASM (`get_pending_oracle_changes`, with when it takes effect) or a pending owner (`get_config.pending_owner_id`, until it accepts) |
+
+Not built yet: alerts on large single payouts, and a solvency check of locked collateral against the contract's intents USDC balance.

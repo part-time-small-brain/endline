@@ -1,0 +1,31 @@
+---
+title: Collecting
+description: Winning options pay out automatically with auto-collect, or with one tap on Collect. Both are gasless for payouts of $1 or more.
+---
+
+## Two ways to get paid
+
+| | Auto-collect | Collect button |
+|---|---|---|
+| You sign | Right after buying in the app | After the final price is set |
+| Sent | 1 to 2 min after the price is final | From 1 min after the price is final |
+| Later | Nothing to do | Tap "Collect $X" in the app |
+
+Our relay sends both and pays the gas when the payout is $1 or more. The payout goes to your NEAR Intents balance.
+
+Collecting returns your option to the contract for its payout. Auto-collect is that instruction signed in advance, valid until 7 days after the end. The relay holds it until the price is final, since sending it earlier would fail.
+
+| Situation | Result |
+|---|---|
+| You win $1 or more | Paid in USDC, at most what the cap pays |
+| You win under $1 | Collect it from a NEAR wallet, which pays the gas; auto-collect skips it, and an EVM wallet can't collect it in the app |
+| You lose | Nothing to do. The app shows "Ended $0" |
+| You sold back | The relay drops your auto-collect |
+| Options you didn't buy in the app | No auto-collect; use Collect |
+| No auto-collect, never came back | The payout waits in the contract and doesn't expire |
+
+## Relay limits
+
+The relay only pays gas for an exercise of our own option tokens (1 to 10 per collect, each at least the minimum size) after the price is final, with a total payout of at least $1 (collect several positions together to reach it). Smaller payouts are collected from a NEAR wallet. Each signed instruction goes on-chain once, and each IP address gets 30 requests per minute.
+
+If the transfer to your NEAR Intents balance fails, the amount is recorded as claimable in the contract. Anyone can retry it with `withdraw_claimable`, and it always goes to you, so an EVM wallet that can't sign NEAR transactions doesn't need to: ask us and we retry it for you. Payouts only come from the collateral locked for that market.

@@ -1,0 +1,43 @@
+---
+title: Fees and pricing
+description: Who sets the price, how a quote works, and what you pay on top.
+---
+
+## What you pay
+
+The firm price you sign is all that leaves your balance for a buy, spread included.
+
+| Other cost | Paid by |
+|---|---|
+| NEAR Intents fee, currently 0.0001% of each amount given up ([formula](./developers/sdk.mdx#why-trade-legs-arent-mirror-images)) | Market maker. You pay exactly the quoted price and receive exactly your size |
+| Gas for trades and collects | Our relay. You don't need NEAR |
+| NEAR wallet setup and deposits | You, as a normal NEAR transaction |
+| Cross-chain deposits | You, at 1Click's fee for the route |
+
+## How a quote works
+
+There is no order book. While you edit, the ticket shows the market makers' current prices, refreshed every 5 seconds: the lowest price to buy and the highest to sell back, for the option you picked. A market without a price isn't offered. When you buy, the relay runs a 0.3 to 1.5 second auction among connected market makers (today, only ours). The lowest price to buy wins, or the highest to sell. Both sides settle in one NEAR Intents transaction, or neither does.
+
+- The countdown ends 3 s before the market maker's deadline, so the trade can still land on-chain.
+- Near the end, the app fetches a new price. It swaps it in if better or within 0.5% of the price you accepted, and asks you if worse, so refreshes can't add up. It never accepts a worse price for you.
+- Open quotes reserve market maker inventory, so together they can't exceed your balance. A new quote cancels your unsigned one.
+
+The ticket's "Sell back now $X" is what the market maker would pay for the same option right away. The gap to what you pay is the round-trip cost. The firm quote is that price times your size, unless the market moved or a risk limit or the $1 minimum applies.
+
+## How prices are set
+
+Our market maker prices each bet as two options, one at the price to beat and one at the cap, using Black-76 with Deribit's implied volatility and price for the same expiry. When Deribit doesn't list a strike or expiry, it interpolates the nearest listed Deribit expiry's volatility curve.
+
+| Our market maker today | Value |
+|---|---|
+| Spread | The worst of both options' volatilities moving 2 points, and each moving 1 point the opposite way |
+| Hedging cost added | Hyperliquid taker fee, 4.5 bps, on the hedge each trade causes; a buy also pays closing it at expiry |
+| Cost of locked collateral | 7% a year on the USDC locked (the most the bet can pay) |
+| Minimum price | $1. It won't buy back options worth less, and won't sell for as much as the option can pay |
+| Largest single trade | $2,000 of max payout |
+
+It stops quoting at the sell-back cutoff, on stale data, at a risk limit or when out of inventory. Other market makers can set different terms.
+
+## Sizes
+
+The smallest buy is the asset's [minimum size](./developers/contract.mdx#testnet-underlyings) in the contract, so every option can be collected for free. You can sell back anything you hold that is worth the $1 minimum price.

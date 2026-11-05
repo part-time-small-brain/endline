@@ -1,0 +1,261 @@
+@import "tailwindcss";
+@import "@fontsource-variable/funnel-sans/wght.css";
+@import "@fontsource-variable/funnel-display/wght.css";
+@import "@fontsource-variable/geist-mono/wght.css";
+@import "@fontsource-variable/mona-sans/wght.css";
+
+@custom-variant near (&:where([data-look="near"] *));
+
+:root {
+  color-scheme: light;
+  --page: #dee3ea;
+  --surface: #f4f6f9;
+  --well: #dee3ea;
+  --well-hover: #d2d9e2;
+  --track: #d2d9e2;
+  --paper: #ffffff;
+  --ink: #0e1420;
+  --ink-2: #475163;
+  --ink-3: #5a6577;
+  --on-ink: #ffffff;
+  --rule: #c3cbd6;
+  --grid: rgb(14 20 32 / 0.07);
+  --cone: rgb(14 20 32 / 0.06);
+  --scrim: rgb(14 20 32 / 0.45);
+  --danger: #b3261e;
+
+  --up: #12b886;
+  --up-ink: #0b6e50;
+  --up-field: #bee7dd;
+  --up-soft: #dbefec;
+  --up-glow: var(--up-field);
+  --up-glow-soft: var(--up-soft);
+  --on-up: #0e1420;
+  --down: #f0506e;
+  --down-ink: #9e3549;
+  --down-field: #f3ced8;
+  --down-soft: #f4e4ea;
+  --down-glow: var(--down-field);
+  --down-glow-soft: var(--down-soft);
+  --on-down: #0e1420;
+  --glow-far: 1;
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+  --page: #000000;
+  --surface: #0e0e10;
+  --well: #18181b;
+  --well-hover: #212125;
+  --track: #121214;
+  --paper: #27272b;
+  --ink: #f2f2f3;
+  --ink-2: #a1a1a7;
+  --ink-3: #8b8b92;
+  --on-ink: #000000;
+  --rule: #26262b;
+  --grid: rgb(255 255 255 / 0.05);
+  --cone: rgb(255 255 255 / 0.06);
+  --scrim: rgb(0 0 0 / 0.7);
+  --danger: #ff8a80;
+
+  --up: #12b886;
+  --up-ink: #20bc8d;
+  --up-field: #0e221e;
+  --up-soft: #0e1616;
+  --up-glow: #0f3e31;
+  --up-glow-soft: #0e1e1b;
+  --on-up: #0e1420;
+  --down: #f15e7a;
+  --down-ink: #f47e95;
+  --down-field: #29181d;
+  --down-soft: #191215;
+  --down-glow: #4e242e;
+  --down-glow-soft: #23151a;
+  --on-down: #0e1420;
+  --glow-far: 0;
+}
+
+[data-look="near"] {
+  color-scheme: dark;
+  --page: #0a0a0a;
+  --surface: #121212;
+  --well: #1a1a1a;
+  --well-hover: #232323;
+  --track: #121212;
+  --paper: #262626;
+  --ink: #f2f1e9;
+  --ink-2: #b4b3ab;
+  --ink-3: #96958e;
+  --on-ink: #0a0a0a;
+  --rule: #262626;
+  --grid: rgb(242 241 233 / 0.06);
+  --cone: rgb(242 241 233 / 0.06);
+  --scrim: rgb(0 0 0 / 0.7);
+  --danger: #ffb547;
+  --teal: #17d9d4;
+
+  --up: #00ec97;
+  --up-ink: #00ec97;
+  --up-field: #0b261c;
+  --up-soft: #0c1814;
+  --up-glow: rgb(0 236 151 / 0.35);
+  --up-glow-soft: rgb(0 236 151 / 0.12);
+  --on-up: #0a0a0a;
+  --down: #ff7966;
+  --down-ink: #ff7966;
+  --down-field: #2b1612;
+  --down-soft: #1a0f0d;
+  --down-glow: rgb(255 121 102 / 0.35);
+  --down-glow-soft: rgb(255 121 102 / 0.12);
+  --on-down: #0a0a0a;
+  --glow-far: 0;
+  --radius-xl: 6px;
+  --radius-2xl: 6px;
+  --radius-3xl: 14px;
+  --font-sans: "Mona Sans Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-sans);
+}
+
+[data-look="near"] .font-sans,
+[data-look="near"] .font-display {
+  font-family: var(--font-sans);
+}
+
+[data-look="near"] body {
+  background-image: radial-gradient(rgb(242 241 233 / 0.06) 1px, transparent 1.5px);
+  background-size: 18px 18px;
+}
+
+:root,
+[data-side="up"] {
+  --side: var(--up);
+  --side-ink: var(--up-ink);
+  --side-field: var(--up-field);
+  --side-glow: var(--up-glow);
+  --on-side: var(--on-up);
+}
+
+[data-side="down"] {
+  --side: var(--down);
+  --side-ink: var(--down-ink);
+  --side-field: var(--down-field);
+  --side-glow: var(--down-glow);
+  --on-side: var(--on-down);
+}
+
+@theme inline {
+  --color-page: var(--page);
+  --color-surface: var(--surface);
+  --color-well: var(--well);
+  --color-well-hover: var(--well-hover);
+  --color-track: var(--track);
+  --color-paper: var(--paper);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-on-ink: var(--on-ink);
+  --color-rule: var(--rule);
+  --color-grid: var(--grid);
+  --color-cone: var(--cone);
+  --color-scrim: var(--scrim);
+  --color-danger: var(--danger);
+  --color-teal: var(--teal);
+  --color-up: var(--up);
+  --color-up-ink: var(--up-ink);
+  --color-up-field: var(--up-field);
+  --color-up-soft: var(--up-soft);
+  --color-up-glow: var(--up-glow);
+  --color-up-glow-soft: var(--up-glow-soft);
+  --color-on-up: var(--on-up);
+  --color-down: var(--down);
+  --color-down-ink: var(--down-ink);
+  --color-down-field: var(--down-field);
+  --color-down-soft: var(--down-soft);
+  --color-down-glow: var(--down-glow);
+  --color-down-glow-soft: var(--down-glow-soft);
+  --color-on-down: var(--on-down);
+  --color-side: var(--side);
+  --color-side-ink: var(--side-ink);
+  --color-side-field: var(--side-field);
+  --color-on-side: var(--on-side);
+  --font-sans: "Funnel Sans Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Funnel Display Variable", "Funnel Sans Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Geist Mono Variable", ui-monospace, monospace;
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+@layer base {
+  html {
+    background: var(--page);
+    color: var(--ink);
+    scrollbar-gutter: stable;
+    font-family: var(--font-sans);
+    font-variant-numeric: tabular-nums;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-display);
+    text-wrap: balance;
+    letter-spacing: -0.02em;
+  }
+
+  p {
+    text-wrap: pretty;
+  }
+
+  #root {
+    overflow-x: clip;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--ink);
+    outline-offset: 2px;
+  }
+}
+
+@keyframes rise {
+  from {
+    transform: translateY(24px);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+
+@keyframes fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes pulse-ring {
+  from {
+    opacity: 0.6;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(3);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+  }
+}

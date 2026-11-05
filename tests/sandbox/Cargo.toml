@@ -1,0 +1,16 @@
+[package]
+name = "sandbox-tests"
+version = "0.1.0"
+edition.workspace = true
+publish.workspace = true
+
+[dev-dependencies]
+anyhow = "1"
+base64 = "0.22"
+bs58 = "0.5"
+ed25519-dalek = "2"
+hex = "0.4"
+near-workspaces = "=0.23.0"
+serde_json = "1"
+sha2 = "0.10"
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }

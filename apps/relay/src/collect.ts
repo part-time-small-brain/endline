@@ -1,0 +1,218 @@
+import { isDeepStrictEqual } from "node:util";
+import { exerciseOptions, type Fill, type Intent, longPayout, MIN_RELAYED_PAYOUT_USD, maxPayout, parseTokenId, readPayload, relayedTransfer, type Series, type SignedPayload, termsOf, transferFee } from "@near-options/sdk";
+import type { Claims } from "./claims.ts";
+import type { Config } from "./config.ts";
+import type { Fills } from "./fills.ts";
+import { HttpError } from "./relay.ts";
+import { type Chain, ranByNonce, Rejected } from "./rpc.ts";
+
+// block time can trail our clock, and an exercise before final_at burns the signer's nonce
+const FINAL_MARGIN_SEC = 60;
+const MAX_CLAIMS = 1_000;
+const MAX_DEADLINE_MS = 10 * 60_000;
+// intents rechecks the deadline on-chain, and near-api-js retries a send for up to ~85 s: a payload that expires first burns our gas
+const MIN_DEADLINE_MS = 2 * 60_000;
+
+interface Sent {
+  signerId: string;
+  nonce: string;
+  deadlineMs: number;
+}
+
+interface Exercise extends Sent {
+  tokens: Record<string, bigint>;
+}
+
+type Settings = Pick<Config, "INTENTS_ID" | "OPTIONS_ID" | "QUOTE_ASSET" | "RELAYER_ACCOUNT_ID">;
+
+interface Leg {
+  asset: string;
+  series: Series;
+  amount: bigint;
+}
+
+function readSigned(signed: SignedPayload, intentsId: string): { sent: Sent; intents: Intent[] } | undefined {
+  const { signer_id, nonce, deadline, verifying_contract, intents } = readPayload(signed);
+  const deadlineMs = Date.parse(deadline);
+  if (verifying_contract !== intentsId || !Number.isFinite(deadlineMs) || new Date(deadlineMs).toISOString() !== deadline) return undefined;
+  return { sent: { signerId: signer_id, nonce, deadlineMs }, intents };
+}
+
+function readExercise(signed: SignedPayload, config: Settings): Exercise | undefined {
+  try {
+    const read = readSigned(signed, config.INTENTS_ID);
+    const [intent, ...extra] = read?.intents ?? [];
+    if (!read || intent?.intent !== "transfer" || extra.length > 0) return undefined;
+    const tokens = Object.fromEntries(Object.entries(intent.tokens).map(([asset, amount]) => [asset, BigInt(amount)]));
+    return isDeepStrictEqual(intent, exerciseOptions(config.OPTIONS_ID, tokens)) ? { ...read.sent, tokens } : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function readTransfer(signed: SignedPayload, config: Settings, fee: bigint): Sent | undefined {
+  try {
+    const read = readSigned(signed, config.INTENTS_ID);
+    const [move] = read?.intents ?? [];
+    if (!read || move?.intent !== "transfer") return undefined;
+    const amount = BigInt(move.tokens[config.QUOTE_ASSET] ?? 0);
+    const expected = relayedTransfer(move.receiver_id, config.RELAYER_ACCOUNT_ID, config.QUOTE_ASSET, amount, fee);
+    return isDeepStrictEqual(read.intents, expected) ? read.sent : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function relayBuys(fills: Fill[]): Map<string, { net: bigint; buys: number }> {
+  const bought = new Map<string, { net: bigint; buys: number }>();
+  for (const { series_id, side, size } of fills) {
+    const { net, buys } = bought.get(series_id) ?? { net: 0n, buys: 0 };
+    bought.set(series_id, side === "buy" ? { net: net + BigInt(size), buys: buys + 1 } : { net: net - BigInt(size), buys });
+  }
+  return bought;
+}
+
+export class Collector {
+  private claiming: Exercise[] = [];
+  private submitted = new Map<string, number>();
+  private sending = new Set<string>();
+
+  constructor(
+    private chain: Chain,
+    private config: Settings,
+    private claims: Claims,
+    private fills: Pick<Fills, "byAccount">,
+  ) {}
+
+  get feeAccount(): string {
+    return this.config.RELAYER_ACCOUNT_ID;
+  }
+
+  async execute(signed: SignedPayload): Promise<string> {
+    const exercise = this.read(signed);
+    if (exercise.deadlineMs > Date.now() + MAX_DEADLINE_MS) throw new HttpError(400, "an exercise sent now must expire within 10 minutes");
+    const total = await this.payout(await this.legs(exercise));
+    if (total === undefined) throw new HttpError(409, "the final price is not settled yet");
+    if (total === 0n) throw new HttpError(400, "these options pay nothing");
+    if (total < (await this.minPayout())) throw new HttpError(400, "the relay pays gas only for payouts of at least $1: collect from a NEAR wallet");
+    return this.submit(signed, exercise, true);
+  }
+
+  async transfer(signed: SignedPayload): Promise<string> {
+    const fee = transferFee((await this.chain.contractConfig()).quote_decimals);
+    const sent = readTransfer(signed, this.config, fee);
+    if (!sent) throw new HttpError(400, "only one USDC transfer followed by the relay's fee is relayed");
+    if (sent.deadlineMs > Date.now() + MAX_DEADLINE_MS) throw new HttpError(400, "a transfer sent now must expire within 10 minutes");
+    return this.submit(signed, sent, true);
+  }
+
+  async claim(signed: SignedPayload): Promise<void> {
+    const exercise = this.read(signed);
+    const stored = this.claims.all().filter((claim) => !isDeepStrictEqual(claim, signed));
+    const open = [...this.claiming, ...stored.flatMap((claim) => readExercise(claim, this.config) ?? [])];
+    if (open.length >= MAX_CLAIMS) throw new HttpError(503, "the claim queue is full");
+    this.claiming.push(exercise);
+    let saved: Promise<void>;
+    try {
+      const legs = await this.legs(exercise);
+      const maxTotal = legs.reduce((sum, { series, amount }) => sum + maxPayout(termsOf(series), amount), 0n);
+      if (maxTotal < (await this.minPayout())) throw new HttpError(400, "auto-collect needs a max payout of at least $1");
+      const bought = relayBuys(await this.fills.byAccount(exercise.signerId));
+      for (const { asset, series, amount } of legs) {
+        const mine = open.filter((other) => other.signerId === exercise.signerId && other.tokens[asset] !== undefined);
+        const claimed = mine.reduce((sum, other) => sum + (other.tokens[asset] ?? 0n), amount);
+        const { net, buys } = bought.get(series.id) ?? { net: 0n, buys: 0 };
+        if (claimed > net) throw new HttpError(409, "auto-collect covers only options bought in this app");
+        if (mine.length >= buys) throw new HttpError(409, "one auto-collect per buy");
+        if (claimed > (await this.chain.balanceOf(exercise.signerId, asset))) throw new HttpError(409, "open claims exceed the options held");
+      }
+      await this.simulate(signed);
+      saved = this.claims.add(signed);
+    } finally {
+      this.claiming.splice(this.claiming.indexOf(exercise), 1);
+    }
+    await saved;
+  }
+
+  async submitClaims(): Promise<void> {
+    for (const signed of this.claims.all()) {
+      try {
+        const exercise = this.read(signed);
+        const total = await this.payout(await this.legs(exercise));
+        if (total === undefined) {
+          await this.simulate(signed);
+          continue;
+        }
+        if (total >= (await this.minPayout())) await this.submit(signed, exercise, false);
+        await this.claims.remove(signed);
+      } catch (error) {
+        if (error instanceof HttpError && error.status !== 409) await this.claims.remove(signed);
+        else console.error("claim not submitted", error);
+      }
+    }
+  }
+
+  private read(signed: SignedPayload): Exercise {
+    const exercise = readExercise(signed, this.config);
+    if (!exercise) throw new HttpError(400, "only a single exercise transfer of our option tokens is relayed");
+    return exercise;
+  }
+
+  private async legs({ tokens }: Exercise): Promise<Leg[]> {
+    const listed = new Map((await this.chain.listSeries()).map((s) => [s.id, s]));
+    const prefix = `nep245:${this.config.OPTIONS_ID}:`;
+    const legs: Leg[] = [];
+    for (const [asset, amount] of Object.entries(tokens)) {
+      const { seriesId, side } = parseTokenId(asset.slice(prefix.length));
+      const series = listed.get(seriesId);
+      if (side !== "long" || !series) throw new HttpError(400, "only long tokens of series in the listing can be exercised");
+      if (amount < (await this.chain.minWrite(series.underlying))) throw new HttpError(400, "amount is below the minimum write size");
+      legs.push({ asset, series, amount });
+    }
+    return legs;
+  }
+
+  private async submit(signed: SignedPayload, { signerId, nonce, deadlineMs }: Sent, settleByNonce: boolean): Promise<string> {
+    for (const [key, deadline] of this.submitted) if (deadline < Date.now()) this.submitted.delete(key);
+    const key = `${signerId}:${nonce}`;
+    if (this.submitted.has(key)) throw new HttpError(409, "this payload was already submitted");
+    if (this.sending.has(signerId)) throw new HttpError(409, "an earlier payload from this account is still being sent");
+    this.sending.add(signerId);
+    try {
+      await this.simulate(signed);
+      if (deadlineMs < Date.now() + MIN_DEADLINE_MS) throw new HttpError(400, "a payload must stay valid for at least 2 minutes when it is sent");
+      this.submitted.set(key, deadlineMs);
+      return await this.chain.execute([signed]).catch(async (error: unknown) => {
+        if (settleByNonce) {
+          console.error("execute_intents errored, settling by the user's nonce", key, error);
+          if (await ranByNonce(this.chain, signed, key)) return "";
+        } else if (await this.simulate(signed).then(() => true, () => false)) this.submitted.delete(key);
+        throw error;
+      });
+    } finally {
+      this.sending.delete(signerId);
+    }
+  }
+
+  private async payout(legs: Leg[]): Promise<bigint | undefined> {
+    const nowSec = Date.now() / 1000;
+    let total = 0n;
+    for (const { series, amount } of legs) {
+      const settlement = await this.chain.settlement(series.underlying, series.expiry);
+      if (!settlement || nowSec < settlement.final_at + FINAL_MARGIN_SEC) return undefined;
+      total += longPayout(termsOf(series), amount, BigInt(settlement.price));
+    }
+    return total;
+  }
+
+  private async minPayout(): Promise<bigint> {
+    return MIN_RELAYED_PAYOUT_USD * 10n ** BigInt((await this.chain.contractConfig()).quote_decimals);
+  }
+
+  private async simulate(signed: SignedPayload): Promise<void> {
+    await this.chain.simulate([signed]).catch((error: unknown) => {
+      if (error instanceof Rejected) throw new HttpError(422, error.message);
+      throw error;
+    });
+  }
+}

@@ -1,0 +1,59 @@
+---
+title: SDK
+description: The TypeScript library shared by the relay, market maker and web app.
+---
+
+`@near-options/sdk` is a source-only workspace package in `packages/sdk`, used from inside the monorepo. It isn't on npm.
+
+| File | What |
+|---|---|
+| `series.ts` | Series ids (`BTC-27NOV26-110000_112000-C`), long and short token ids, intents asset ids |
+| `math.ts` | Capped long payout at settlement, in USDC units, same rounding as the contract |
+| `fees.ts` | Intents fee, exact gross-up, `unmatched()` check of a set of diffs |
+| `trade.ts` | `buyDiffs` / `sellDiffs`: fee-exact user and market maker legs |
+| `intents.ts` | Intent payloads: `token_diff`, write and exercise transfers, sessions, versioned nonces |
+| `signing.ts` | What NEP-413 and ERC-191 wallets sign, and reading it back |
+| `protocol.ts` | Wire and contract-view schemas (zod) |
+| `black76.ts` | Black-76 price, delta, vega; `capped` prices a capped series as two options |
+
+Series ids and payout math are tested against `testdata/vectors.json`, shared with the Rust contract. Signing is tested byte for byte against `@defuse-protocol/intents-sdk`.
+
+## Example
+
+```ts
+import { buyDiffs, intentsAssetId, longPayout, seriesId, unmatched } from "@near-options/sdk";
+
+const id = seriesId({ underlying: "BTC", expiry: 1795766400, strike: 110_000_000_000n, width: 2_000_000_000n, quoteDecimals: 6, kind: "call" });
+// "BTC-27NOV26-110000_112000-C"
+
+longPayout({ kind: "call", strike: 110_000_000_000n, width: 2_000_000_000n, unit: 100_000_000n }, 1_000_000n, 115_000_000_000n);
+// 20000000n: 0.01 BTC of Up at $110,000, capped at $112,000, settling at $115,000 pays $20.00 in USDC
+
+const option = intentsAssetId("opt3.near-options-dev.testnet", id);
+const quote = "nep141:usdc.near-options-dev.testnet";
+const { user, marketMaker } = buyDiffs({ option, quote, size: 1_000_000n, premium: 20_000_000n, pips: 1n });
+// user:        { usdc: -20000000, option: +1000000 }
+// marketMaker: { usdc: +19999980, option: -1000002 }
+unmatched([user, marketMaker], 1n);
+// {}: the two legs balance exactly after fees
+```
+
+All amounts are `bigint` in the token's smallest unit. USDC has 6 decimals; option tokens have the `decimals` set for their underlying.
+
+## Why trade legs aren't mirror images
+
+`intents.near` charges `ceil(amount × fee / 1,000,000)` on every amount someone gives up (NEP-245 amounts of 1 or less are free). Totals must balance exactly after fees, so payers send gross and receivers get net.
+
+| Trade | User leg | Market maker leg |
+|---|---|---|
+| Buy `n` long for `p` USDC | `{U: -p, L: +n}` | `{U: +netOf(U, p), L: -grossFor(L, n)}` |
+| Sell `n` long for `q` USDC | `{L: -n, U: +q}` | `{L: +netOf(L, n), U: -grossFor(U, q)}` |
+
+Paying someone exactly 30,000,000 at a fee of 1 needs a gross of 30,000,031, not 30,000,030. Always check `unmatched()` is empty before submitting.
+
+## Commands
+
+```bash
+pnpm --filter @near-options/sdk test
+pnpm --filter @near-options/sdk typecheck
+```

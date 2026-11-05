@@ -1,0 +1,54 @@
+name: near-options
+
+x-app: &app
+  image: near-options-app
+  platform: linux/amd64
+  build: { context: .., dockerfile: deploy/Dockerfile, target: app }
+  restart: unless-stopped
+
+services:
+  relay:
+    <<: *app
+    command: pnpm --filter @near-options/relay start
+    environment: [NETWORK_ID, NEAR_RPC_URL, INTENTS_ID, OPTIONS_ID, QUOTE_ASSET, RELAYER_ACCOUNT_ID, RELAYER_PRIVATE_KEY, MM_API_KEYS, FAUCET, ONECLICK_JWT, PORT=8787, DATA_DIR=/data, TRUST_PROXY=true]
+    volumes: [relay-data:/data]
+  mm:
+    <<: *app
+    command: pnpm --filter @near-options/mm start
+    environment: [NETWORK_ID, NEAR_RPC_URL, INTENTS_ID, OPTIONS_ID, MM_ACCOUNT_ID, MM_PRIVATE_KEY, MM_API_KEY, ALERT_WEBHOOK_URL, RELAY_WS_URL=ws://relay:8787/mm]
+    depends_on: [relay]
+  lister:
+    <<: *app
+    command: pnpm --filter @near-options/mm start list
+    environment: [NEAR_RPC_URL, INTENTS_ID, OPTIONS_ID, MM_ACCOUNT_ID, MM_PRIVATE_KEY]
+  monitor:
+    <<: *app
+    command: pnpm --filter @near-options/mm start monitor
+    environment: [NETWORK_ID, NEAR_RPC_URL, INTENTS_ID, OPTIONS_ID, RELAYER_ACCOUNT_ID, ALERT_WEBHOOK_URL, "HEALTH_URL=${HEALTH_URL:-http://web/health}"]
+  proposer:
+    <<: *app
+    command: pnpm --filter @near-options/mm start propose
+    environment: [NEAR_RPC_URL, OPTIONS_ID, "ORACLE_ACCOUNT_ID=${ORACLE_ACCOUNT_ID:-$RELAYER_ACCOUNT_ID}", "ORACLE_PRIVATE_KEY=${ORACLE_PRIVATE_KEY:-$RELAYER_PRIVATE_KEY}"]
+  web:
+    image: near-options-web
+    platform: linux/amd64
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+      target: web
+      args:
+        VITE_NETWORK: ${NETWORK_ID}
+        VITE_RPC_URL: ${NEAR_RPC_URL}
+        VITE_INTENTS_ID: ${INTENTS_ID}
+        VITE_OPTIONS_ID: ${OPTIONS_ID}
+        VITE_QUOTE_ASSET: ${QUOTE_ASSET}
+    restart: unless-stopped
+    depends_on: [relay]
+  tunnel:
+    image: cloudflare/cloudflared:2026.10.5@sha256:1b1d34d0a9c0bfca9de72db8460d328db3f19edd2b96169114e3e893a97bbe53
+    restart: unless-stopped
+    command: tunnel --no-autoupdate --url http://web:80
+    depends_on: [web]
+
+volumes:
+  relay-data: {}

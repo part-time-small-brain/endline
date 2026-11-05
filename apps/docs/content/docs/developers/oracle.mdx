@@ -1,0 +1,84 @@
+---
+title: Oracle WASM
+description: The program that fixes each settlement price, how it runs, and how to pin a new build.
+---
+
+One price per `(underlying, expiry)`: the median of 7 exchanges' 30-minute TWAPs before expiry, cross-checked against Deribit. Source: `oracle/` (Rust, `wasm32-wasip2`). User-facing summary: [Settlement](../settlement.mdx).
+
+## Why this design
+
+- Pyth dropped NEAR, `priceoracle.near` returns `null` prices, Switchboard shut down, and RedStone and Chainlink have no NEAR feeds.
+- OutLayer's `price-oracle.near` is spot-only: no fixing at a past timestamp.
+- OutLayer runs a pinned WASM in Intel TDX and returns the result in the same transaction (yield/resume).
+- The TEE isn't enforced on-chain: OutLayer's operator holds full-access keys and attestation is checked off-chain. A wrong price is possible, so the dispute window is required.
+
+## Input and output
+
+```json
+{"index":"btc_usd","expiry":1792742400,"quote_decimals":6,"max_dev_bps":50}
+```
+
+Output for 2026-10-23 (about 370 bytes; OutLayer's limit is 900):
+
+```json
+{"ok":true,"index":"btc_usd","expiry":1792742400,"price":"81593524333","source":"cex_twap_median",
+ "deribit":81594.54,"cex_median":81593.52433333333,"usdt_usd":0.99862667,
+ "venues":{"binance":81596.72,"bitfinex":81698.2,"bitstamp":81593.52,"bybit":81593.08,"coinbase":81587.42,"kraken":81590.36,"okx":81600.56}}
+```
+
+`price` is in quote units (USDC, 6 decimals), ready for the contract.
+
+## What it computes
+
+1. Per venue, a 30-minute TWAP of 1-minute closes over `[E−1800, E)`. Candles deduped, on the minute, finite and positive. A venue counts with at least 25 candles.
+2. USDT venues convert with a USDT/USD TWAP over the same window: the average of Coinbase USDT-USD and Kraken USDTUSD, only if both answer within 20 bps of each other. Otherwise, or outside 0.97 to 1.03, USDT venues drop out.
+3. `m` = median of valid venues, only with at least 3.
+4. `d` = Deribit's `get_delivery_prices` row for the expiry date, only for 08:00 UTC expiries. A veto, never the price. Always `www.deribit.com`.
+5. Result: `m` if `d` is within `max_dev_bps` (50) of it, or for a non-08:00 expiry, which has no `d`. `ok: false` if an 08:00 expiry has no `d` (`deribit unavailable`), if they disagree (`sources disagree`) or if there's no `m` (`no data`). Deribit alone never settles.
+6. Refuses to run before `E + 60 s`; rejects quote decimals above 9.
+
+| Venue | Pair | Quote |
+|---|---|---|
+| Coinbase | BTC-USD / ETH-USD | USD |
+| Kraken | XBTUSD / ETHUSD | USD |
+| Bitstamp | btcusd / ethusd | USD |
+| Bitfinex | tBTCUSD / tETHUSD | USD |
+| Binance (`data-api.binance.vision`) | BTCUSDT / ETHUSDT | USDT |
+| OKX | BTC-USDT / ETH-USDT | USDT |
+| Bybit | BTCUSDT / ETHUSDT | USDT |
+
+On 2026-10-23 the BTC median was 0.1 bp from Deribit. Bitfinex sat +12.7 bp (its USD trades at a premium) and the median ignored it.
+
+## Build and run
+
+```bash
+cargo test -p oracle
+cargo build -p oracle --target wasm32-wasip2 --release
+echo '{"index":"btc_usd","expiry":1792742400,"quote_decimals":6,"max_dev_bps":50}' \
+  | wasmtime run -S http target/wasm32-wasip2/release/oracle.wasm
+```
+
+Logic is tested natively on recorded exchange responses in `oracle/tests/fixtures`.
+
+## Contract integration
+
+| Step | Rule |
+|---|---|
+| `request_settlement(underlying, expiry)` | Anyone. Needs a series at that expiry, `E + 300 ≤ now < E + oracle_window_sec`, no existing proposal, no request in flight. Attach ≥ 0.01 NEAR (a run costs about 0.0012, the rest is refunded), 300 TGas (less is refused) |
+| OutLayer call | `request_execution` with the pinned `{url, hash}`, build target `wasm32-wasip2`. The yield times out after 200 blocks (about 2 min) |
+| `on_settlement_result` | Never panics. Requires `ok`, the echoed `index` and `expiry`, and `price > 0`. Anything else is logged and nothing is stored |
+| Proposed | Final at `now + dispute_window_sec`. The owner may override before then |
+| Fallback | `propose_settlement` by a whitelisted oracle account, from `E + oracle_window_sec` |
+
+## Pinning a new WASM
+
+1. `scripts/oracle-smoke.sh <you>.testnet` builds the WASM, uploads it to IPFS via Pinata, checks the gateway serves the exact bytes, prints `url` and `sha256`, and runs it once on `outlayer.testnet`. Needs a Pinata JWT and the account key in the near CLI legacy keychain.
+2. The owner pins it: `set_oracle_wasm({"oracle_wasm":{"outlayer_id":"outlayer.testnet","url":"…","sha256":"…"}})` with 1 yocto.
+
+## Testnet status
+
+| Item | State |
+|---|---|
+| Pinned WASM | `bafybeihm4qbofrnolgcyxle75u3rqv3pjn5vev5cgjezag7ng42dr6jxw4` (sha256 `259a7937…8340`) on `opt3.near-options-dev.testnet` |
+| OutLayer testnet | Stalled from 2026-10-24, working again by 2026-10-29: the pinned WASM runs there with all 7 venues reachable. Mainnet `outlayer.near` is live. Testnet still settles through the proposer |
+| Testnet proposer | `pnpm --filter @near-options/mm start propose`: refuses a mainnet RPC, downloads the pinned WASM, checks its sha256 every minute before running it, runs it in wasmtime and calls `propose_settlement` once `oracle_window_sec` has passed. Same code and sources, no TEE attestation |

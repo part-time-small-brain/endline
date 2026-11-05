@@ -1,0 +1,53 @@
+---
+title: Settlement
+description: The final price is the median of 7 major exchanges, averaged over the 30 minutes before the end, and can be challenged before it's final.
+---
+
+## The final price
+
+Each exchange's 1-minute closing prices are averaged over the 30 minutes before the end. The final price is the median of those averages.
+
+| Exchanges | Quoted in |
+|---|---|
+| Coinbase, Kraken, Bitstamp, Bitfinex | USD |
+| Binance, OKX, Bybit | USDT, converted at a 30-minute USDT/USD average from Coinbase and Kraken |
+
+- An exchange counts only with at least 25 of its 30 one-minute prices, and at least 3 exchanges must count, so one bad exchange can't move the median.
+- If the two USDT/USD rates are missing, more than 0.2% (20 bps) apart, or outside 0.97 to 1.03, the USDT exchanges drop out.
+- On 08:00 UTC markets, no price is set if Deribit's delivery price is more than 0.5% (50 bps) from the median, or if Deribit doesn't answer (we retry every 10 minutes). Deribit alone never sets the price. On 23 Oct 2026 the BTC median was 0.1 bp from it.
+- Selling back and new options stop 30 minutes before the end, when the averaging window opens.
+
+Exact rules: [Oracle WASM](./developers/oracle.mdx).
+
+## Timeline
+
+| Step | When |
+|---|---|
+| Market ends | Once a day, shown in your time zone (08:00 UTC) |
+| Selling back closes | 30 min before the end |
+| Price requested | From 5 min after the end, by our settler every 10 min until a price is in. Anyone can request it too |
+| Manual price allowed | From 6 h after the end |
+| Dispute window | 1 h |
+| Auto-collect sent | 1 to 2 min after final |
+
+The app shows "Waiting for the final price, usually about 1 h", then the proposed price and when it becomes final.
+
+## Who computes it
+
+[OutLayer](https://outlayer.fastnear.com/docs/getting-started) runs the oracle WASM pinned in the contract by sha256, inside a TEE (Intel TDX), and the contract stores the price from OutLayer's callback. You also trust OutLayer's operator: the TEE is checked off-chain, not by the contract.
+
+Before mainnet launch, a proposer run by the team runs the same pinned WASM and proposes its result.
+
+## Dispute window
+
+A proposed price becomes final when its dispute window ends. Until then our monitor checks it against Deribit every minute and alerts if it's more than 0.2% off or missing, and the owner can override it. The owner can't move the end of the window or change its length, but it can stop a price from being proposed at all ([Safety and risks](./safety-and-risks.mdx#what-the-owner-can-and-cant-do)).
+
+## If something goes wrong
+
+| Problem | What happens |
+|---|---|
+| Fewer than 3 exchanges, median and Deribit 0.5% apart, or no Deribit price on an 08:00 market | No automatic price. The oracle account proposes one by hand once the manual window opens |
+| OutLayer down or timing out | Our settler retries every 10 min, and anyone can. If none succeeds within 6 h, manual proposal |
+| Wrong price proposed | The owner overrides it inside the dispute window |
+
+Until a price is final, the market is pending and nothing pays out. There is no fallback payout formula.

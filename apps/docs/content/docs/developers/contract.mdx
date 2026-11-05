@@ -1,0 +1,122 @@
+---
+title: Contract reference
+description: Methods, messages, token ids and payout math of the options contract.
+---
+
+NEP-245 multi-token contract with per-series collateral accounting. Rust, near-sdk 5.29. Source: `contracts/options`.
+
+| Network | Account |
+|---|---|
+| Testnet | `opt3.near-options-dev.testnet` (intents: `intents.near-options-dev.testnet`) |
+| Mainnet | Not deployed |
+
+## Init
+
+```rust
+new(owner_id, intents_id, quote_asset, quote_decimals, dispute_window_sec, oracle_delay_sec, timing: Option<Timing>)
+```
+
+`oracle_delay_sec` (60 s to 7 days, fixed at deploy; 1 day on mainnet, 60 s on testnet) is how long `add_oracle` and `set_oracle_wasm` wait before they take effect. Until then the old oracle set and WASM stay in force, and `get_pending_oracle_changes` shows what is coming. `remove_oracle` is immediate.
+
+`Timing` is fixed at deploy and has no setter.
+
+| Field | Mainnet default | Testnet |
+|---|---|---|
+| `period_sec` / `offset_sec` (expiry grid) | 86400 / 28800 (daily 08:00 UTC) | 60 / 0 (every minute) |
+| `write_cutoff_sec` | 1800 | 60 |
+| `oracle_window_sec` (OutLayer requests until, manual proposals from) | 21600 | 600 |
+| `max_horizon_sec` | 180 days | 7 days |
+| `dispute_window_sec` (60 s to 1 day) | 3600 (mainnet value; required init argument) | 120 |
+
+## Series and token ids
+
+`create_series(underlying, strike, width, expiry, kind)` is permissionless and payable. Attach NEAR for storage (the series plus the empty supply and balance rows its first write fills); the excess is refunded.
+
+Every series is capped: a call (Up) pays `S−K` and a put (Down) pays `K−S`, each at most `width`. The cap is `K + width` for calls and `K − width` for puts.
+
+- `underlying` must be whitelisted (`add_underlying`).
+- `expiry` on the timing grid, in the future, within the horizon.
+- `strike` and `width` in quote units per one whole underlying, each a positive whole cent. Puts need `width < strike`.
+- The id is derived, never passed in: `{UNDERLYING}-{D}{MON}{YY}-{STRIKE}_{CAP}-{C|P}`, like Deribit's combo names. Fractional prices use `d` as the decimal point (`2650d5`). Expiries not at 08:00 UTC add the time: `BTC-24OCT26T0712-110000_112000-C`. The same strike with another width is another series.
+
+| Token | Id | Example |
+|---|---|---|
+| Long (the option) | series id | `BTC-27NOV26-110000_112000-C` |
+| Short (writer's claim on leftover collateral) | series id + `-SHORT` | `BTC-27NOV26-110000_112000-C-SHORT` |
+| Inside intents | `nep245:<contract>:<token id>` | `nep245:opt3.near-options-dev.testnet:BTC-27NOV26-110000_112000-C` |
+
+Option token decimals are the underlying's `decimals` from `add_underlying`. One whole token is one contract on one whole underlying.
+
+## Math
+
+`unit = 10^underlying_decimals`. `K` strike, `W` width and `S` settlement price, all in quote units per whole underlying. `n` option amount. `I = min(max(S−K, 0), W)` for calls, `min(max(K−S, 0), W)` for puts.
+
+| | Calls and puts |
+|---|---|
+| Collateral to write `n` | `ceil(n·W / unit)` |
+| Options for collateral `c` | `floor(c·unit / W)` |
+| Burn pair refund | `floor(n·W / unit)` |
+| Long payout | `floor(n·I / unit)` |
+| Short payout | `refund − ceil(n·I / unit)`, at least 0 |
+
+Collateral and every payout are in the quote asset (USDC). Guarantees, tested: `long + short ≤ pair refund ≤ collateral`, a price past the cap pays exactly what the cap pays, and splitting a position never pays more than closing it at once. u128 with U256 intermediates; overflow panics. Shared test vectors: `testdata/vectors.json`.
+
+## Entry point: `mt_on_transfer`
+
+Users reach the contract only through a signed intents `transfer` with `msg`, which makes `intents.near` call `mt_on_transfer`. Calls from anyone else are rejected. `sender_id` (the signer) owns any output, a panic refunds the signer, and a call takes at most 10 tokens.
+
+| `msg` | Tokens sent | Effect | Returns |
+|---|---|---|---|
+| `{"action":"write","series_id":"…"}` | Exactly one: the quote asset (USDC) | Mint `n` long + `n` short into the sender's intents balance | Unused collateral |
+| `{"action":"exercise"}` | Long tokens | Pay long payouts | Zeros |
+| `{"action":"redeem"}` | Short tokens | Pay short payouts | Zeros |
+| `{"action":"burn_pair"}` | `[long, short]` of one series, equal amounts | Pay the pair refund, any time | Zeros |
+
+Writes close `write_cutoff_sec` before expiry. Exercise and redeem need a final price.
+
+```json
+{"intent":"transfer","receiver_id":"opt3.near-options-dev.testnet","tokens":{"nep141:usdc.near-options-dev.testnet":"2000000000"},
+ "msg":"{\"action\":\"write\",\"series_id\":\"BTC-27NOV26-110000_112000-C\"}","min_gas":"100000000000000"}
+```
+
+## Other methods
+
+| Method | Who | Notes |
+|---|---|---|
+| `exercise(token_id, amount)`, `redeem(...)`, `burn_pair(series_id, amount)` | Holder on the contract's own ledger | 1 yocto. Pays into the caller's intents balance |
+| `withdraw_claimable(owner_id, asset)` | Anyone | 1 yocto. Retries a failed payout, always to `owner_id` |
+| `request_settlement(underlying, expiry)` | Anyone | Attach ≥ 0.01 NEAR, 300 TGas (less is refused). From expiry + 5 min until expiry + `oracle_window_sec` |
+| `propose_settlement(underlying, expiry, price)` | Oracle account | 1 yocto. Manual fallback. Needs a listed series at that expiry, only from expiry + `oracle_window_sec`, once per key |
+| `override_settlement(underlying, expiry, price)` | Owner | 1 yocto. Only before `final_at`, keeps `final_at` |
+| `set_oracle_wasm(oracle_wasm: {outlayer_id, url, sha256})` | Owner | 1 yocto. Pins the oracle WASM from `now + oracle_delay_sec`: lowercase sha256, `https://` url. A new call replaces a pending WASM and restarts the delay |
+| `add_oracle(account_id)` | Owner | 1 yocto. The account can propose from `now + oracle_delay_sec` |
+| `add_underlying`, `remove_oracle`, `set_paused` | Owner | 1 yocto |
+| `propose_owner(owner_id \| null)` | Owner | 1 yocto. Replaces any earlier proposal; `null` withdraws it |
+| `accept_owner()` | Proposed owner | 1 yocto. Ownership moves only now, so a typo can't lose it and a multisig or DAO proves it can call before it owns |
+| NEP-245 `mt_transfer`, `mt_batch_transfer`, `mt_transfer_call`, `mt_batch_transfer_call` | Holders | ≥ 1 yocto plus storage for new balance rows. Max 10 tokens per batch. No approvals. Plain transfers to `intents.near` or this contract are rejected: use `mt_transfer_call` / `mt_batch_transfer_call`. Into `intents.near` the `msg` must be empty or an account id (a plain deposit) |
+
+Pause blocks writes and new series only. Exits are never blocked.
+
+## Views
+
+`get_config` (includes `pending_owner_id`, `oracle_delay_sec`), `get_oracle_wasm` and `get_oracles` (in force now), `get_pending_oracle_changes`, `get_underlyings`, `get_series`, `list_series(from_index, limit ≤ 200)` (every series ever listed), `list_series_by_expiry(from_expiry, after_id, limit ≤ 200)` (series with `expiry ≥ from_expiry` in `(expiry, id)` order; for the next page pass the last one's `expiry` and `id` as `from_expiry` and `after_id`), `get_settlement(underlying, expiry)`, `get_claimable(account_id, asset)`, and NEP-245 `mt_balance_of`, `mt_batch_balance_of`, `mt_supply`, `mt_batch_supply`, `mt_token`.
+
+`mt_supply` includes retired tokens: options closed through intents stay in the contract's intents balance and are never burned. Open interest = supply minus the contract's own intents balance of that token.
+
+## Events
+
+- NEP-245 `mt_mint`, `mt_burn`, `mt_transfer` (`standard: "nep245"`, `version: "1.0.0"`).
+- `near-options` `0.2.0` (series gained `width`, close events a single USDC `payout`): `series_created`, `write`, `exercise`, `redeem` and `burn_pair` (each with its USDC `payout`), `settlement_proposed`, `settlement_overridden`, `payout_failed` (`owner_id`, `asset`, `amount`: now claimable).
+
+## Testnet underlyings
+
+| Underlying | Deribit index | Option decimals | Minimum write |
+|---|---|---|---|
+| BTC | `btc_usd` | 8 | 0.00001 BTC |
+| ETH | `eth_usd` | 18 | 0.001 ETH |
+
+Collateral and payouts: USDC, `nep141:usdc.near-options-dev.testnet`, 6 decimals.
+
+## Not built yet
+
+NEP-245 metadata views (`mt_metadata_*`).

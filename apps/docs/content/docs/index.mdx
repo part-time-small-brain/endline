@@ -1,0 +1,27 @@
+---
+title: Introduction
+description: Bet on BTC or ETH going up or down by a date. Fully backed, paid automatically, settled through NEAR Intents.
+---
+
+<Callout title="Status">
+  near-options runs on NEAR testnet, with test tokens and faster timing ([values](./developers/architecture.mdx#environments)). Get test USDC from Add funds in the app. Mainnet is next.
+</Callout>
+
+## In five steps
+
+1. Put USDC in your NEAR Intents balance. You can fund it from any chain.
+2. Pick BTC or ETH, an end time, a price to beat and what you pay. Up pays if the final price ends above the price to beat, Down if below, and the further past it, the more you get, up to a cap two price steps out.
+3. Sign once at a firm price. You don't need a gas token.
+4. At the end, the final price is the median of 7 major exchanges.
+5. If you were right, the payout lands in your balance automatically. If not, you lose what you paid and no more.
+
+Up is a call and Down is a put with a capped payout: European, cash-settled and fully collateralized in USDC. [How it works](./how-it-works.mdx) has the math.
+
+Your USDC, options and payouts are balances in `intents.near`, the NEAR Intents contract. We never hold your funds, and there is no bridge of ours in between.
+
+<Cards>
+  <Card title="Quickstart" href="/quickstart" description="Your first trade." />
+  <Card title="How it works" href="/how-it-works" description="Payouts with examples." />
+  <Card title="Settlement" href="/settlement" description="Where the final price comes from." />
+  <Card title="Safety and risks" href="/safety-and-risks" description="What can go wrong." />
+</Cards>

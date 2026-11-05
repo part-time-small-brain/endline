@@ -1,0 +1,88 @@
+---
+title: Running locally and on testnet
+description: Run the app with no backend, run the tests, or bring up the full stack on testnet.
+---
+
+## Toolchain
+
+Node 24, pnpm, Rust 1.95 with `wasm32-unknown-unknown` and `wasm32-wasip2`, `cargo-near` 0.22, `near` (near-cli-rs), `outlayer` (outlayer-cli), `wasmtime`.
+
+## The app with no backend
+
+```bash
+pnpm install
+VITE_MOCK=1 pnpm --filter @near-options/web dev
+```
+
+Mock mode has a demo wallet with $250 of play money, a mock relay on the real protocol types, and positions in every state. NEAR and EVM wallets also work, with real signatures and fake settlement.
+
+## Tests and builds
+
+```bash
+cargo test -p options -p oracle
+pnpm -r test && pnpm -r typecheck
+(cd contracts/options && cargo near build non-reproducible-wasm)
+cargo build -p oracle --target wasm32-wasip2 --release
+```
+
+Sandbox tests run against the real mainnet `intents.near` wasm:
+
+```bash
+scripts/fetch-sandbox-wasms.sh
+cargo test -p sandbox-tests
+```
+
+## Full stack on testnet
+
+The shared environment is `near-options-dev.testnet`; ids are in `deploy/testnet.json`. Use `https://rpc.testnet.fastnear.com`. Testnet scripts sign with the near CLI legacy keychain (`~/.near-credentials`).
+
+| Step | How |
+|---|---|
+| 1. Accounts | One faucet account per role (you, market maker, relayer), or one for all: `near account create-account sponsor-by-faucet-service <name>.testnet autogenerate-new-keypair save-to-legacy-keychain network-config testnet create` |
+| 2. Own environment (optional) | `scripts/deploy-testnet.sh <you>.testnet` deploys an intents copy, mock USDC, the options contract with minute timing and makes you the manual oracle. Needs about 21 NEAR. It skips accounts that exist; a new contract version needs a new account (`OPTIONS_ID=opt2.<you>.testnet`). Overwrites `deploy/testnet.json` |
+| 3. Fund intents balances | The environment owner sends mock USDC with `ft_transfer_call` to the intents contract, `msg` = the receiving account. The market maker and users both need USDC. Or start the relay with `FAUCET=true` (relayer = `<root>`) and users get 100 USDC a day from Add funds, when the app and relay share an origin |
+| 4. Register keys | The market maker and CLI users call `add_public_key` on the intents contract. The web app does this itself for NEAR wallets; EVM wallets need nothing |
+| 5. Create a series | `pnpm --filter @near-options/mm start list` (market maker env) keeps a rolling set listed and stocked. One-off: `scripts/demo-series.sh BTC\|ETH <minutes-ahead> <strike-usd> <width-usd> call\|put <usdc-units>` (only the lister's width, 2 strike steps, gets quoted) creates it and has the market maker write inventory |
+| 6. Run relay, market maker, web | Below |
+| 7. Trade | In the web app, or `apps/mm/src/smoke.ts` from a terminal. Use series 1 to 2 h out |
+| 8. Settle | The proposer (or the oracle account by hand) proposes the price from expiry + 10 min. Final 2 min later |
+
+```bash
+export NEAR_RPC_URL=https://rpc.testnet.fastnear.com INTENTS_ID=intents.near-options-dev.testnet \
+  OPTIONS_ID=opt3.near-options-dev.testnet QUOTE_ASSET=nep141:usdc.near-options-dev.testnet
+
+NETWORK_ID=testnet DATA_DIR=data RELAYER_ACCOUNT_ID=<relayer>.testnet RELAYER_PRIVATE_KEY=ed25519:… \
+  MM_API_KEYS=<key of 16+ chars> pnpm --filter @near-options/relay start
+
+MM_ACCOUNT_ID=<mm>.testnet MM_PRIVATE_KEY=ed25519:… RELAY_WS_URL=ws://localhost:8080/mm MM_API_KEY=<same key> \
+  pnpm --filter @near-options/mm start
+
+VITE_RELAY_URL=http://localhost:8080 VITE_NETWORK=testnet VITE_RPC_URL=$NEAR_RPC_URL VITE_INTENTS_ID=$INTENTS_ID \
+  VITE_OPTIONS_ID=$OPTIONS_ID VITE_QUOTE_ASSET=$QUOTE_ASSET pnpm --filter @near-options/web dev
+```
+
+Each command runs in its own shell after the `export` line. Write market maker inventory with `pnpm --filter @near-options/mm start write <series_id> <usdc units>`.
+
+## Settlement helpers
+
+```bash
+pnpm --filter @near-options/mm start propose [--once]    # testnet proposer: ORACLE_ACCOUNT_ID, ORACLE_PRIVATE_KEY
+pnpm --filter @near-options/mm start monitor [--once]    # read-only alerts: NEAR_RPC_URL, OPTIONS_ID
+pnpm --filter @near-options/mm start settle [--once]     # mainnet settler: RELAYER_ACCOUNT_ID, RELAYER_PRIVATE_KEY
+pnpm --filter @near-options/mm start positions           # market maker balances, greeks, net delta
+```
+
+## Docker
+
+`deploy/` has the Dockerfile and compose file for the hosted testnet stack: `web` (Caddy serving the app, these docs under `/docs` and the relay's public routes), `relay`, `mm`, `monitor`, `proposer` and a Cloudflare tunnel. Each container reads only its own variables from `deploy/.env` (template: `deploy/env.example`).
+
+```bash
+docker compose -f deploy/compose.yaml --env-file deploy/.env build
+```
+
+## These docs
+
+```bash
+pnpm --filter @near-options/docs dev      # http://localhost:3000/docs
+pnpm --filter @near-options/docs build    # static files in apps/docs/out
+```

@@ -1,0 +1,19 @@
+[workspace]
+resolver = "2"
+members = ["contracts/*", "oracle", "tests/sandbox"]
+
+[workspace.package]
+edition = "2021"
+publish = false
+
+[workspace.dependencies]
+near-sdk = "5.29.0"
+uint = { version = "0.10.2", default-features = false }
+
+[profile.release]
+codegen-units = 1
+opt-level = "z"
+lto = true
+debug = false
+panic = "abort"
+overflow-checks = true

@@ -1,0 +1,11 @@
+packages:
+  - "packages/*"
+  - "apps/*"
+allowBuilds:
+  bigint-buffer: false
+  bufferutil: false
+  core-js-pure: false
+  esbuild: false
+  protobufjs: false
+  secp256k1: false
+  utf-8-validate: false

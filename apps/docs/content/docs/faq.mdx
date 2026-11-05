@@ -1,0 +1,52 @@
+---
+title: FAQ
+description: Short answers to common questions.
+---
+
+## Can I lose more than I pay?
+
+No.
+
+## How is this different from a yes/no "Up or Down" market?
+
+A yes/no market pays a fixed amount. Here you choose the price to beat, and the payout grows with how far past it the final price lands, up to a cap two price steps out, about 1.2–3% past it ([How it works](./how-it-works.mdx)).
+
+## Who is on the other side of my trade?
+
+Our market maker, for now. It locks the full payout in the contract before selling. It can hedge on Hyperliquid to earn the spread instead of betting against you, but hedging is off unless its operator sets a key.
+
+## When does a market end?
+
+Daily at 08:00 UTC, shown in your time zone.
+
+## What if the final price is wrong?
+
+It can't become final until the 1 h dispute window ends, and the owner can override it before then ([Settlement](./settlement.mdx#dispute-window)).
+
+## Can I sell before the end?
+
+Yes, with Sell back, until 30 minutes before the end, at a price of at least $1.
+
+## Do I need NEAR for gas?
+
+No. The relay pays gas for trades and collects. Only NEAR wallet setup and deposits are normal transactions.
+
+## What if I forget to collect?
+
+The payout waits in the contract and doesn't expire. Tap Collect any time, or turn on auto-collect to skip that.
+
+## Why is the payout capped?
+
+So every bet can be fully backed with a little USDC. The most an option can pay is locked before you buy, and the cap keeps that amount small: about $5 locked for every $1 of bets, instead of a whole BTC behind every Up. Every payout is USDC.
+
+## Which wallets work?
+
+NEAR and Ethereum wallets ([Quickstart](./quickstart.mdx#1-connect-a-wallet)).
+
+## Is my position private?
+
+No. Option balances on NEAR Intents are public.
+
+## Where's the code?
+
+<Source />. Start with [Architecture](./developers/architecture.mdx).

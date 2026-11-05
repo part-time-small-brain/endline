@@ -1,0 +1,43 @@
+---
+title: Quickstart
+description: Fund, pick Up or Down, choose an amount, and get paid automatically.
+---
+
+## 1. Connect a wallet
+
+| Wallet | Examples | One-time setup |
+|---|---|---|
+| NEAR | HOT, Meteor, Intear | "Enable": one transaction that lets the wallet sign trades on NEAR Intents |
+| Ethereum | MetaMask, Rabby, any browser wallet | None |
+
+## 2. Add funds
+
+Pick a token and chain and send it to the deposit address shown. It arrives as USDC. Failed or short deposits are refunded to your NEAR Intents balance. From a NEAR wallet, it's one transaction.
+
+On testnet, tap "Get 100 test USDC" in Add funds instead: once a day per account.
+
+Fund before you trade: you only get prices your balance covers.
+
+## 3. Pick a market
+
+The Trade screen opens in Lite: one sentence. Tap a slot to change when it ends (your time zone), BTC or ETH, above or below, the price to beat (with the % move), and what you pay: $10, $25, $50, $100 or any amount. Lite shows Max loss, a gross payout multiple, an estimated chance the final price ends above or below the price to beat, "win up to" the most the bet can pay (the cap, not profit), "Full payout if BTC ends above/below $cap", and "Sell back now $X" ([round-trip cost](./fees-and-pricing.mdx#how-a-quote-works)).
+
+Pro, in the header next to Lite and Tap, switches to the chart ticket: same markets, with Breakeven and "If BTC ends above $X" labeled next to Max loss.
+
+Tap shows the same markets as a grid. Rows are prices to beat, columns are end dates, and the price line runs into a dashed line at today's price. Cells above it are Up and cells below it are Down (a bet you hold keeps its cell), and each shows how many times your stake it pays at most. Pick a stake, then tap a cell to buy it. Set up a Tap balance (your wallet signs a fixed text, twice the first time on a device, then you move money in) and each tap buys at once, signed in your browser with no wallet prompt. A tap only goes through if the price still pays at least the multiple on the cell and costs at most the Max loss under the stake.
+
+## 4. Buy
+
+1. Tap Buy. The first time, your wallet asks for a sign-in signature. It moves no funds and lasts 24 hours.
+2. Sign the firm price before its countdown ends. You get the option and pay in one step, or nothing happens. If the price expires while you sign, you aren't charged.
+3. Optionally sign once more for auto-collect, so a win is paid without you coming back ([Collecting](./collecting.mdx)).
+
+How the price is made: [Fees and pricing](./fees-and-pricing.mdx).
+
+## After you buy
+
+| When | What you see |
+|---|---|
+| Before the end | What you paid, value now and P&L. Sell back until 30 min before the end |
+| Ended | "Waiting for the final price", then the proposed price and when it becomes final |
+| Final | Paid automatically, a Collect button, or "Ended $0" |
