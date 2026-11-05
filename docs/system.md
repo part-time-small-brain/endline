@@ -131,7 +131,7 @@ On the server:
 | `proposer` | Testnet oracle: `ORACLE_*`, defaulting to the relayer's account and key |
 | `tunnel` | `cloudflared`, outbound only, running the named tunnel from `TUNNEL_TOKEN`. Its public hostname (`api.endline.trade` → `http://web:80`) is set in Zero Trust → Networks → Tunnels |
 
-Each container gets only its own variables from `deploy/.env` (template: `deploy/env.example`). Images are built on a Mac and travel as tarballs (the server's Docker can't pull over SSH). Deploys, restarts, alerts and their fixes: [runbook.md](runbook.md).
+Each container gets only its own variables from `deploy/.env` (template: `deploy/env.example`). The server builds and deploys `main` itself (`deploy/autodeploy.ps1`, every 5 min). Deploys, restarts, alerts and their fixes: [runbook.md](runbook.md).
 
 ### Testnet from scratch
 
