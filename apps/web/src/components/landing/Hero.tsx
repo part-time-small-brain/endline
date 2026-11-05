@@ -98,7 +98,7 @@ export function Hero({ market, nowSec }: { market: DemoMarket | undefined; nowSe
           </h1>
           <Rise delay={0.3}>
             <p className="mt-6 max-w-[520px] text-base lg:text-xl">
-              Call whether Bitcoin or Ethereum ends above or below your price. The most you can lose is what you pay.
+              Choose whether Bitcoin or Ethereum ends above or below your price. The most you can lose is what you pay.
             </p>
           </Rise>
           <Rise delay={0.42}>

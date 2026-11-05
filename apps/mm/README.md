@@ -48,7 +48,7 @@ Read from the process environment.
 | `MIN_PREMIUM_USD` | Default `1`. Asks are floored to it, bids below it are refused |
 | `MAX_TRADE_USD` | Max payout (contracts × width) per quote, default `2000` |
 | `MAX_SERIES_USD` | Max net short/long payout per series, default `5000`. The lister stocks at most this much per series |
-| `MAX_DELTA_USD` | Max net delta per underlying right after a fill, before its hedge, default `50000`. Near expiry a full `MAX_TRADE_USD` trade near the money is up to `MAX_TRADE_USD × spot / width` of delta (~$80k for BTC) and gets refused; demo-size bets fit. Also each hedge order's size limit |
+| `MAX_DELTA_USD` | Max net delta per underlying right after a fill, before its hedge, default `50000`. Near expiry a full `MAX_TRADE_USD` trade near the money is up to `MAX_TRADE_USD × spot / width` of delta (~$80k for BTC) and gets refused; demo-size trades fit. Also each hedge order's size limit |
 | `MAX_VEGA_USD` | Max net vega per vol point, default `200` |
 | `NETWORK_ID` | `mainnet` (default) or `testnet`. Monitor only, used in the printed `near` commands |
 | `ALERT_WEBHOOK_URL` | Optional. Monitor only: POSTs each `ALERT`/`RESOLVED`/`FINAL` line as `{"text","content"}` (Slack and Discord incoming webhooks) |

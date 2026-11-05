@@ -37,9 +37,9 @@ Deribit must list options on it (the market maker prices from Deribit's vol) and
 
 Options need a seller. The market maker is that seller:
 1. **Creates inventory.** It locks USDC in the contract, the most each option can pay (its width), and gets long + short tokens. Nobody can buy an option until someone has written it.
-2. **Prices it.** A capped bet is two options, one at the strike and one at the cap, each priced with Black-76 on Deribit's volatility, plus a spread. The spread is the house's income.
+2. **Prices it.** A capped Up or Down is two options, one at the strike and one at the cap, each priced with Black-76 on Deribit's volatility, plus a spread. The spread is the house's income.
 3. **Takes the other side.** It sells longs to buyers and buys them back from sellers.
-4. **Hedges.** Selling calls leaves it short BTC. It offsets that with a Hyperliquid perp, so it earns the spread instead of betting on direction. Off unless a key is set.
+4. **Hedges.** Selling calls leaves it short BTC. It offsets that with a Hyperliquid perp, so it earns the spread instead of taking a view on direction. Off unless a key is set.
 
 It can't run away with user money: every option is fully collateralized inside the contract from the moment it exists.
 
@@ -156,7 +156,7 @@ Each container gets only its own variables from `deploy/.env` (template: `deploy
    VITE_RELAY_URL=http://localhost:8080 VITE_NETWORK=testnet VITE_RPC_URL=$NEAR_RPC_URL VITE_INTENTS_ID=$INTENTS_ID \
      VITE_OPTIONS_ID=$OPTIONS_ID VITE_QUOTE_ASSET=$QUOTE_ASSET pnpm --filter @endline/web dev
    ```
-7. **Trade.** In the web app, or from a terminal with `apps/mm/src/smoke.ts` ([mm README](../apps/mm/README.md#run)). Use series 1–2 h out and sizes near the trade cap: minutes before expiry, small options are worth under the MM's $1 minimum, so it won't quote or buy them back. For bigger demo trades raise `MAX_TRADE_USD` and `MAX_DELTA_USD` on the testnet MM: near expiry a capped bet's delta approaches one per contract.
+7. **Trade.** In the web app, or from a terminal with `apps/mm/src/smoke.ts` ([mm README](../apps/mm/README.md#run)). Use series 1–2 h out and sizes near the trade cap: minutes before expiry, small options are worth under the MM's $1 minimum, so it won't quote or buy them back. For bigger demo trades raise `MAX_TRADE_USD` and `MAX_DELTA_USD` on the testnet MM: near expiry a capped option's delta approaches one per contract.
 8. **Settle.** The [proposer](../apps/mm/README.md#testnet-proposer) does it; by hand, `<root>` proposes the price from expiry + 10 min (price in USDC units):
    ```bash
    near contract call-function as-transaction opt.<root>.testnet propose_settlement \

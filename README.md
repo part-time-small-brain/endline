@@ -1,8 +1,6 @@
 # Endline
 
-Call where BTC and ETH end. Fund from any chain, max loss is what you pay. Each position is a European, cash-settled option with a capped payout, fully backed in USDC, that lives and trades inside NEAR Intents. Live on NEAR testnet; mainnet (with deposits from any chain via 1Click) is built but not deployed yet.
-
-Site: https://endline.trade (planned, not live yet).
+Pick where BTC and ETH end. Fund from any chain, max loss is what you pay. Each position is a European, cash-settled option with a capped payout, fully backed in USDC, that lives and trades inside NEAR Intents. Live on NEAR testnet; mainnet (with deposits from any chain via 1Click) is built but not deployed yet.
 
 ## The problem
 
