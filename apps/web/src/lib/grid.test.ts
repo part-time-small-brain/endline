@@ -50,7 +50,7 @@ describe("tap grid", () => {
     expect(buildGrid(series, SPOT, 25n * USD, marked(series), none).cells[0]?.[0]?.series.kind).toBe("put");
   });
 
-  it("says a held bet is winning only while spot is past its price to beat, and a bet you don't hold never is", () => {
+  it("says a held bet is winning only while spot is past its price to beat, and shows the winning side when you hold both", () => {
     const series = [listed(81_000, "call"), listed(81_000, "put"), listed(82_000, "call")];
     const at = (spot: bigint, held: string) => buildGrid(series, spot, 25n * USD, marked(series), new Set([held])).cells;
     const [call, put, other] = series.map((s) => s.id) as [string, string, string];
@@ -58,8 +58,10 @@ describe("tap grid", () => {
     expect(at(81_000n * USD, call)[1]?.[0]).toMatchObject({ series: series[0], winning: false });
     expect(at(80_000n * USD, put)[1]?.[0]).toMatchObject({ series: series[1], winning: true });
     expect(at(81_000n * USD, put)[1]?.[0]).toMatchObject({ series: series[1], winning: false });
-    expect(at(81_500n * USD, put)[0]?.[0]).toMatchObject({ series: series[2], held: false, winning: false });
     expect(at(81_500n * USD, other)[0]?.[0]).toMatchObject({ series: series[2], held: true, winning: false });
+    const both = new Set([call, put]);
+    expect(buildGrid(series, 80_000n * USD, 25n * USD, marked(series), both).cells[1]?.[0]).toMatchObject({ series: series[1], winning: true });
+    expect(buildGrid(series, 82_000n * USD, 25n * USD, marked(series), both).cells[1]?.[0]).toMatchObject({ series: series[0], winning: true });
   });
 
   it("shows the gross multiple rounded down, and none for a stake below one contract or a series without a mark", () => {

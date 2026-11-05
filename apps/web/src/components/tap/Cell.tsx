@@ -2,7 +2,7 @@ import { m } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 import type { TapState } from "../../hooks/useTaps.ts";
 import type { GridCell } from "../../lib/grid.ts";
-import { formatMultiple, formatPct } from "../../lib/money.ts";
+import { formatMultiple } from "../../lib/money.ts";
 import { SideGlyph } from "../Glyphs.tsx";
 
 const LOOK = {
@@ -42,7 +42,8 @@ export function Cell({ cell, label, value, change, state, onTap }: Props) {
   if (!cell) return <span className="block size-full rounded-md border border-rule/60" aria-hidden="true" />;
   const { series, multiple, held } = cell;
   const pays = multiple === undefined ? "—" : formatMultiple(multiple);
-  const text = change === undefined ? pays : formatPct(change);
+  const pct = change === undefined ? undefined : Math.round(change * 100);
+  const text = pct === undefined ? pays : `${pct > 0 ? "+" : ""}${pct}%`;
   const look = LOOK[series.kind][winning && state?.status !== "done" ? "winning" : held ? "held" : "open"];
   return (
     <m.button
@@ -54,18 +55,18 @@ export function Cell({ cell, label, value, change, state, onTap }: Props) {
       whileTap={{ scale: 0.9 }}
       animate={{ scale: state?.status === "done" ? [1, 1.08, 1] : 1 }}
       onClick={() => onTap(cell)}
-      className={`relative flex size-full flex-col items-center justify-center gap-1 rounded-md border font-mono transition-[background-color,border-color,box-shadow] disabled:opacity-40 ${look} ${state ? RING[state.status] : ""}`}
+      className={`relative flex size-full flex-col items-center justify-center gap-1 rounded-md border font-mono transition-[background-color,border-color,box-shadow] ${held ? "" : "disabled:opacity-40"} ${look} ${state ? RING[state.status] : ""}`}
     >
       {flips > 0 && (
         <span
           key={flips}
           aria-hidden="true"
-          className="pointer-events-none absolute inset-0 rounded-md opacity-0 shadow-[0_0_0_2px_currentColor,0_0_28px_currentColor] [animation:fade_1.2s_var(--ease-out)_1_reverse]"
+          className="pointer-events-none absolute inset-0 rounded-md opacity-0 shadow-[0_0_0_2px_currentColor,0_0_28px_currentColor] [animation:fade_1.2s_ease-in_1_reverse]"
         />
       )}
       {value === undefined ? <SideGlyph kind={series.kind} size={14} /> : <span className="text-[0.6875rem] leading-none font-semibold">{value}</span>}
-      <span className={`leading-none font-medium ${text.length > 5 ? "text-xs sm:text-base" : "text-[15px] sm:text-lg"} ${change === undefined ? "" : change > 0 ? "text-up-ink" : change < 0 ? "text-down-ink" : "text-ink-2"}`}>{text}</span>
-      {change !== undefined && <span className="text-[0.625rem] leading-none opacity-70">{pays}</span>}
+      <span className={`leading-none font-medium ${text.length > (pct === undefined ? 5 : 4) ? "text-xs sm:text-base" : "text-[15px] sm:text-lg"} ${pct === undefined ? "" : pct > 0 ? "text-up-ink" : pct < 0 ? "text-down-ink" : "text-ink-2"}`}>{text}</span>
+      {pct !== undefined && <span className="text-[0.625rem] leading-none opacity-70">{pays}</span>}
     </m.button>
   );
 }

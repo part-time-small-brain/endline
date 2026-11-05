@@ -1,4 +1,4 @@
-import { type ListedSeries, longPayout, type Mark, type OptionKind } from "@endline/sdk";
+import type { ListedSeries, Mark, OptionKind } from "@endline/sdk";
 import { payoutMultiple, type Ticket, ticket } from "./ticket.ts";
 
 export interface GridCell {
@@ -23,16 +23,17 @@ export function buildGrid(listed: ListedSeries[], spot: bigint, stake: bigint, m
     expiries.map((expiry) => {
       const natural = strike > spot ? "call" : "put";
       const both = [at(strike, expiry, natural), at(strike, expiry, natural === "call" ? "put" : "call")];
-      const series = both.find((s) => s && held.has(s.id)) ?? both[0];
+      const mine = both.filter((s) => s && held.has(s.id));
+      const series = mine.find((s) => s && winningAt(s, spot)) ?? mine[0] ?? both[0];
       if (!series) return undefined;
       const priced = ticket(series, stake, marks?.[series.id]);
-      const mine = held.has(series.id);
-      const winning = mine && longPayout(priced.terms, priced.terms.unit, spot) > 0n;
-      return { series, ticket: priced, multiple: payoutMultiple(priced), held: mine, winning };
+      return { series, ticket: priced, multiple: payoutMultiple(priced), held: held.has(series.id), winning: winningAt(series, spot) };
     }),
   );
   return { strikes, expiries, cells };
 }
+
+const winningAt = (series: ListedSeries, spot: bigint) => (series.kind === "call" ? spot > BigInt(series.strike) : spot < BigInt(series.strike));
 
 export function rowOf(strikes: bigint[], price: bigint): number {
   if (strikes.length < 2) return 0;
