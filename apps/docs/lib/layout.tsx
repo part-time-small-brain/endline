@@ -1,8 +1,8 @@
 import type { BaseLayoutProps } from "fumadocs-ui/layouts/shared";
 
-export const sourceUrl: string | undefined = undefined;
+export const sourceUrl = "https://github.com/part-time-small-brain/endline";
 
-export const sourceMarkdown = sourceUrl ? `Source: [GitHub](${sourceUrl})` : "Source: coming soon";
+export const sourceMarkdown = `Source: [GitHub](${sourceUrl})`;
 
 function Wordmark() {
   return (

@@ -17,7 +17,7 @@ try {
   $deployed = git rev-parse -q --verify deployed
   if ($deployed -ne $remote) {
     Run git reset --hard --quiet $remote | Out-Null
-    $server = -not $deployed -or (Run git diff --name-only --no-renames $deployed $remote | Where-Object { $_ -notmatch '^(apps/web/|apps/docs/|docs/)|\.md$' })
+    $server = -not $deployed -or (Run git diff --name-only --no-renames $deployed $remote | Where-Object { $_ -notmatch '^(apps/web/|apps/docs/)|\.md$' })
     if ($server) {
       Push-Location deploy
       Run docker compose build | Out-Null
