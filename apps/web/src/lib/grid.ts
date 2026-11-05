@@ -33,7 +33,7 @@ export function buildGrid(listed: ListedSeries[], spot: bigint, stake: bigint, m
   return { strikes, expiries, cells };
 }
 
-const winningAt = (series: ListedSeries, spot: bigint) => (series.kind === "call" ? spot > BigInt(series.strike) : spot < BigInt(series.strike));
+export const winningAt = (series: Pick<ListedSeries, "kind" | "strike">, spot: bigint) => (series.kind === "call" ? spot > BigInt(series.strike) : spot < BigInt(series.strike));
 
 export function rowOf(strikes: bigint[], price: bigint): number {
   if (strikes.length < 2) return 0;

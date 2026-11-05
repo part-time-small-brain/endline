@@ -38,9 +38,9 @@ describe("phaseOf", () => {
   it("opens the final round with the averaging window, not the trading cutoff, and drops the column 3 h after the end", () => {
     const proposed = { price: 81_400n * USD, finalAt: E + 3_900 };
     expect(phaseOf(E, null, E - 1_801)).toBeUndefined();
-    expect(phaseOf(E, null, E - 1_800)).toBe("final_round");
-    expect(phaseOf(E, null, E - 1)).toBe("final_round");
-    expect(phaseOf(E, null, E)).toBe("ended");
+    expect(phaseOf(E, null, E - 1_800)).toBe("close_only");
+    expect(phaseOf(E, null, E - 1)).toBe("close_only");
+    expect(phaseOf(E, null, E)).toBe("awaiting_price");
     expect(phaseOf(E, proposed, E + 300)).toBe("proposed");
     expect(phaseOf(E, proposed, E + 3_900)).toBe("final");
     expect(phaseOf(E, proposed, E + 10_799)).toBe("final");
@@ -65,9 +65,9 @@ describe("closingOf", () => {
   it("keeps a column in its final round for everyone, but after the end only while you have a stake in it", () => {
     const next = E + 86_400;
     const none = () => null;
-    expect(closingOf([next, E], () => false, none, E - 600)).toEqual({ expiry: E, phase: "final_round" });
+    expect(closingOf([next, E], () => false, none, E - 600)).toEqual({ expiry: E, phase: "close_only" });
     expect(closingOf([next, E], () => false, none, E + 60)).toBeUndefined();
-    expect(closingOf([next, E, E], (e) => e === E, none, E + 60)).toEqual({ expiry: E, phase: "ended" });
+    expect(closingOf([next, E, E], (e) => e === E, none, E + 60)).toEqual({ expiry: E, phase: "awaiting_price" });
     expect(closingOf([E, next], () => true, () => ({ price: 81_400n * USD, finalAt: E + 300 }), E + 600)).toEqual({ expiry: E, phase: "final" });
     expect(closingOf([E, next], () => true, none, E - 1_801)).toBeUndefined();
   });
@@ -75,13 +75,13 @@ describe("closingOf", () => {
 
 describe("free calls in the reveal", () => {
   it("are a win only above their stake, too close near the price to beat until the price is known, and say their points", () => {
-    expect(callVerdict(series("call"), "final_round", 81_500n * USD, 25)).toBe("win");
-    expect(callVerdict(series("call"), "final_round", 81_500n * USD, -50)).toBe("lose");
-    expect(callVerdict(series("call"), "ended", 81_050n * USD, -88)).toBe("close");
+    expect(callVerdict(series("call"), "close_only", 81_500n * USD, 25)).toBe("win");
+    expect(callVerdict(series("call"), "close_only", 81_500n * USD, -50)).toBe("lose");
+    expect(callVerdict(series("call"), "awaiting_price", 81_050n * USD, -88)).toBe("close");
     expect(callVerdict(series("call"), "final", 81_050n * USD, -88)).toBe("lose");
-    expect(pointsSays("final_round", "win", "+25 pts")).toBe("on track for +25 pts");
+    expect(pointsSays("close_only", "win", "+25 pts")).toBe("on track for +25 pts");
     expect(pointsSays("proposed", "lose", "-100 pts")).toBe("-100 pts if the proposed price stands");
     expect(pointsSays("final", "win", "+25 pts")).toBe("+25 pts");
-    expect(pointsSays("ended", "close", "-88 pts")).toBe("too close to call");
+    expect(pointsSays("awaiting_price", "close", "-88 pts")).toBe("too close to call");
   });
 });

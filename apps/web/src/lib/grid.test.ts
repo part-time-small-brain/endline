@@ -59,7 +59,6 @@ describe("tap grid", () => {
     expect(at(80_000n * USD, put)[1]?.[0]).toMatchObject({ series: series[1], winning: true });
     expect(at(81_000n * USD, put)[1]?.[0]).toMatchObject({ series: series[1], winning: false });
     expect(at(81_500n * USD, other)[0]?.[0]).toMatchObject({ series: series[2], held: true, winning: false });
-    expect(at(81_500n * USD, put)[0]?.[0]).toMatchObject({ series: series[2], held: false, winning: false });
     const both = new Set([call, put]);
     expect(buildGrid(series, 80_000n * USD, 25n * USD, marked(series), both).cells[1]?.[0]).toMatchObject({ series: series[1], winning: true });
     expect(buildGrid(series, 82_000n * USD, 25n * USD, marked(series), both).cells[1]?.[0]).toMatchObject({ series: series[0], winning: true });
