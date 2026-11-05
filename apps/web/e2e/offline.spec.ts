@@ -575,6 +575,13 @@ test.describe("Tap", () => {
 
   test("a tap signs only while the firm quote still pays the multiple on the cell, and a refused one shows the new multiple at once", async ({ page }) => {
     const state = await withTapBalance(page);
+    await page.route("**/rpc", async (route) => {
+      const params = route.request().postDataJSON().params;
+      if (params.method_name !== "mt_batch_balance_of") return route.fallback();
+      const ids: string[] = JSON.parse(Buffer.from(params.args_base64, "base64").toString()).token_ids;
+      await route.fulfill({ json: { jsonrpc: "2.0", id: "web", result: { result: [...Buffer.from(JSON.stringify(ids.map((id) => (id.endsWith("-P") ? "0" : String(250 * USD)))))] } } });
+    });
+    await page.clock.fastForward(10_000);
     let ask = 400;
     await page.route("**/marks", (route) => route.fulfill({ json: [{ series_id: "BTC-5NOV26-81000_83000-C", ask: String(ask * USD), bid: String(380 * USD), vol: 0.4 }] }));
     const cell = page.getByRole("table").getByRole("button", { name: /^Up · BTC ends above \$81,000 · Tomorrow/ });
@@ -649,13 +656,13 @@ test.describe("Tap", () => {
     expect(await flashes()).toBe(0);
     index = 81_200;
     await page.clock.fastForward(5_000);
-    await expect(cell).toHaveAccessibleName(/· up \$2\.60 · winning now · you hold this$/);
     await expect.poll(flashes, { intervals: [50] }).toBe(1);
+    await expect(cell).toHaveAccessibleName(/· up \$2\.60 · winning now · you hold this$/);
     await expect.poll(flashes).toBe(0);
     index = 80_650;
     await page.clock.fastForward(5_000);
-    await expect(cell).toHaveAccessibleName(/· up \$2\.60 · you hold this$/);
     await expect.poll(flashes, { intervals: [50] }).toBe(1);
+    await expect(cell).toHaveAccessibleName(/· up \$2\.60 · you hold this$/);
   });
 
   async function heldThroughTheEnd(page: Page) {
