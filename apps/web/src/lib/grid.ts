@@ -1,4 +1,4 @@
-import type { ListedSeries, Mark, OptionKind } from "@endline/sdk";
+import { type ListedSeries, longPayout, type Mark, type OptionKind } from "@endline/sdk";
 import { payoutMultiple, type Ticket, ticket } from "./ticket.ts";
 
 export interface GridCell {
@@ -6,6 +6,7 @@ export interface GridCell {
   ticket: Ticket;
   multiple: bigint | undefined;
   held: boolean;
+  winning: boolean;
 }
 
 interface Grid {
@@ -25,7 +26,9 @@ export function buildGrid(listed: ListedSeries[], spot: bigint, stake: bigint, m
       const series = both.find((s) => s && held.has(s.id)) ?? both[0];
       if (!series) return undefined;
       const priced = ticket(series, stake, marks?.[series.id]);
-      return { series, ticket: priced, multiple: payoutMultiple(priced), held: held.has(series.id) };
+      const mine = held.has(series.id);
+      const winning = mine && longPayout(priced.terms, priced.terms.unit, spot) > 0n;
+      return { series, ticket: priced, multiple: payoutMultiple(priced), held: mine, winning };
     }),
   );
   return { strikes, expiries, cells };

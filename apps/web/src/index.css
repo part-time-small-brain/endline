@@ -250,6 +250,21 @@
   }
 }
 
+@keyframes cross-flash {
+  from {
+    opacity: 0.9;
+    box-shadow:
+      0 0 0 2px currentColor,
+      0 0 28px currentColor;
+  }
+  to {
+    opacity: 0;
+    box-shadow:
+      0 0 0 2px currentColor,
+      0 0 28px currentColor;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
