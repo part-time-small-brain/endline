@@ -5,7 +5,9 @@ import type { Market } from "../api/market.ts";
 import type { DepositStatus, OneClick } from "../api/oneClick.ts";
 import { type Relay, RelayError } from "../api/relay.ts";
 import type { Config } from "../config.ts";
+import { toUnits } from "../lib/money.ts";
 import { costOf } from "../lib/payoff.ts";
+import type { SettlementView } from "../lib/status.ts";
 import type { Services } from "../services.ts";
 import { exampleMark } from "./marks.ts";
 import { createWorld, QUOTE_DECIMALS, START_BALANCE, type Underlying, UNDERLYINGS, WRITE_CUTOFF_SEC } from "./world.ts";
@@ -13,6 +15,8 @@ import { createWorld, QUOTE_DECIMALS, START_BALANCE, type Underlying, UNDERLYING
 const MM_DEADLINE_MS = 25_000;
 const SIGN_MARGIN_MS = 3_000;
 const SETTLE_DELAY_MS = 1_200;
+const PROPOSE_AFTER_SEC = 120;
+const DISPUTE_SEC = 3_600;
 const DEPOSIT_STEP_MS = 4_000;
 const FAUCET_AMOUNT = 100_000_000n;
 
@@ -34,6 +38,7 @@ export function createMockServices(config: Config): Services {
   const issued = new Map<string, { quote: Quote; account: string; status: StatusUpdate }>();
   const deposits = new Map<string, { startedAt: number; amount: bigint; account: string; credited: boolean }>();
   const dripped = new Set<string>();
+  const proposed = new Map<string, SettlementView>();
   const option = (seriesId: string) => intentsAssetId(config.optionsId, seriesId);
   const markOf = (s: Series) => exampleMark(s, world.spot[s.underlying as Underlying], UNDERLYINGS[s.underlying as Underlying].vol, nowSec(), QUOTE_DECIMALS);
 
@@ -185,7 +190,14 @@ export function createMockServices(config: Config): Services {
       const balances = wallet(accountId);
       return Object.fromEntries(assets.map((asset) => [asset, balances.get(asset) ?? 0n]));
     },
-    settlement: async (underlying, expiry) => world.settlements.get(`${underlying}:${expiry}`) ?? null,
+    async settlement(underlying, expiry) {
+      const key = `${underlying}:${expiry}`;
+      const known = world.settlements.get(key) ?? proposed.get(key);
+      if (known || nowSec() < expiry + PROPOSE_AFTER_SEC || !world.series.some((s) => s.underlying === underlying && s.expiry === expiry)) return known ?? null;
+      const settlement = { price: toUnits(world.spot[underlying as Underlying], QUOTE_DECIMALS), finalAt: expiry + PROPOSE_AFTER_SEC + DISPUTE_SEC };
+      proposed.set(key, settlement);
+      return settlement;
+    },
     salt: async () => randomBytes(4),
     hasPublicKey: async () => true,
   };

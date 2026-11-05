@@ -5,9 +5,11 @@ import { useCollect } from "../hooks/useCollect.ts";
 import { capLabel, seriesTitle } from "../lib/labels.ts";
 import { formatPct, formatUsd, toNumber } from "../lib/money.ts";
 import type { PositionStatus } from "../lib/status.ts";
+import { winCard } from "../lib/shareCard.ts";
 import { countdown, formatEnds, formatUtc } from "../lib/time.ts";
 import { Button } from "./Button.tsx";
 import { SettlementNote } from "./SettlementNote.tsx";
+import { ShareButton } from "./ShareButton.tsx";
 import { TxLink } from "./TxLink.tsx";
 
 const PILLS: Record<PositionStatus, { label: string; tone: string }> = {
@@ -73,6 +75,11 @@ export function PositionCard({ view, quoteDecimals, nowSec, onSellBack }: Props)
       </dl>
 
       <SettlementNote view={view} quoteDecimals={quoteDecimals} nowSec={nowSec} />
+      {(view.status === "collect" || view.status === "paid") && view.settlement && view.payout > view.paid && (
+        <div className="mt-3">
+          <ShareButton card={winCard(series, view.payout, view.paid, view.settlement.price, quoteDecimals)} />
+        </div>
+      )}
 
       {(view.status === "active" || view.status === "closed") && (
         <Button tone="ghost" size="lg" disabled={!sellable} onClick={() => onSellBack(view)}>
