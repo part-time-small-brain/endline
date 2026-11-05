@@ -1,4 +1,4 @@
-import { payload, relayedTransfer, toSign, transferFee } from "@near-options/sdk";
+import { payload, relayedTransfer, toSign, transferFee } from "@endline/sdk";
 import { useCallback } from "react";
 import { refusedOr } from "../api/relay.ts";
 import { useApp } from "../app/context.ts";

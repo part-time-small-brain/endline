@@ -1,5 +1,5 @@
 import type { AddressInfo } from "node:net";
-import { MmMessage, type QuoteEvent } from "@near-options/sdk";
+import { MmMessage, type QuoteEvent } from "@endline/sdk";
 import { afterEach, describe, expect, it } from "vitest";
 import { WebSocketServer } from "ws";
 import { PUT, quoteEvent } from "./fixtures/desk.ts";

@@ -1,5 +1,5 @@
 {
-  "name": "@near-options/relay",
+  "name": "@endline/relay",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -9,7 +9,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@near-options/sdk": "workspace:*",
+    "@endline/sdk": "workspace:*",
     "near-api-js": "^7.3.1",
     "ws": "^8.22.0",
     "zod": "^4.6.7"

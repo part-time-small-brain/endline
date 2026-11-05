@@ -1,4 +1,4 @@
-import { Fill, Mark, type PublishRequest, Quote, type QuoteRequest, SeriesListing, type SignedPayload, StatusUpdate } from "@near-options/sdk";
+import { Fill, Mark, type PublishRequest, Quote, type QuoteRequest, SeriesListing, type SignedPayload, StatusUpdate } from "@endline/sdk";
 import { z } from "zod";
 
 export interface Relay {

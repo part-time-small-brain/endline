@@ -1,4 +1,4 @@
-import { listedWidth, MmMessage, type Series, seriesId } from "@near-options/sdk";
+import { listedWidth, MmMessage, type Series, seriesId } from "@endline/sdk";
 import { describe, expect, it } from "vitest";
 import { CALL, DEMO_PUT, long, NOW, PAIRS, PUT, quoteEvent, SETTINGS, short, testDesk } from "./fixtures/desk.ts";
 import { marks } from "./marks.ts";

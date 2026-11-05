@@ -21,7 +21,7 @@ export async function pageMarkdown(page: Page): Promise<string> {
 export function index(): string {
   const pages = flattenTree(source.getPageTree().children).flatMap((node) => source.getNodePage(node) ?? []);
   const lines = pages.map((page) => `- [${page.data.title}](${markdownUrl(page.slugs)}): ${page.data.description ?? ""}`);
-  return `# near-options\n\n> Up/Down options on BTC and ETH, settled through NEAR Intents.\n\n${lines.join("\n")}\n`;
+  return `# Endline\n\n> BTC & ETH options on NEAR Intents.\n\n${lines.join("\n")}\n`;
 }
 
 export async function full(): Promise<string> {

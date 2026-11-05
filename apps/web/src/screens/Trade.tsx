@@ -1,4 +1,4 @@
-import { capPrice } from "@near-options/sdk";
+import { capPrice } from "@endline/sdk";
 import type { PositionView } from "../app/usePositions.ts";
 import { useTicket } from "../app/useTicket.ts";
 import { Brackets } from "../components/Brackets.tsx";

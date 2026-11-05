@@ -1,4 +1,4 @@
-import type { Mark } from "@near-options/sdk";
+import type { Mark } from "@endline/sdk";
 
 export const MARK_TTL_MS = 10_000;
 

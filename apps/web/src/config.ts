@@ -1,4 +1,4 @@
-import { AccountId } from "@near-options/sdk";
+import { AccountId } from "@endline/sdk";
 import { z } from "zod";
 
 const Network = z.enum(["mainnet", "testnet"]);

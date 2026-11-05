@@ -1,4 +1,4 @@
-import { exerciseOptions, payload, Quote, readPayload, sessionPayload, StatusUpdate } from "@near-options/sdk";
+import { exerciseOptions, payload, Quote, readPayload, sessionPayload, StatusUpdate } from "@endline/sdk";
 import type { KeyPairString } from "near-api-js";
 import { nep413Signer } from "./signer.ts";
 

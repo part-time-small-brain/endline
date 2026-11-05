@@ -1,4 +1,4 @@
-import { type Quote, readPayload, type SignedPayload, type StatusUpdate } from "@near-options/sdk";
+import { type Quote, readPayload, type SignedPayload, type StatusUpdate } from "@endline/sdk";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { beforeDeadline, finalStatus, RelayError } from "../api/relay.ts";
 import { useApp } from "../app/context.ts";

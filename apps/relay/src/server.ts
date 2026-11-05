@@ -1,5 +1,5 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
-import { AccountId, PublishRequest, QuoteRequest, SignedRequest } from "@near-options/sdk";
+import { AccountId, PublishRequest, QuoteRequest, SignedRequest } from "@endline/sdk";
 import { z } from "zod";
 import type { Collector } from "./collect.ts";
 import type { Faucet } from "./faucet.ts";

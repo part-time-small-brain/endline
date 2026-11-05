@@ -2,7 +2,7 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { randomBytes } from "node:crypto";
-import { payload, type Quote, type QuoteEvent, type QuoteRequest, readPayload, type SignedPayload, tokenDiff, type Unsigned } from "@near-options/sdk";
+import { payload, type Quote, type QuoteEvent, type QuoteRequest, readPayload, type SignedPayload, tokenDiff, type Unsigned } from "@endline/sdk";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Auctions, MAX_WAIT_MS } from "./auction.ts";
 import { checkBid } from "./bid.ts";

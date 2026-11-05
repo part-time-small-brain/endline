@@ -1,4 +1,4 @@
-import { type SignedPayload, sessionPayload, toSign } from "@near-options/sdk";
+import { type SignedPayload, sessionPayload, toSign } from "@endline/sdk";
 import type { Wallet } from "./wallet.ts";
 
 const SESSION_MS = 24 * 3_600_000;

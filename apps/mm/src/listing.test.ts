@@ -1,4 +1,4 @@
-import { type Series, seriesId, strikeStepCents } from "@near-options/sdk";
+import { type Series, seriesId, strikeStepCents } from "@endline/sdk";
 import { describe, expect, it } from "vitest";
 import type { ListingTerms } from "./chain.ts";
 import { expiries, type Holding, type Market, planBurns, planRedeems, planWrites, strikes, targets, watched } from "./listing.ts";

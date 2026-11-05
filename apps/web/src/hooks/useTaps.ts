@@ -1,4 +1,4 @@
-import { type ListedSeries, readPayload } from "@near-options/sdk";
+import { type ListedSeries, readPayload } from "@endline/sdk";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { beforeDeadline, finalStatus, RelayError } from "../api/relay.ts";
 import { useApp } from "../app/context.ts";

@@ -1,4 +1,4 @@
-import { Mark } from "@near-options/sdk";
+import { Mark } from "@endline/sdk";
 import type { Settings } from "./config.ts";
 import { longAsset, shortAsset } from "./portfolio.ts";
 import { toQuoteUnits } from "./pricing.ts";

@@ -1,4 +1,4 @@
-import type { OptionKind } from "@near-options/sdk";
+import type { OptionKind } from "@endline/sdk";
 
 export function Mark({ size = 22 }: { size?: number }) {
   return (
@@ -13,11 +13,10 @@ export function Mark({ size = 22 }: { size?: number }) {
 export function Wordmark() {
   return (
     <span className="inline-flex items-center gap-0.5 font-display text-xl font-semibold tracking-[-0.02em]">
-      near
       <span className="mx-0.5">
         <Mark />
       </span>
-      options
+      endline
     </span>
   );
 }

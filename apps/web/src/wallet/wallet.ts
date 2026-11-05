@@ -1,4 +1,4 @@
-import type { SignedPayload, Standard, Unsigned } from "@near-options/sdk";
+import type { SignedPayload, Standard, Unsigned } from "@endline/sdk";
 
 export interface NearCall {
   receiverId: string;

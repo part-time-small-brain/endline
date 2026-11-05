@@ -40,23 +40,23 @@ export NEAR_RPC_URL=https://rpc.mainnet.fastnear.com INTENTS_ID=intents.near OPT
   QUOTE_ASSET=nep141:17208628f84f5d6ad33f0da3bbbeb27ffcb398eac501a31bd6ad2011e36133a1
 
 NETWORK_ID=mainnet DATA_DIR=data/mainnet RELAYER_ACCOUNT_ID=<relayer> RELAYER_PRIVATE_KEY=ed25519:… \
-  MM_API_KEYS=<16+ chars> pnpm --filter @near-options/relay start
+  MM_API_KEYS=<16+ chars> pnpm --filter @endline/relay start
 
 MM_ACCOUNT_ID=<mm> MM_PRIVATE_KEY=ed25519:… RELAY_WS_URL=ws://localhost:8080/mm MM_API_KEY=<same> \
-  pnpm --filter @near-options/mm start
+  pnpm --filter @endline/mm start
 
-NETWORK_ID=mainnet RELAYER_ACCOUNT_ID=<relayer> ALERT_WEBHOOK_URL=… pnpm --filter @near-options/mm start monitor
+NETWORK_ID=mainnet RELAYER_ACCOUNT_ID=<relayer> ALERT_WEBHOOK_URL=… pnpm --filter @endline/mm start monitor
 
-RELAYER_ACCOUNT_ID=<relayer> RELAYER_PRIVATE_KEY=ed25519:… pnpm --filter @near-options/mm start settle
+RELAYER_ACCOUNT_ID=<relayer> RELAYER_PRIVATE_KEY=ed25519:… pnpm --filter @endline/mm start settle
 
 VITE_RELAY_URL=http://localhost:8080 VITE_NETWORK=mainnet VITE_RPC_URL=$NEAR_RPC_URL VITE_INTENTS_ID=$INTENTS_ID \
-  VITE_OPTIONS_ID=$OPTIONS_ID VITE_QUOTE_ASSET=$QUOTE_ASSET pnpm --filter @near-options/web dev
+  VITE_OPTIONS_ID=$OPTIONS_ID VITE_QUOTE_ASSET=$QUOTE_ASSET pnpm --filter @endline/web dev
 ```
 
 - No `FAUCET` (the relay refuses it on mainnet), no proposer (testnet only).
 - Before hosting this anywhere reachable from the internet, split the keys: give the relay a function-call key that can only call `execute_intents` on `intents.near` (it needs nothing else once the faucet is off), and run the settler as its own account with a full-access key (`request_settlement` attaches NEAR), passed as `RELAYER_ACCOUNT_ID`/`RELAYER_PRIVATE_KEY` to `settle` only. A leaked relay key then can't move the relayer's NEAR.
 - No lister: it keeps $500 of USDC back for buy-backs, so at dust sizes it writes nothing.
-- Series by hand: `create_series` for that expiry ([system.md](system.md#testnet-from-scratch) step 5, `network-config mainnet`), then `pnpm --filter @near-options/mm start write <series_id> <collateral units>` with the MM env.
+- Series by hand: `create_series` for that expiry ([system.md](system.md#testnet-from-scratch) step 5, `network-config mainnet`), then `pnpm --filter @endline/mm start write <series_id> <collateral units>` with the MM env.
 - Make the trade collectable: buy an Up one strike step ($1,000) under spot with the lister's width (2 strike steps: $2,000 while BTC is between ~$66.7k and $133k), so the cap sits above spot. 0.001 contracts lock $2 of USDC, cost about $1–1.50 and pay about $1 if BTC holds. A deeper in-the-money Up costs about its whole $2 payout plus carry, which the MM refuses as at or above max payout. An at-the-money dust option is worth cents, the MM asks at least `MIN_PREMIUM_USD` ($1), and a zero payout can't be collected.
 - The app's deposit sheet won't work from `pnpm dev`: `/deposit-quote` is same-origin and the dev app calls the relay on another port. Fund the test user from near-intents.org or with `ft_transfer_call` (plan step 5)
 - Trade from the web app, or `apps/mm/src/smoke.ts` ([mm README](../apps/mm/README.md#run)), which needs the user's key registered on `intents.near` (plan step 5 for that account) and USDC in their intents balance.

@@ -65,7 +65,7 @@ importers:
       '@defuse-protocol/intents-sdk':
         specifier: ^0.92.0
         version: 0.92.0(@hot-labs/near-connect@0.11.4)(bufferutil@4.1.0)(debug@4.4.3)(fastestsmallesttextencoderdecoder@1.0.22)(google-protobuf@3.21.4)(got@11.8.6)(typescript@7.0.2)(utf-8-validate@6.0.6)(zod@4.6.7)
-      '@near-options/sdk':
+      '@endline/sdk':
         specifier: workspace:*
         version: link:../../packages/sdk
       '@nktkas/hyperliquid':
@@ -102,7 +102,7 @@ importers:
 
   apps/relay:
     dependencies:
-      '@near-options/sdk':
+      '@endline/sdk':
         specifier: workspace:*
         version: link:../../packages/sdk
       near-api-js:
@@ -148,7 +148,7 @@ importers:
       '@hot-labs/near-connect':
         specifier: ^0.11.4
         version: 0.11.4
-      '@near-options/sdk':
+      '@endline/sdk':
         specifier: workspace:*
         version: link:../../packages/sdk
       '@number-flow/react':

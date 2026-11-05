@@ -2,7 +2,7 @@ import { randomBytes } from "node:crypto";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { type Fill, type Intent, payload, readPayload, relayedTransfer, type SignedPayload, tokenDiff, writeOptions } from "@near-options/sdk";
+import { type Fill, type Intent, payload, readPayload, relayedTransfer, type SignedPayload, tokenDiff, writeOptions } from "@endline/sdk";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Claims } from "./claims.ts";
 import { Collector } from "./collect.ts";

@@ -1,4 +1,4 @@
-import type { QuoteEvent, QuoteResponse } from "@near-options/sdk";
+import type { QuoteEvent, QuoteResponse } from "@endline/sdk";
 import type { Bid } from "./bid.ts";
 
 export const MIN_WAIT_MS = 300;

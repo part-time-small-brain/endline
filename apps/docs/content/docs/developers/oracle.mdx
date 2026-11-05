@@ -81,4 +81,4 @@ Logic is tested natively on recorded exchange responses in `oracle/tests/fixture
 |---|---|
 | Pinned WASM | `bafybeihm4qbofrnolgcyxle75u3rqv3pjn5vev5cgjezag7ng42dr6jxw4` (sha256 `259a7937…8340`) on `opt3.near-options-dev.testnet` |
 | OutLayer testnet | Stalled from 2026-10-24, working again by 2026-10-29: the pinned WASM runs there with all 7 venues reachable. Mainnet `outlayer.near` is live. Testnet still settles through the proposer |
-| Testnet proposer | `pnpm --filter @near-options/mm start propose`: refuses a mainnet RPC, downloads the pinned WASM, checks its sha256 every minute before running it, runs it in wasmtime and calls `propose_settlement` once `oracle_window_sec` has passed. Same code and sources, no TEE attestation |
+| Testnet proposer | `pnpm --filter @endline/mm start propose`: refuses a mainnet RPC, downloads the pinned WASM, checks its sha256 every minute before running it, runs it in wasmtime and calls `propose_settlement` once `oracle_window_sec` has passed. Same code and sources, no TEE attestation |

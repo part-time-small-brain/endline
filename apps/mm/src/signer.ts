@@ -1,5 +1,5 @@
 import { createIntentSignerNEP413 } from "@defuse-protocol/intents-sdk";
-import { type Payload, SignedPayload } from "@near-options/sdk";
+import { type Payload, SignedPayload } from "@endline/sdk";
 import { baseEncode, KeyPair, type KeyPairString } from "near-api-js";
 
 export type SignPayload = (payload: Payload) => Promise<SignedPayload>;

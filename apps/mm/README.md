@@ -5,15 +5,15 @@ Quotes option series to the RFQ relay, signs its `token_diff` leg with NEP-413, 
 ## Run
 
 ```bash
-pnpm --filter @near-options/mm start                                   # quote
-pnpm --filter @near-options/mm start write <series_id> <collateral>    # write inventory
-pnpm --filter @near-options/mm start list [--once]                     # list series, write and recycle inventory
-pnpm --filter @near-options/mm start positions                         # balances, greeks, net delta
-pnpm --filter @near-options/mm start monitor [--once]                  # settlement, reserve, pending admin change and uptime alerts
-pnpm --filter @near-options/mm start settle [--once]                   # mainnet: request OutLayer settlements
-pnpm --filter @near-options/mm start propose [--once]                  # testnet: run the pinned oracle WASM and propose prices
-pnpm --filter @near-options/mm test
-pnpm --filter @near-options/mm typecheck
+pnpm --filter @endline/mm start                                   # quote
+pnpm --filter @endline/mm start write <series_id> <collateral>    # write inventory
+pnpm --filter @endline/mm start list [--once]                     # list series, write and recycle inventory
+pnpm --filter @endline/mm start positions                         # balances, greeks, net delta
+pnpm --filter @endline/mm start monitor [--once]                  # settlement, reserve, pending admin change and uptime alerts
+pnpm --filter @endline/mm start settle [--once]                   # mainnet: request OutLayer settlements
+pnpm --filter @endline/mm start propose [--once]                  # testnet: run the pinned oracle WASM and propose prices
+pnpm --filter @endline/mm test
+pnpm --filter @endline/mm typecheck
 ```
 
 Before quoting, the MM account needs its key registered on the verifier (`add_public_key`), USDC in its intents balance, and written inventory for each series it should quote. Steps: [docs/system.md](../../docs/system.md#testnet-from-scratch).
@@ -24,7 +24,7 @@ Act as a user against a running relay (nep413, so the user key must be registere
 
 ```bash
 USER_ACCOUNT_ID=… USER_PRIVATE_KEY=ed25519:… NEAR_RPC_URL=… INTENTS_ID=… \
-  pnpm --filter @near-options/mm exec tsx src/smoke.ts <relay-url> <series_id> buy|sell|collect|claim <size>
+  pnpm --filter @endline/mm exec tsx src/smoke.ts <relay-url> <series_id> buy|sell|collect|claim <size>
 ```
 
 All actions need `NEAR_RPC_URL` and `INTENTS_ID`: `buy` and `sell` sign a session first ([rfq.md](../../docs/rfq.md#sessions-and-open-quotes)). `collect` and `claim` also need `OPTIONS_ID`: `collect` sends an exercise to the relay's `/execute`, `claim` stores one valid for 7 days at its `/claims` for auto-collect.

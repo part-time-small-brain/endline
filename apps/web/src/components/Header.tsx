@@ -82,7 +82,7 @@ export function Header({ route, open, toCollect, onConnect, onAddFunds }: Props)
   return (
     <header className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 px-4 py-1.5 sm:min-h-16 sm:px-6 sm:py-0 near:border-b near:border-rule">
       <div className="flex shrink-0 items-center gap-3">
-        <Link href={PATHS.landing} aria-label="near·options home" className="-m-2 rounded-lg p-2 sm:m-0 sm:p-0">
+        <Link href={PATHS.landing} aria-label="Endline home" className="-m-2 rounded-lg p-2 sm:m-0 sm:p-0">
           <span className="hidden sm:inline">
             <Wordmark />
           </span>

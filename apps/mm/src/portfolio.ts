@@ -1,4 +1,4 @@
-import { capPrice, capped, intentsAssetId, type Series, shortTokenId, termsOf, YEAR_MS } from "@near-options/sdk";
+import { capPrice, capped, intentsAssetId, type Series, shortTokenId, termsOf, YEAR_MS } from "@endline/sdk";
 import type { ContractConfig } from "./chain.ts";
 import type { Market } from "./market.ts";
 

@@ -327,7 +327,7 @@ async function phoneHeaderRows(page: Page, label: string, trade = true) {
   const box = async (locator: Locator) => (await locator.boundingBox())!;
   const center = (b: { y: number; height: number }) => b.y + b.height / 2;
   const wallet = await header.getByRole("button", { name: /^(Connect|Balance, add funds|Account .+)$/ }).all();
-  const first = await Promise.all([header.getByRole("link", { name: "near·options home" }), header.getByText(/^(Demo|Testnet)$/), ...wallet].map(box));
+  const first = await Promise.all([header.getByRole("link", { name: "Endline home" }), header.getByText(/^(Demo|Testnet)$/), ...wallet].map(box));
   const nav = await box(header.getByRole("navigation", { name: "App", exact: true }));
   const views = await header.getByRole("group", { name: "Trade view", exact: true }).all();
   for (const b of first) expect.soft(Math.abs(center(b) - center(first[0]!)), `${label} first row`).toBeLessThanOrEqual(2);

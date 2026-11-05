@@ -1,4 +1,4 @@
-import type { Series } from "@near-options/sdk";
+import type { Series } from "@endline/sdk";
 import { Chain } from "./chain.ts";
 import type { Config } from "./config.ts";
 import { createExchange } from "./hyperliquid.ts";

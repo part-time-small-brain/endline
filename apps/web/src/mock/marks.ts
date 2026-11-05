@@ -1,4 +1,4 @@
-import { capped, type Mark, type Series, YEAR_MS } from "@near-options/sdk";
+import { capped, type Mark, type Series, YEAR_MS } from "@endline/sdk";
 import { toUnits } from "../lib/money.ts";
 
 const SPREAD_VOL = 0.015;

@@ -1,4 +1,4 @@
-import { black76, type Mark, type Series, YEAR_MS } from "@near-options/sdk";
+import { black76, type Mark, type Series, YEAR_MS } from "@endline/sdk";
 
 export function chance(series: Pick<Series, "kind" | "strike" | "expiry">, spot: number, vol: number, nowSec: number, quoteDecimals: number): number {
   const strike = Number(series.strike) / 10 ** quoteDecimals;

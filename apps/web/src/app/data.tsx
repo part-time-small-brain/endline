@@ -1,4 +1,4 @@
-import { type Fill, intentsAssetId, type ListedSeries, type Mark, type SeriesListing, type Timing } from "@near-options/sdk";
+import { type Fill, intentsAssetId, type ListedSeries, type Mark, type SeriesListing, type Timing } from "@endline/sdk";
 import { createContext, type ReactNode, useCallback, useContext, useMemo } from "react";
 import type { MarketSnapshot, PricePoint } from "../api/market.ts";
 import { usePoll } from "../hooks/usePoll.ts";

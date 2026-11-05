@@ -177,7 +177,7 @@ export function Tap({ state, nowSec, views, onConnect, onAddFunds, onQuote }: Pr
       <div className="flex flex-col gap-2 rounded-md border border-rule bg-surface p-4 sm:p-6">
         <AmountPicker value={budget} quoteDecimals={quoteDecimals} onChange={setBudget} />
         <p className="text-sm text-ink-2">
-          Each tap buys one bet for about {formatUsd(budget, quoteDecimals).replace(/\.00$/, "")}. Max loss {formatUsd(maxLossOf(budget), quoteDecimals, "up")} a tap.
+          Each tap buys one option for about {formatUsd(budget, quoteDecimals).replace(/\.00$/, "")}. Max loss {formatUsd(maxLossOf(budget), quoteDecimals, "up")} a tap.
         </p>
       </div>
       <p className="pb-6 text-center font-mono text-[10px] font-medium tracking-[0.14em] text-ink-3 uppercase">Signed in your browser · settled on NEAR Intents</p>

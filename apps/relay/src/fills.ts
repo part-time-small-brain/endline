@@ -1,6 +1,6 @@
 import { appendFile, mkdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { Fill } from "@near-options/sdk";
+import { Fill } from "@endline/sdk";
 import { parseJson } from "./json.ts";
 
 export class Fills {

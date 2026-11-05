@@ -1,4 +1,4 @@
-import { intentsAssetId, type QuoteEvent, type Series, shortTokenId } from "@near-options/sdk";
+import { intentsAssetId, type QuoteEvent, type Series, shortTokenId } from "@endline/sdk";
 import type { Settings } from "../config.ts";
 import { parseBookSummary } from "../deribit.ts";
 import { Inventory } from "../inventory.ts";

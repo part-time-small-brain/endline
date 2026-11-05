@@ -1,5 +1,5 @@
 import { setTimeout as sleep } from "node:timers/promises";
-import type { Series } from "@near-options/sdk";
+import type { Series } from "@endline/sdk";
 import { Account, type KeyPairString, teraToGas } from "near-api-js";
 import { ChainReader } from "./chain.ts";
 import type { SettlerConfig } from "./config.ts";

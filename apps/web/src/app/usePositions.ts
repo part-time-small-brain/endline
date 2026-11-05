@@ -1,4 +1,4 @@
-import { type Fill, type ListedSeries, longPayout, termsOf } from "@near-options/sdk";
+import { type Fill, type ListedSeries, longPayout, termsOf } from "@endline/sdk";
 import { useMemo } from "react";
 import { type PositionStatus, positionStatus, type SettlementView, seriesStatus } from "../lib/status.ts";
 import { type AppData, settlementKey, useData } from "./data.tsx";

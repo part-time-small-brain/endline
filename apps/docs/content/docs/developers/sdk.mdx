@@ -3,7 +3,7 @@ title: SDK
 description: The TypeScript library shared by the relay, market maker and web app.
 ---
 
-`@near-options/sdk` is a source-only workspace package in `packages/sdk`, used from inside the monorepo. It isn't on npm.
+`@endline/sdk` is a source-only workspace package in `packages/sdk`, used from inside the monorepo. It isn't on npm.
 
 | File | What |
 |---|---|
@@ -21,7 +21,7 @@ Series ids and payout math are tested against `testdata/vectors.json`, shared wi
 ## Example
 
 ```ts
-import { buyDiffs, intentsAssetId, longPayout, seriesId, unmatched } from "@near-options/sdk";
+import { buyDiffs, intentsAssetId, longPayout, seriesId, unmatched } from "@endline/sdk";
 
 const id = seriesId({ underlying: "BTC", expiry: 1795766400, strike: 110_000_000_000n, width: 2_000_000_000n, quoteDecimals: 6, kind: "call" });
 // "BTC-27NOV26-110000_112000-C"
@@ -54,6 +54,6 @@ Paying someone exactly 30,000,000 at a fee of 1 needs a gross of 30,000,031, not
 ## Commands
 
 ```bash
-pnpm --filter @near-options/sdk test
-pnpm --filter @near-options/sdk typecheck
+pnpm --filter @endline/sdk test
+pnpm --filter @endline/sdk typecheck
 ```

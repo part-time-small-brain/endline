@@ -1,7 +1,7 @@
 import { createHash, randomUUID, timingSafeEqual } from "node:crypto";
 import type { IncomingMessage } from "node:http";
 import type { Duplex } from "node:stream";
-import { MmMessage, type QuoteResponse } from "@near-options/sdk";
+import { MmMessage, type QuoteResponse } from "@endline/sdk";
 import { WebSocket, WebSocketServer } from "ws";
 import { parseJson } from "./json.ts";
 import { Marks } from "./marks.ts";

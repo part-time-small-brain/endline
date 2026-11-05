@@ -1,4 +1,4 @@
-import { CLAIM_WINDOW_SEC } from "@near-options/sdk";
+import { CLAIM_WINDOW_SEC } from "@endline/sdk";
 import { Account, JsonRpcProvider, KeyPair } from "near-api-js";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { loadConfig } from "./config.ts";

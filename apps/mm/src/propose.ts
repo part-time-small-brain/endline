@@ -4,7 +4,7 @@ import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
-import type { Series } from "@near-options/sdk";
+import type { Series } from "@endline/sdk";
 import { Account, type KeyPairString, teraToGas } from "near-api-js";
 import { z } from "zod";
 import { ChainReader } from "./chain.ts";

@@ -1,4 +1,4 @@
-import { transferFee } from "@near-options/sdk";
+import { transferFee } from "@endline/sdk";
 import { useState } from "react";
 import { useData } from "../../app/data.tsx";
 import { useTransfer } from "../../hooks/useTransfer.ts";

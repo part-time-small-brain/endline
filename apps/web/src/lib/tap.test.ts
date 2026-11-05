@@ -1,4 +1,4 @@
-import type { Series } from "@near-options/sdk";
+import type { Series } from "@endline/sdk";
 import { describe, expect, it } from "vitest";
 import { decide, maxLossOf } from "./tap.ts";
 

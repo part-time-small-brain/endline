@@ -1,4 +1,4 @@
-import { capPrice, type Mark, maxPayout, type Series, type Terms, termsOf } from "@near-options/sdk";
+import { capPrice, type Mark, maxPayout, type Series, type Terms, termsOf } from "@endline/sdk";
 import { breakeven, costOf, sizeForBudget } from "./payoff.ts";
 
 export interface Ticket {

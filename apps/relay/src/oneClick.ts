@@ -1,4 +1,4 @@
-import { AccountId, verifyDepositQuote } from "@near-options/sdk";
+import { AccountId, verifyDepositQuote } from "@endline/sdk";
 import { z } from "zod";
 import { parseJson } from "./json.ts";
 import { rateLimit } from "./limit.ts";

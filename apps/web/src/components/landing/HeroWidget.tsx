@@ -1,4 +1,4 @@
-import { longPayout, type OptionKind, type Series } from "@near-options/sdk";
+import { longPayout, type OptionKind, type Series } from "@endline/sdk";
 import { CurrencyBtc, CurrencyEth } from "@phosphor-icons/react";
 import { type Ref, useState } from "react";
 import { Link } from "../../app/router.tsx";

@@ -1,5 +1,5 @@
 import { isDeepStrictEqual } from "node:util";
-import { SignedPayload } from "@near-options/sdk";
+import { SignedPayload } from "@endline/sdk";
 import { z } from "zod";
 import { JsonFile } from "./jsonFile.ts";
 

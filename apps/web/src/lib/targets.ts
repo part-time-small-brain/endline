@@ -1,4 +1,4 @@
-import type { OptionKind } from "@near-options/sdk";
+import type { OptionKind } from "@endline/sdk";
 
 export interface Preset {
   name: "Safer" | "Balanced" | "Bolder";

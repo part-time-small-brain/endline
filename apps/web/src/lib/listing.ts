@@ -1,4 +1,4 @@
-import { type ListedSeries, type SeriesListing, seriesId } from "@near-options/sdk";
+import { type ListedSeries, type SeriesListing, seriesId } from "@endline/sdk";
 import type { ContractTerms } from "../api/chain.ts";
 
 // ids show expiries to the minute, so a series off the minute can't be checked

@@ -26,13 +26,13 @@ The ticket's "Sell back now $X" is what the market maker would pay for the same 
 
 ## How prices are set
 
-Our market maker prices each bet as two options, one at the price to beat and one at the cap, using Black-76 with Deribit's implied volatility and price for the same expiry. When Deribit doesn't list a strike or expiry, it interpolates the nearest listed Deribit expiry's volatility curve.
+Our market maker prices each Up or Down as two options, one at the price to beat and one at the cap, using Black-76 with Deribit's implied volatility and price for the same expiry. When Deribit doesn't list a strike or expiry, it interpolates the nearest listed Deribit expiry's volatility curve.
 
 | Our market maker today | Value |
 |---|---|
 | Spread | The worst of both options' volatilities moving 2 points, and each moving 1 point the opposite way |
 | Hedging cost added | Hyperliquid taker fee, 4.5 bps, on the hedge each trade causes; a buy also pays closing it at expiry |
-| Cost of locked collateral | 7% a year on the USDC locked (the most the bet can pay) |
+| Cost of locked collateral | 7% a year on the USDC locked (the most the option can pay) |
 | Minimum price | $1. It won't buy back options worth less, and won't sell for as much as the option can pay |
 | Largest single trade | $2,000 of max payout |
 

@@ -4,7 +4,7 @@ import { writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { PassThrough } from "node:stream";
-import type { Series } from "@near-options/sdk";
+import type { Series } from "@endline/sdk";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { due, parseFixing, proposeCommand, verifiedWasm } from "./propose.ts";
 

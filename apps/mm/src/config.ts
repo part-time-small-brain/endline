@@ -1,4 +1,4 @@
-import { AccountId } from "@near-options/sdk";
+import { AccountId } from "@endline/sdk";
 import { z } from "zod";
 
 const positive = (fallback: number) => z.coerce.number().positive().default(fallback);

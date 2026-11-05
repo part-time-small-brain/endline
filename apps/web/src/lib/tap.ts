@@ -1,4 +1,4 @@
-import { maxPayout, type Quote, type Series, termsOf } from "@near-options/sdk";
+import { maxPayout, type Quote, type Series, termsOf } from "@endline/sdk";
 
 const OVER_STAKE_PER_MILLE = 50n;
 

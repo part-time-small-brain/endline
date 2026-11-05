@@ -1,4 +1,4 @@
-import { EXPIRY_TIME_OF_DAY, listedWidth, SECONDS_PER_DAY, type Series, seriesId } from "@near-options/sdk";
+import { EXPIRY_TIME_OF_DAY, listedWidth, SECONDS_PER_DAY, type Series, seriesId } from "@endline/sdk";
 import type { PricePoint } from "../api/market.ts";
 import type { SettlementView } from "../lib/status.ts";
 

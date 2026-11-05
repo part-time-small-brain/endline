@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import { payload, type QuoteEvent, type QuoteResponse, type StatusUpdate, tokenDiff } from "@near-options/sdk";
+import { payload, type QuoteEvent, type QuoteResponse, type StatusUpdate, tokenDiff } from "@endline/sdk";
 import type { Settings } from "./config.ts";
 import { type Desk, decide } from "./quote.ts";
 import type { SignPayload } from "./signer.ts";

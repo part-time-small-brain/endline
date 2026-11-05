@@ -14,7 +14,7 @@ import {
   toSign,
   type Unsigned,
   unmatched,
-} from "@near-options/sdk";
+} from "@endline/sdk";
 import oneClickQuote from "../../../testdata/oneclick-quote.json" with { type: "json" };
 import { legs } from "./bid.ts";
 import { HttpError } from "./relay.ts";
