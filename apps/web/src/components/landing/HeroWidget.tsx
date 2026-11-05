@@ -1,10 +1,10 @@
 import { longPayout, type OptionKind, type Series } from "@endline/sdk";
 import { CurrencyBtc, CurrencyEth } from "@phosphor-icons/react";
 import { type Ref, useState } from "react";
+import { useApp } from "../../app/context.ts";
 import { Link } from "../../app/router.tsx";
 import { formatChance, formatPrice, formatUsd, toNumber, toUnits } from "../../lib/money.ts";
 import { chance } from "../../lib/odds.ts";
-import { PATHS } from "../../lib/route.ts";
 import { presets } from "../../lib/targets.ts";
 import { type Ticket, ticket } from "../../lib/ticket.ts";
 import { countdown, formatClock, formatUtc } from "../../lib/time.ts";
@@ -32,6 +32,7 @@ const ICONS: Record<string, typeof CurrencyBtc> = { BTC: CurrencyBtc, ETH: Curre
 const strikeOf = (s: Series) => BigInt(s.strike);
 
 export function HeroWidget({ market, nowSec, kind, onKind, onLine, plotRef }: Props) {
+  const { paths } = useApp().config;
   const [symbolChoice, setSymbol] = useState<string>();
   const [seriesChoice, setSeries] = useState<string>();
   const [payUsd, setPay] = useState(25);
@@ -169,7 +170,7 @@ export function HeroWidget({ market, nowSec, kind, onKind, onLine, plotRef }: Pr
           <Stat label="Breakeven" value={current.breakeven === null ? "None" : formatPrice(current.breakeven, qd)} />
         </dl>
         <Link
-          href={`${PATHS.trade}?${new URLSearchParams({ series: series.id, pay: String(payUsd) })}`}
+          href={`${paths.trade}?${new URLSearchParams({ series: series.id, pay: String(payUsd) })}`}
           className="inline-flex h-14 items-center justify-center rounded-2xl bg-side font-semibold text-on-side transition-[transform,filter] duration-150 ease-out hover:brightness-105 active:scale-[0.98]"
         >
           Try {asset.symbol} {up ? "Up" : "Down"} for ${payUsd}

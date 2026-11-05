@@ -19,7 +19,7 @@ Endline: cross-chain crypto options settled through NEAR Intents. European, cash
 | `apps/relay` | RFQ relay: auction, trade settlement, gasless collect | TypeScript, Node |
 | `apps/mm` | Market maker bot plus `write` / `positions` / `monitor` / `propose` / `settle` CLIs | TypeScript, Node |
 | `apps/web` | Consumer app | TypeScript, React, Vite |
-| `apps/docs` | Public docs site, served under `/docs` ([maintaining](docs/system.md#maintaining-the-public-docs)) | MDX, Fumadocs, Next.js static export |
+| `apps/docs` | Public docs site at `docs.endline.trade` ([maintaining](docs/system.md#maintaining-the-public-docs)) | MDX, Fumadocs, Next.js static export |
 | `testdata/` | Cross-language test vectors. Rust and TS both test against them | JSON |
 | `docs/` | What is built or being built. Source of truth for behaviour | Markdown |
 | `docs/ideas/` | Future features. Not scope until moved into `docs/` | Markdown |

@@ -1,17 +1,18 @@
+import { useApp } from "../../app/context.ts";
 import { Link } from "../../app/router.tsx";
-import { PATHS } from "../../lib/route.ts";
 import { Wordmark } from "../Glyphs.tsx";
 import { ThemeSwitch } from "../ThemeSwitch.tsx";
 
 const LINK = "text-ink-2 transition-colors duration-150 hover:text-ink";
 
 export function Footer() {
+  const { paths } = useApp().config;
   return (
     <footer className="mx-auto max-w-7xl px-4 pt-12 pb-8 lg:px-12">
       <div className="flex flex-wrap items-center gap-x-8 gap-y-4">
         <Wordmark />
         <nav aria-label="Footer" className="flex items-center gap-6 text-sm sm:ml-auto">
-          <Link href={PATHS.trade} className={LINK}>
+          <Link href={paths.trade} className={LINK}>
             App
           </Link>
           <a href="/docs" className={LINK}>

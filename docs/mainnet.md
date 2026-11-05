@@ -58,7 +58,7 @@ VITE_RELAY_URL=http://localhost:8080 VITE_NETWORK=mainnet VITE_RPC_URL=$NEAR_RPC
 - No lister: it keeps $500 of USDC back for buy-backs, so at dust sizes it writes nothing.
 - Series by hand: `create_series` for that expiry ([system.md](system.md#testnet-from-scratch) step 5, `network-config mainnet`), then `pnpm --filter @endline/mm start write <series_id> <collateral units>` with the MM env.
 - Make the trade collectable: buy an Up one strike step ($1,000) under spot with the lister's width (2 strike steps: $2,000 while BTC is between ~$66.7k and $133k), so the cap sits above spot. 0.001 contracts lock $2 of USDC, cost about $1–1.50 and pay about $1 if BTC holds. A deeper in-the-money Up costs about its whole $2 payout plus carry, which the MM refuses as at or above max payout. An at-the-money dust option is worth cents, the MM asks at least `MIN_PREMIUM_USD` ($1), and a zero payout can't be collected.
-- The app's deposit sheet won't work from `pnpm dev`: `/deposit-quote` is same-origin and the dev app calls the relay on another port. Fund the test user from near-intents.org or with `ft_transfer_call` (plan step 5)
+- The app's deposit sheet works from `pnpm dev` only if the relay lists the dev origin: `APP_ORIGINS=http://localhost:5173`. Otherwise fund the test user from near-intents.org or with `ft_transfer_call` (plan step 5)
 - Trade from the web app, or `apps/mm/src/smoke.ts` ([mm README](../apps/mm/README.md#run)), which needs the user's key registered on `intents.near` (plan step 5 for that account) and USDC in their intents balance.
 
 ## Settle and collect

@@ -3,9 +3,9 @@ title: Relay API
 description: HTTP for users, WebSocket for market makers. Sessions, quotes, publishing, collects and errors.
 ---
 
-The relay runs the RFQ auction, settles trades with `intents.near::execute_intents([mm, user])` and submits collects gaslessly. Source: `apps/relay`. Wire types (zod): `packages/sdk/src/protocol.ts`. The hosted app serves the relay's public routes on its own origin.
+The relay runs the RFQ auction, settles trades with `intents.near::execute_intents([mm, user])` and submits collects gaslessly. Source: `apps/relay`. Wire types (zod): `packages/sdk/src/protocol.ts`. The hosted app calls the relay at `https://api.endline.trade`.
 
-## User API (HTTP, JSON, CORS `*` except `/faucet`)
+## User API (HTTP, JSON, CORS `*` except `/faucet` and `/deposit-quote`)
 
 | Route | Body → answer |
 |---|---|
@@ -19,7 +19,7 @@ The relay runs the RFQ auction, settles trades with `intents.near::execute_inten
 | `POST /execute` | `{signed}` → `{tx_hash}`. Gasless collect. `tx_hash` is `""` when the send errored but the signer's nonce shows it ran |
 | `POST /transfer` | `{signed}` → `{tx_hash}`. Moves USDC between intents accounts for a $0.01 fee to the relayer instead of gas ([rules](#transfer)). `tx_hash` as for `/execute` |
 | `POST /claims` | `{signed}` → `{ok: true}`. Stores a pre-signed exercise for auto-collect |
-| `POST /faucet` | Testnet only. `{account_id}` → `{tx_hash}`. Sends 100 test USDC into that account's intents balance (NEAR account or lowercase `0x` address). Same-origin only, `content-type: application/json`. Once per account and once per IP (IPv6: per /48) per 24 h |
+| `POST /faucet` | Testnet only. `{account_id}` → `{tx_hash}`. Sends 100 test USDC into that account's intents balance (NEAR account or lowercase `0x` address). CORS only for the relay's `APP_ORIGINS` (the Endline app), `content-type: application/json`. Once per account and once per IP (IPv6: per /48) per 24 h |
 
 `POST /quote`, `/execute`, `/transfer`, `/claims`, `/faucet` and `/deposit-quote` share one rate limit: 30 requests per minute per client IP (IPv6: per /64). On top, each signer gets 4 quotes per 25 s, counted once their session and balance check out (quotes refused for funds don't count), and a quote that settles into a trade gives its slot back within that 25 s window, and a buyer needs $1 before any market maker is asked.
 
@@ -80,7 +80,7 @@ Body: `{error}`.
 
 ## Market maker API (WebSocket `/mm?key=<api key>`)
 
-Not exposed on the hosted app. To connect a market maker, run your own relay.
+Not exposed on the hosted relay (`api.endline.trade`). To connect a market maker, run your own relay.
 
 | Direction | Message |
 |---|---|

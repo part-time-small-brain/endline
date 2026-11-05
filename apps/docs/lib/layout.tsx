@@ -25,7 +25,7 @@ export const baseOptions: BaseLayoutProps = {
     {
       type: "custom",
       children: (
-        <a href="/app" className="open-app">
+        <a href="https://app.endline.trade" className="open-app">
           Open app
         </a>
       ),

@@ -1,0 +1,2 @@
+/docs https://docs.endline.trade/ 301
+/docs/* https://docs.endline.trade/:splat 301

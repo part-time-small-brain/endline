@@ -28,14 +28,14 @@ describe("theme", () => {
     expect(pageColor.light).toMatch(/^#/);
     expect(pageColor.dark).toMatch(/^#/);
     expect(pageColor.near).toMatch(/^#/);
-    const run = (stored: string | null, prefersDark: boolean, pathname = "/", mode: string | null = null) => {
+    const run = (stored: string | null, prefersDark: boolean, pathname = "/", mode: string | null = null, origin = "https://example.com", appUrl = "%VITE_APP_URL%") => {
       const root = { dataset: {} as Record<string, string> };
       const meta = { content: "" };
-      new Function("localStorage", "matchMedia", "document", "location", script ?? "")(
+      new Function("localStorage", "matchMedia", "document", "location", (script ?? "").replace("%VITE_APP_URL%", appUrl))(
         { getItem: (key: string) => (key === TRADE_MODE_KEY ? mode : stored) },
         () => ({ matches: prefersDark }),
         { documentElement: root, querySelector: (selector: string) => (selector === 'meta[name="theme-color"]' ? meta : null) },
-        { pathname },
+        { pathname, origin },
       );
       return { theme: root.dataset.theme, look: root.dataset.look, bar: meta.content };
     };
@@ -50,6 +50,9 @@ describe("theme", () => {
         const near = routeOf(pathname) !== "landing";
         expect(run("light", false, pathname, mode), `${pathname} ${mode}`).toEqual(near ? { theme: "light", look: "near", bar: pageColor.near } : { theme: "light", bar: pageColor.light });
       }
+    const app = "https://app.example.com";
+    expect(run("light", false, "/", null, app, app).look).toBe("near");
+    expect(run("light", false, "/", null, "https://example.com", app).look).toBeUndefined();
   });
 
   it("follows another tab's choice and resets to system when storage is cleared", () => {

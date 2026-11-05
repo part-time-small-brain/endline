@@ -1,5 +1,5 @@
+import { useApp } from "../../app/context.ts";
 import { Link } from "../../app/router.tsx";
-import { PATHS } from "../../lib/route.ts";
 import { Wordmark } from "../Glyphs.tsx";
 import { ThemeSwitch } from "../ThemeSwitch.tsx";
 import { jump } from "./jump.ts";
@@ -13,6 +13,7 @@ const SECTIONS = [
 const LINK = "hidden h-10 items-center rounded-full px-3 text-sm font-medium whitespace-nowrap text-ink-2 transition-colors duration-150 hover:bg-ink/5 hover:text-ink lg:inline-flex";
 
 export function Nav() {
+  const { paths } = useApp().config;
   return (
     <nav
       aria-label="Main"
@@ -33,7 +34,7 @@ export function Nav() {
         <ThemeSwitch />
       </div>
       <Link
-        href={PATHS.trade}
+        href={paths.trade}
         className="inline-flex h-10 items-center rounded-full bg-ink px-4 text-sm font-semibold whitespace-nowrap text-on-ink transition-[transform,opacity] duration-150 ease-out hover:opacity-90 active:scale-[0.97]"
       >
         Open app

@@ -18,6 +18,11 @@ const Env = z
     DATA_DIR: z.string().min(1),
     TRUST_PROXY: z.stringbool().default(false),
     FAUCET: z.stringbool().default(false),
+    APP_ORIGINS: z
+      .string()
+      .default("")
+      .transform((list) => list.split(",").map((origin) => origin.trim()).filter((origin) => origin !== ""))
+      .pipe(z.array(z.string().refine((url) => URL.canParse(url) && new URL(url).origin === url, "an origin like https://app.example.com: no path, no trailing slash"))),
     ONECLICK_JWT: z.string().min(1).optional(),
   })
   .refine((env) => env.NETWORK_ID === "testnet" || !env.FAUCET, { path: ["FAUCET"], message: "the faucet runs only on testnet" });

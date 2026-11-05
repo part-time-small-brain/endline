@@ -2,8 +2,8 @@ import type { OptionKind } from "@endline/sdk";
 import { Scales } from "@phosphor-icons/react";
 import { m, useReducedMotion, useSpring } from "motion/react";
 import { type ReactNode, useLayoutEffect, useRef, useState } from "react";
+import { useApp } from "../../app/context.ts";
 import { Link } from "../../app/router.tsx";
-import { PATHS } from "../../lib/route.ts";
 import { HeroWidget, PLOT_HEIGHT } from "./HeroWidget.tsx";
 import { jump } from "./jump.ts";
 import { EASE_DRAWER, EASE_OUT, SPRING } from "./motion.ts";
@@ -24,6 +24,7 @@ const offsetIn = (element: HTMLElement, ancestor: HTMLElement) => {
 };
 
 export function Hero({ market, nowSec }: { market: DemoMarket | undefined; nowSec: number }) {
+  const { paths } = useApp().config;
   const [kind, setKind] = useState<OptionKind>("call");
   const [lineY, setLineY] = useState(PLOT_HEIGHT / 2);
   const [box, setBox] = useState<{ plot: number; title: number; sideBySide: boolean }>();
@@ -104,7 +105,7 @@ export function Hero({ market, nowSec }: { market: DemoMarket | undefined; nowSe
           <Rise delay={0.42}>
             <div className="mt-8 flex flex-wrap items-center gap-3">
               <Link
-                href={PATHS.trade}
+                href={paths.trade}
                 className="inline-flex h-14 items-center rounded-2xl bg-ink px-6 font-semibold text-on-ink transition-[transform,opacity] duration-150 ease-out hover:opacity-90 active:scale-[0.97]"
               >
                 Start trading

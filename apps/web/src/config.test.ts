@@ -18,6 +18,15 @@ it("talks to the relay on the page's own origin unless VITE_RELAY_URL is set", (
   expect(() => loadConfig({ ...ENV, VITE_RELAY_URL: "relay" })).toThrow();
 });
 
+it("splits landing and app only when VITE_APP_URL is set, matching the app by origin", () => {
+  vi.stubGlobal("window", { location: { origin: "https://app.example.com" } });
+  expect(loadConfig(ENV).paths.trade).toBe("/app");
+  expect(loadConfig({ ...ENV, VITE_APP_URL: "https://app.example.com" }).paths.trade).toBe("/");
+  for (const bad of ["https://app.example.com/", "https://App.example.com", "https://app.example.com/app", "app.example.com"]) expect(() => loadConfig({ ...ENV, VITE_APP_URL: bad })).toThrow();
+  vi.stubGlobal("window", { location: { origin: "https://example.com" } });
+  expect(loadConfig({ ...ENV, VITE_APP_URL: "https://app.example.com" }).paths.trade).toBe("https://app.example.com/");
+});
+
 it("mock mode stays on mainnet ids unless VITE_NETWORK=testnet asks for a testnet-like mock", () => {
   expect(loadConfig({ VITE_MOCK: "1" })).toMatchObject({ mock: true, network: "mainnet", intentsId: "intents.near" });
   expect(loadConfig({ VITE_MOCK: "1", VITE_NETWORK: "testnet" })).toMatchObject({ mock: true, network: "testnet", intentsId: expect.stringMatching(/\.testnet$/) });

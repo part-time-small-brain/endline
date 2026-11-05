@@ -21,7 +21,7 @@ Tracks: `defi`.
 
 ## Try it (testnet)
 
-Live app: https://salvador-developmental-privileges-division.trycloudflare.com/app (docs at `/docs`).
+Live app: https://app.endline.trade (landing: https://endline.trade, docs: https://docs.endline.trade).
 
 1. Open the app. Lite starts with one editable sentence: end time, BTC or ETH, above or below, price to beat, amount and capped payout. Max loss and estimated chance stay visible. Lite / Pro / Tap in the header opens the chart ticket or the tap grid: rows of prices to beat, columns of end dates, tap a cell to buy it.
 2. Click Connect and pick a wallet.

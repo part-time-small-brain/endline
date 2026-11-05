@@ -164,12 +164,30 @@ describe("http", () => {
     }
   });
 
-  it.each(["/faucet", "/deposit-quote"])("keeps %s same-origin: no CORS on it or its preflight", async (path) => {
+  it.each(["/faucet", "/deposit-quote"])("keeps %s closed to other origins by default: no CORS on it or its preflight", async (path) => {
     for (const init of [{ method: "OPTIONS" }, { method: "POST", body: "{}", headers: { "content-type": "application/json" } }]) {
       const response = await fetch(`http://${base}${path}`, init);
       expect(response.headers.get("access-control-allow-origin")).toBeNull();
     }
     expect((await fetch(`http://${base}/series`)).headers.get("access-control-allow-origin")).toBe("*");
+  });
+
+  it.each(["/faucet", "/deposit-quote"])("opens %s to the listed app origins only", async (path) => {
+    const app = "https://app.example.com";
+    const listed = createRelayServer(relay, fills, hub, collector, oneClick, undefined, false, new Set([app]));
+    await new Promise<void>((resolve) => listed.listen(0, "127.0.0.1", resolve));
+    const url = `http://127.0.0.1:${(listed.address() as AddressInfo).port}${path}`;
+    try {
+      for (const [origin, allowed] of [[app, app], ["https://evil.example", null], [`${app}.evil.example`, null], ["https://APP.example.com", null], ["http://app.example.com", null], [`${app}/`, null], ["null", null]]) {
+        for (const init of [{ method: "OPTIONS" }, { method: "POST", body: "{}" }]) {
+          const response = await fetch(url, { ...init, headers: { origin: origin as string, "content-type": "application/json" } });
+          expect([origin, init.method, response.headers.get("access-control-allow-origin"), response.headers.get("vary")]).toEqual([origin, init.method, allowed, "origin"]);
+        }
+      }
+      expect((await fetch(url, { method: "OPTIONS" })).headers.get("access-control-allow-origin")).toBeNull();
+    } finally {
+      await new Promise((resolve) => listed.close(resolve));
+    }
   });
 
   it.each([

@@ -21,7 +21,7 @@
 | Mainnet settler | `apps/mm` (`settle`) | From `expiry + 5 min`, calls `request_settlement` for each listed `(underlying, expiry)` every 10 min until a price is proposed or `oracle_window_sec` closes. Refuses a testnet RPC | Nothing on-chain triggers OutLayer: someone has to ask and pay ([mm README](../apps/mm/README.md#mainnet-settler)) | Us (relayer key) |
 | Settlement monitor | `apps/mm` (`monitor`) | Every minute: checks each proposed price against Deribit, flags expiries nobody settled, watches the NEAR reserve of the contract, the intents contract and the relayer, and pending oracle and owner changes. Settlement alerts carry the exact `near` command to fix it | A wrong price can only be overridden before `final_at`, and a missing one needs a manual proposal. Nobody notices either unless something watches ([security.md](security.md#monitoring)) | Us (read-only, no key) |
 | Web app | `apps/web` | Up/Down buying, positions, collect | The product people use | Us |
-| Public docs | `apps/docs` | Static user and developer docs, served under `/docs` | Users and developers need plain answers without reading the repo | Us |
+| Public docs | `apps/docs` | Static user and developer docs at `docs.endline.trade` | Users and developers need plain answers without reading the repo | Us |
 | SDK | `packages/sdk` | Series ids, payout math, fee-exact trade legs, intent payloads, signing, Black-76, wire schemas | One source of truth for relay, MM and web; mirrors the contract's math | Library |
 
 ## Adding an asset
@@ -102,17 +102,34 @@ Use `https://rpc.testnet.fastnear.com`. `rpc.testnet.near.org` is deprecated and
 
 ### Hosting
 
-The testnet stack runs 24/7 on a single Docker host reached over SSH, behind a Cloudflare quick tunnel: no open ports, server IP hidden. Quick-tunnel URLs change on restart; a named tunnel on our own domain replaces it before judging.
+Static sites run on Cloudflare Pages (free), in the Cloudflare account that holds `endline.trade`. Everything with a key runs 24/7 on a single Docker host reached over SSH, behind a named Cloudflare tunnel: no open ports, server IP hidden.
+
+| Host | Served by |
+|---|---|
+| `endline.trade`, `app.endline.trade` | Pages project `endline-web`: one build of `apps/web`, landing on the apex, the app at the root of `app.` (`VITE_APP_URL`). `/docs/*` redirects to `docs.` (`apps/web/public/_redirects`) |
+| `docs.endline.trade` | Pages project `endline-docs`: `apps/docs` |
+| `api.endline.trade` | Named tunnel `endline` → `http://web:80` on the server: the relay's public routes |
+
+Both Pages projects build from `main` on every merge (Cloudflare's GitHub app on the repo), production branch only:
+
+| Project | Build command | Output | Env |
+|---|---|---|---|
+| `endline-web` | `pnpm --filter @endline/web build` | `apps/web/dist` | `VITE_*` from [web README](../apps/web/README.md#env): testnet ids as in `deploy/env.example`, `VITE_RELAY_URL=https://api.endline.trade`, `VITE_APP_URL=https://app.endline.trade`; `NODE_VERSION`, `PNPM_VERSION` as in `deploy/Dockerfile` |
+| `endline-docs` | `pnpm --filter @endline/docs build` | `apps/docs/out` | `NODE_VERSION`, `PNPM_VERSION` |
+
+Security headers for both come from `_headers` in each app's `public/`.
+
+On the server:
 
 | Container | Role |
 |---|---|
-| `web` | Caddy: serves the web build, the public docs under `/docs`, and proxies the relay's public routes on the same origin. Sets `X-Forwarded-For` from Cloudflare's `CF-Connecting-IP`. App pages are `no-cache`; hashed `/assets/*` are immutable, and a missing asset is a 404, not the SPA page |
-| `relay` | `TRUST_PROXY=true`, data on the `relay-data` volume. `FAUCET=true` turns on the test USDC faucet (the relayer owns the mock USDC supply) |
+| `web` | Caddy: proxies the relay's public routes and answers 404 to anything else. Sets `X-Forwarded-For` from Cloudflare's `CF-Connecting-IP` |
+| `relay` | `TRUST_PROXY=true`, data on the `relay-data` volume. `APP_ORIGINS=https://app.endline.trade`. `FAUCET=true` turns on the test USDC faucet (the relayer owns the mock USDC supply) |
 | `mm` | Talks to the relay over the compose network; `/mm` is not public |
 | `lister` | MM key and account: keeps series listed and stocked ([mm README](../apps/mm/README.md#market-lister)) |
 | `monitor` | Read-only, no key. Also watches the intents contract's and the relayer's NEAR, and `/health` through `web` (`HEALTH_URL`) |
 | `proposer` | Testnet oracle: `ORACLE_*`, defaulting to the relayer's account and key |
-| `tunnel` | `cloudflared`, outbound only. Public URL: `docker compose logs tunnel` |
+| `tunnel` | `cloudflared`, outbound only, running the named tunnel from `TUNNEL_TOKEN`. Its public hostname (`api.endline.trade` → `http://web:80`) is set in Zero Trust → Networks → Tunnels |
 
 Each container gets only its own variables from `deploy/.env` (template: `deploy/env.example`). Images are built on a Mac and travel as tarballs (the server's Docker can't pull over SSH). Deploys, restarts, alerts and their fixes: [runbook.md](runbook.md).
 
@@ -125,7 +142,7 @@ Each container gets only its own variables from `deploy/.env` (template: `deploy
    near account create-account sponsor-by-faucet-service <name>.testnet autogenerate-new-keypair save-to-legacy-keychain network-config testnet create
    ```
 2. **Own environment (optional).** `scripts/deploy-testnet.sh <you>.testnet` deploys the intents copy, mock USDC (you hold the whole supply), the options contract with minute timing, the BTC and ETH underlyings, and makes you the manual oracle. Safe to rerun: it skips what exists, including an options contract already at `opt.<you>.testnet`; the contract can't be upgraded, so a new version goes to a new account with `OPTIONS_ID=opt2.<you>.testnet`. It needs about 21 NEAR on `<you>`, more than the faucet gives: create extra faucet accounts and top up with `near tokens <other>.testnet send-near <you>.testnet '9 NEAR' …`. It overwrites `deploy/testnet.json`, so don't commit that unless you mean to move the shared environment.
-3. **Fund intents balances.** `<root>` sends mock USDC (6 decimals) into any account's intents balance. The MM needs it for collateral and buy-backs; users need it, or get it from the relay's faucet when it runs with `FAUCET=true` and the relayer is `<root>`. The faucet is same-origin only, so the web app's button doesn't reach a relay on another port (step 6): fund with the command below.
+3. **Fund intents balances.** `<root>` sends mock USDC (6 decimals) into any account's intents balance. The MM needs it for collateral and buy-backs; users need it, or get it from the relay's faucet when it runs with `FAUCET=true` and the relayer is `<root>`. The web app's faucet button reaches a relay on another origin only if the relay lists it in `APP_ORIGINS` (step 6); otherwise fund with the command below.
    ```bash
    near contract call-function as-transaction usdc.<root>.testnet ft_transfer_call \
      json-args '{"receiver_id":"intents.<root>.testnet","amount":"1000000000","msg":"<account>.testnet"}' \
@@ -148,7 +165,7 @@ Each container gets only its own variables from `deploy/.env` (template: `deploy
      OPTIONS_ID=opt3.near-options-dev.testnet QUOTE_ASSET=nep141:usdc.near-options-dev.testnet
 
    NETWORK_ID=testnet DATA_DIR=data RELAYER_ACCOUNT_ID=<relayer>.testnet RELAYER_PRIVATE_KEY=ed25519:… \
-     MM_API_KEYS=<key of 16+ chars> pnpm --filter @endline/relay start
+     MM_API_KEYS=<key of 16+ chars> APP_ORIGINS=http://localhost:5173 pnpm --filter @endline/relay start
 
    MM_ACCOUNT_ID=<mm>.testnet MM_PRIVATE_KEY=ed25519:… RELAY_WS_URL=ws://localhost:8080/mm MM_API_KEY=<same key> \
      pnpm --filter @endline/mm start
@@ -172,10 +189,9 @@ Each container gets only its own variables from `deploy/.env` (template: `deploy
 |---|---|
 | Pages | `apps/docs/content/docs/*.mdx` for users, `developers/*.mdx` for developers. Order: `meta.json` in each folder |
 | Theme | `apps/docs/app/global.css` only |
-| Preview | `pnpm --filter @endline/docs dev`, then http://localhost:3000/docs |
+| Preview | `pnpm --filter @endline/docs dev`, then http://localhost:3000 |
 | Build | `pnpm --filter @endline/docs build`: static files, search index (`api/search`), `llms.txt` and `llms-full.txt` in `apps/docs/out` |
-| Serving | The `web` image copies `out` to `/srv/docs`; Caddy serves `/docs` and `/docs/*`, with `/docs/404.html` for misses |
-| Base path | `DOCS_BASE_PATH`, default `/docs`. For a `docs.<domain>` root, build with `DOCS_BASE_PATH=` and give it its own Caddy site block |
+| Serving | Pages project `endline-docs` at `docs.endline.trade` ([hosting](#hosting)); `404.html` for misses |
 
 Rules:
 - A change to behaviour, numbers, routes or methods updates the public page in the same PR.
