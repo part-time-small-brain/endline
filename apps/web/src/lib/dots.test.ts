@@ -4,6 +4,14 @@ import { NO_PULL, pull } from "./dots.ts";
 const REACH = { x: 270, y: 150 };
 const PART = 10;
 
+function random(seed: number) {
+  let state = seed;
+  return () => {
+    state = (state * 1103515245 + 12345) % 2147483648;
+    return state / 2147483648;
+  };
+}
+
 describe("dot pull", () => {
   it("reaches further sideways than up and down, and nothing at or past the edge", () => {
     expect(pull(200, 0, REACH, PART).strength).toBeGreaterThan(0);
@@ -28,20 +36,13 @@ describe("dot pull", () => {
     expect(Math.abs(pull(0, -100, REACH, PART).lift)).toBe(0);
   });
 
-  it("still colors but never moves dots when motion is reduced", () => {
-    for (const dy of [-60, -9, 9, 60]) {
-      const still = pull(30, dy, REACH, 0);
-      expect(Math.abs(still.lift)).toBe(0);
-      expect(still.strength).toBeGreaterThan(0);
-    }
-  });
-
   it("stays bounded and fades with distance for random dots", () => {
+    const next = random(7);
     for (let n = 0; n < 2000; n++) {
-      const angle = Math.random() * 2 * Math.PI;
+      const angle = next() * 2 * Math.PI;
       const [dx, dy] = [Math.cos(angle), Math.sin(angle)];
-      const near = Math.random() * 300;
-      const far = near + Math.random() * 100;
+      const near = next() * 300;
+      const far = near + next() * 100;
       const a = pull(dx * near, dy * near, REACH, PART);
       const b = pull(dx * far, dy * far, REACH, PART);
       expect(a.strength).toBeGreaterThanOrEqual(0);

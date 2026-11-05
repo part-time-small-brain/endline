@@ -13,30 +13,36 @@ async function horizon(page: Page) {
   });
 }
 
-async function tints(page: Page, x: number, y: number) {
+async function pixels(page: Page, x: number, y: number, width: number, height: number) {
   return hero(page)
     .locator("canvas")
-    .evaluate((canvas: HTMLCanvasElement, { x, y }) => {
-      const box = canvas.getBoundingClientRect();
-      const scale = canvas.width / box.width;
-      const copy = document.createElement("canvas");
-      copy.width = canvas.width;
-      copy.height = canvas.height;
-      const ctx = copy.getContext("2d", { willReadFrequently: true }) as CanvasRenderingContext2D;
-      ctx.drawImage(canvas, 0, 0);
-      const tint = (top: number) => {
-        const { data } = ctx.getImageData((x - box.left - 30) * scale, (top - box.top) * scale, 60 * scale, 24 * scale);
-        let up = 0;
-        let down = 0;
-        for (let i = 0; i < data.length; i += 4) {
-          const [r = 0, g = 0, , a = 0] = data.subarray(i, i + 4);
-          if (a > 64 && g - r > 60) up++;
-          if (a > 64 && r - g > 60) down++;
-        }
-        return up && down ? "mixed" : up ? "up" : down ? "down" : "none";
-      };
-      return { above: tint(y - 30), below: tint(y + 6) };
-    }, { x, y });
+    .evaluate(
+      (canvas: HTMLCanvasElement, area) => {
+        const box = canvas.getBoundingClientRect();
+        const scale = canvas.width / box.width;
+        const copy = document.createElement("canvas");
+        copy.width = canvas.width;
+        copy.height = canvas.height;
+        const ctx = copy.getContext("2d", { willReadFrequently: true }) as CanvasRenderingContext2D;
+        ctx.drawImage(canvas, 0, 0);
+        return Array.from(ctx.getImageData((area.x - box.left) * scale, (area.y - box.top) * scale, area.width * scale, area.height * scale).data);
+      },
+      { x, y, width, height },
+    );
+}
+
+async function tints(page: Page, x: number, y: number) {
+  const tint = (data: number[]) => {
+    let up = 0;
+    let down = 0;
+    for (let i = 0; i < data.length; i += 4) {
+      const [r = 0, g = 0, , a = 0] = data.slice(i, i + 4);
+      if (a > 64 && g - r > 60) up++;
+      if (a > 64 && r - g > 60) down++;
+    }
+    return up && down ? "mixed" : up ? "up" : down ? "down" : "none";
+  };
+  return { above: tint(await pixels(page, x - 30, y - 30, 60, 24)), below: tint(await pixels(page, x - 30, y + 6, 60, 24)) };
 }
 
 test.beforeEach(async ({ page }) => {
@@ -183,4 +189,39 @@ test("hero dots turn Up above the cursor and Down below it, and fade when it lea
   if (!nav) throw new Error("no nav");
   await page.mouse.move(nav.x + nav.width / 2, nav.y + nav.height / 2);
   await expect.poll(() => tints(page, spot.x, spot.y)).toEqual({ above: "none", below: "none" });
+});
+
+test("hero dots stop drawing once they settle and repaint when the theme changes", async ({ page }) => {
+  test.skip(test.info().project.use.isMobile === true, "needs a hovering pointer");
+  const canvas = hero(page).locator("canvas");
+  await canvas.evaluate((element: HTMLCanvasElement) => {
+    const clear = CanvasRenderingContext2D.prototype.clearRect;
+    element.dataset.draws = "0";
+    CanvasRenderingContext2D.prototype.clearRect = function (this: CanvasRenderingContext2D, ...args: Parameters<typeof clear>) {
+      if (this.canvas === element) element.dataset.draws = String(Number(element.dataset.draws) + 1);
+      return clear.apply(this, args);
+    };
+  });
+  const drawsWhileWaiting = async () => {
+    const before = Number(await canvas.getAttribute("data-draws"));
+    await page.waitForTimeout(300);
+    return Number(await canvas.getAttribute("data-draws")) - before;
+  };
+  const spot = { x: 40, y: 320 };
+  await page.mouse.move(spot.x, spot.y);
+  await expect.poll(() => tints(page, spot.x, spot.y)).toEqual({ above: "up", below: "down" });
+  await expect.poll(drawsWhileWaiting).toBe(0);
+
+  const nav = page.getByRole("navigation", { name: "Main" });
+  const box = await nav.boundingBox();
+  if (!box) throw new Error("no nav");
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await expect.poll(() => tints(page, spot.x, spot.y)).toEqual({ above: "none", below: "none" });
+  await expect.poll(drawsWhileWaiting).toBe(0);
+
+  const dark = test.info().project.use.colorScheme === "dark";
+  const whiteDots = async () => ((await pixels(page, 9, 9, 1, 1))[0] ?? 0) > 128;
+  expect(await whiteDots()).toBe(dark);
+  await nav.getByTitle(dark ? "Light" : "Dark").click();
+  await expect.poll(whiteDots).toBe(!dark);
 });

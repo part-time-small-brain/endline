@@ -1,5 +1,3 @@
-export const GAP = 18;
-
 export interface Pull {
   strength: number;
   up: boolean;

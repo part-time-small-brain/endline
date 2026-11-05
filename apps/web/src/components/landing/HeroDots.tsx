@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
-import { GAP, NO_PULL, pull } from "../../lib/dots.ts";
+import { NO_PULL, pull } from "../../lib/dots.ts";
 
+const GAP = 18;
 const REACH = { x: 270, y: 150 };
 const PART = 10;
 const EASE = 0.15;
@@ -31,6 +32,15 @@ export function HeroDots({ still }: { still: boolean }) {
     let shown = 0;
     let frame = 0;
 
+    const readColors = () => {
+      const style = getComputedStyle(canvas);
+      ctx.fillStyle = style.getPropertyValue("--ink");
+      // canvas reads an opaque color back as #rrggbb, so a 00 suffix makes it transparent
+      const ink = String(ctx.fillStyle);
+      return { ink, grid: style.getPropertyValue("--grid"), up: style.getPropertyValue("--up"), down: style.getPropertyValue("--down") };
+    };
+    let colors = readColors();
+
     const circle = (dot: Dot, radius: number) => {
       ctx.moveTo(dot.x + radius, dot.y + dot.lift);
       ctx.arc(dot.x, dot.y + dot.lift, radius, 0, 2 * Math.PI);
@@ -41,18 +51,16 @@ export function HeroDots({ still }: { still: boolean }) {
 
     const draw = () => {
       frame = 0;
-      const at = cursor;
-      const style = getComputedStyle(canvas);
-      shown += ((at ? 1 : 0) - shown) * EASE;
-      let moving = Math.abs((at ? 1 : 0) - shown) > 0.005;
-      if (at) line = at;
+      shown += ((cursor ? 1 : 0) - shown) * EASE;
+      let moving = Math.abs((cursor ? 1 : 0) - shown) > 0.005;
+      if (cursor) line = cursor;
       ctx.clearRect(0, 0, width, height);
 
-      ctx.fillStyle = style.getPropertyValue("--grid");
+      ctx.fillStyle = colors.grid;
       ctx.beginPath();
       const lit: Dot[] = [];
       for (const dot of dots) {
-        const p = at ? pull(dot.x - at.x, dot.y - at.y, REACH, part) : NO_PULL;
+        const p = cursor ? pull(dot.x - cursor.x, dot.y - cursor.y, REACH, part) : NO_PULL;
         if (p.strength > 0) dot.up = p.up;
         dot.strength += (p.strength - dot.strength) * EASE;
         dot.lift += (p.lift - dot.lift) * EASE;
@@ -62,24 +70,19 @@ export function HeroDots({ still }: { still: boolean }) {
       }
       ctx.fill();
 
-      const upColor = style.getPropertyValue("--up");
-      const downColor = style.getPropertyValue("--down");
       for (const dot of lit) {
         ctx.globalAlpha = dot.strength;
-        ctx.fillStyle = dot.up ? upColor : downColor;
+        ctx.fillStyle = dot.up ? colors.up : colors.down;
         ctx.beginPath();
         circle(dot, DOT + 1.6 * dot.strength);
         ctx.fill();
       }
 
       if (shown > 0.005) {
-        ctx.fillStyle = style.getPropertyValue("--ink");
-        // canvas reads an opaque color back as #rrggbb, so a 00 suffix makes it transparent
-        const ink = String(ctx.fillStyle);
         const fade = ctx.createLinearGradient(line.x - REACH.x, 0, line.x + REACH.x, 0);
-        fade.addColorStop(0, `${ink}00`);
-        fade.addColorStop(0.5, ink);
-        fade.addColorStop(1, `${ink}00`);
+        fade.addColorStop(0, `${colors.ink}00`);
+        fade.addColorStop(0.5, colors.ink);
+        fade.addColorStop(1, `${colors.ink}00`);
         ctx.globalAlpha = 0.9 * shown;
         ctx.fillStyle = fade;
         ctx.fillRect(line.x - REACH.x, line.y - 1, REACH.x * 2, 2);
@@ -99,7 +102,8 @@ export function HeroDots({ still }: { still: boolean }) {
       for (let y = GAP / 2; y < height; y += GAP) {
         for (let x = GAP / 2; x < width; x += GAP) dots.push({ x, y, strength: 0, lift: 0, up: false });
       }
-      wake();
+      cancelAnimationFrame(frame);
+      draw();
     };
     const move = (event: PointerEvent) => {
       const box = canvas.getBoundingClientRect();
@@ -113,7 +117,10 @@ export function HeroDots({ still }: { still: boolean }) {
 
     const size = new ResizeObserver(resize);
     size.observe(canvas);
-    const theme = new MutationObserver(wake);
+    const theme = new MutationObserver(() => {
+      colors = readColors();
+      wake();
+    });
     theme.observe(document.documentElement, { attributeFilter: ["data-theme"] });
     area.addEventListener("pointermove", move);
     area.addEventListener("pointerleave", leave);
@@ -126,5 +133,5 @@ export function HeroDots({ still }: { still: boolean }) {
     };
   }, [still]);
 
-  return <canvas ref={ref} aria-hidden="true" className="absolute inset-0 size-full" />;
+  return <canvas ref={ref} aria-hidden="true" className="pointer-events-none absolute inset-0 size-full" />;
 }
