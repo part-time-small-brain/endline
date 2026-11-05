@@ -162,6 +162,22 @@ test("a bought cell rides into its column's final round, read-only, with the ave
   await expect(grid(page).getByRole("button", { name: / · Today / })).toHaveCount(0);
 });
 
+test("free calls with the demo wallet: call a cell of the next round, see it called and counted, and the board", async ({ page }) => {
+  await openTap(page);
+  await connect(page, /Demo wallet/);
+  await page.getByRole("radio", { name: /^Free call/ }).click();
+  await expect(page.getByRole("radio", { name: /^Free call/ })).toContainText("10 of 10 left this round");
+  await cells(page).filter({ hasText: /^[1-9]\.\d×$/ }).and(page.getByRole("button", { name: / · Tomorrow / })).first().click();
+  await expect(page.getByRole("status").filter({ hasText: /^Called BTC (Up|Down) \$[\d,]+ at \d+\.\d×\.$/ })).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByRole("radio", { name: /^Free call/ })).toContainText("9 of 10 left this round");
+  await expect(grid(page).getByRole("button", { name: / · you called this$/ })).toHaveCount(1);
+  const panel = page.getByRole("region", { name: "Free calls" });
+  await expect(panel.getByText(/· at \d+\.\d×/)).toBeVisible();
+  await expect(panel.getByRole("list").first().getByRole("listitem").first()).toContainText("sun.near");
+  await page.getByRole("radio", { name: /^Buy/ }).click();
+  await expect(page.getByRole("region", { name: "Free calls" })).toHaveCount(0);
+});
+
 test("a custom stake's max loss rounds up, so no tap costs more than it says", async ({ page }) => {
   await openTap(page);
   await page.getByRole("radio", { name: "Other" }).click();
