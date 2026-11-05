@@ -1,4 +1,4 @@
-import { longPayout, termsOf } from "@endline/sdk";
+import { type Call, callMultiple, callPoints, FREE_CALLS_PER_ROUND, longPayout, roundOf, termsOf, TWAP_WINDOW_SEC } from "@endline/sdk";
 import { useState } from "react";
 import { settlementKey } from "../app/data.tsx";
 import type { useTicket } from "../app/useTicket.ts";
@@ -7,22 +7,33 @@ import type { QuoteSelection } from "../components/QuoteSheet.tsx";
 import { Brackets } from "../components/Brackets.tsx";
 import { Button } from "../components/Button.tsx";
 import { Cell } from "../components/tap/Cell.tsx";
+import { FreeCalls } from "../components/tap/FreeCalls.tsx";
 import { RevealCell } from "../components/tap/RevealCell.tsx";
 import { RevealNote } from "../components/tap/RevealNote.tsx";
+import { TapMode } from "../components/tap/TapMode.tsx";
 import { TapSheet } from "../components/tap/TapSheet.tsx";
+import { useCalls } from "../hooks/useCalls.ts";
 import { useTaps } from "../hooks/useTaps.ts";
 import { PriceLine } from "../components/tap/PriceLine.tsx";
-import { AmountPicker } from "../components/trade/AmountPicker.tsx";
 import { AssetPicker } from "../components/trade/AssetPicker.tsx";
 import { MarketStats } from "../components/trade/MarketStats.tsx";
 import { buildGrid, type GridCell, rowOf, winningAt } from "../lib/grid.ts";
-import { averageEstimate, closingOf, isEstimate, type Phase, PHASE_TITLES, revealSays, verdictOf } from "../lib/reveal.ts";
-import { maxLossOf } from "../lib/tap.ts";
+import { averageEstimate, callVerdict, closingOf, isEstimate, type Phase, PHASE_TITLES, pointsSays, revealSays, verdictOf } from "../lib/reveal.ts";
 import { formatMultiple, formatPct, formatPrice, formatUsd, toNumber, toUnits } from "../lib/money.ts";
 import { seriesTitle } from "../lib/labels.ts";
 import { dayLabel, formatClock, formatUtc } from "../lib/time.ts";
 import { useWallet } from "../wallet/context.tsx";
 import { useTap, useTapPayer } from "../wallet/tapBalance.tsx";
+
+const FREE_KEY = "tap-free";
+
+function storedFree(): boolean {
+  try {
+    return localStorage.getItem(FREE_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
 
 interface Props {
   state: ReturnType<typeof useTicket>;
@@ -40,8 +51,17 @@ export function Tap({ state, nowSec, views, onConnect, onAddFunds, onQuote }: Pr
   const [sheet, setSheet] = useState(false);
   const { payer, error: unlockError } = useTapPayer();
   const taps = useTaps(tapBalance.accountId);
+  const calls = useCalls();
+  const [free, setFreeState] = useState(storedFree);
+  const setFree = (on: boolean) => {
+    setFreeState(on);
+    try {
+      localStorage.setItem(FREE_KEY, on ? "1" : "0");
+    } catch {}
+  };
   const onTap = async ({ series, ticket, multiple }: GridCell) => {
     if (!wallet) return onConnect();
+    if (free) return calls.call(series);
     if (tapBalance.accountId === undefined) {
       if (data.balance !== undefined && data.balance < ticket.cost) return onAddFunds();
       return onQuote({ wallet, series, side: "buy", size: ticket.size, budget });
@@ -56,9 +76,15 @@ export function Tap({ state, nowSec, views, onConnect, onAddFunds, onQuote }: Pr
   };
   const yours = views?.filter((v) => v.series.underlying === symbol) ?? [];
   const here = data.listing?.series.filter((s) => s.underlying === symbol) ?? [];
+  const nextRound = (data.listing?.series ?? []).filter((s) => s.quotable && nowSec < s.expiry - TWAP_WINDOW_SEC).map((s) => roundOf(s.expiry)).sort()[0];
+  const left = FREE_CALLS_PER_ROUND - (data.calls ?? []).filter((c) => roundOf(c.terms.expiry) === nextRound).length;
+  const myCalls = (data.calls ?? []).filter((c) => c.terms.underlying === symbol);
+  const calledHere = new Map(myCalls.map((c) => [c.series_id, c]));
   const settlementOf = (expiry: number) => data.settlements[settlementKey({ underlying: symbol, expiry })] ?? null;
-  const closing = closingOf([...here, ...yours.map((v) => v.series)].map((s) => s.expiry), (expiry) => yours.some((v) => v.series.expiry === expiry), settlementOf, nowSec);
+  const staking = (expiry: number) => yours.some((v) => v.series.expiry === expiry) || myCalls.some((c) => c.terms.expiry === expiry);
+  const closing = closingOf([...here, ...yours.map((v) => v.series)].map((s) => s.expiry), staking, settlementOf, nowSec);
   const stakes = closing ? yours.filter((v) => v.series.expiry === closing.expiry) : [];
+  const closingCalls = closing ? myCalls.filter((c) => c.terms.expiry === closing.expiry) : [];
   const settlement = closing ? settlementOf(closing.expiry) : null;
   const average = closing && spotNumber !== undefined ? averageEstimate(data.minutes?.[symbol] ?? [], closing.expiry, nowSec * 1000, spotNumber) : undefined;
   const closingPrice = settlement?.price ?? (average === undefined ? undefined : toUnits(average, quoteDecimals));
@@ -67,11 +93,14 @@ export function Tap({ state, nowSec, views, onConnect, onAddFunds, onQuote }: Pr
   const mine = active.filter((v) => v.tap);
   const bothSides = (v: PositionView) => stakes.some((o) => o.series.strike === v.series.strike && o.series.kind !== v.series.kind);
   const shownStakes = stakes.filter((v) => !bothSides(v) || (closingPrice !== undefined && winningAt(v.series, closingPrice)));
-  const held = new Set([...open, ...shownStakes].map((v) => v.series.id));
+  const owned = new Set([...open, ...shownStakes].map((v) => v.series.id));
+  const calledSeries = here.filter((s) => calledHere.has(s.id) && (s.expiry === closing?.expiry || roundOf(s.expiry) === nextRound));
+  const held = new Set([...owned, ...calledSeries.map((s) => s.id)]);
   const listed = [
     ...priced.filter((s) => s.underlying === symbol && s.expiry !== closing?.expiry && !held.has(s.id)),
     ...here.filter((s) => s.expiry === closing?.expiry && !held.has(s.id)),
     ...[...open, ...shownStakes].map((v) => v.series),
+    ...calledSeries,
   ];
   const grid = spot === undefined ? undefined : buildGrid(listed, spot, budget, data.marks, held);
   const closingColumn = closing && grid ? grid.expiries.indexOf(closing.expiry) : -1;
@@ -88,11 +117,18 @@ export function Tap({ state, nowSec, views, onConnect, onAddFunds, onQuote }: Pr
     const usd = formatUsd(longPayout(termsOf(cell.series), amount, price), quoteDecimals);
     return { kind: cell.series.kind, verdict, amount: `${isEstimate(phase) ? "≈ " : ""}${usd}`, label: `${where(cell, strike)} · ${PHASE_TITLES[phase].toLowerCase()} · ${revealSays(phase, verdict, usd)} · you hold this` };
   };
+  const revealCall = (cell: GridCell, strike: bigint, phase: Phase, price: bigint, call: Call) => {
+    const points = callPoints(termsOf(call.terms), BigInt(call.ask), price);
+    const verdict = callVerdict(cell.series, phase, price, points);
+    const pts = `${points > 0 ? "+" : ""}${points} pts`;
+    return { kind: cell.series.kind, verdict, amount: `${isEstimate(phase) ? "≈ " : ""}${pts}`, label: `${where(cell, strike)} · ${PHASE_TITLES[phase].toLowerCase()} · free call · ${pointsSays(phase, verdict, pts)}` };
+  };
   const label = (cell: GridCell, strike: bigint, expiry: number, own: Holding | undefined) => {
     const pays = cell.multiple === undefined ? "no price right now" : `pays up to ${formatMultiple(cell.multiple)}`;
     const worth = own?.value === undefined ? "" : ` · worth ${formatUsd(own.value, quoteDecimals)}`;
     const pnl = own?.pnl === undefined ? "" : own.pnl > 0n ? ` · up ${formatUsd(own.pnl, quoteDecimals)}` : own.pnl < 0n ? ` · down ${formatUsd(-own.pnl, quoteDecimals)}` : " · even";
-    return `${where(cell, strike)} · ${dayLabel(expiry, nowSec)} ${formatClock(expiry)} · ${pays}${worth}${pnl}${cell.winning ? " · winning now" : ""}${cell.held ? " · you hold this" : ""}`;
+    const mine = owned.has(cell.series.id) ? " · you hold this" : calledHere.has(cell.series.id) ? " · you called this" : "";
+    return `${where(cell, strike)} · ${dayLabel(expiry, nowSec)} ${formatClock(expiry)} · ${pays}${worth}${pnl}${cell.winning ? " · winning now" : ""}${mine}`;
   };
 
   return (
@@ -147,15 +183,18 @@ export function Tap({ state, nowSec, views, onConnect, onAddFunds, onQuote }: Pr
                       if (c === closingColumn && closing) {
                         return (
                           <td key={cell?.series.id ?? expiry} className="h-[var(--row)] p-0.5">
-                            {cell?.held && closingPrice !== undefined ? (
+                            {cell && closingPrice !== undefined && staked(cell.series.id) > 0n ? (
                               <RevealCell {...reveal(cell, strike, closing.phase, closingPrice, staked(cell.series.id))} />
+                            ) : cell && closingPrice !== undefined && calledHere.has(cell.series.id) ? (
+                              <RevealCell {...revealCall(cell, strike, closing.phase, closingPrice, calledHere.get(cell.series.id)!)} />
                             ) : (
                               <span className="block size-full rounded-md border border-rule/40" aria-hidden="true" />
                             )}
                           </td>
                         );
                       }
-                      const own = cell?.held ? holding(open, cell.series.id) : undefined;
+                      const own = cell && owned.has(cell.series.id) ? holding(open, cell.series.id) : undefined;
+                      const call = cell && calledHere.get(cell.series.id);
                       return (
                         <td key={cell?.series.id ?? expiry} className="h-[var(--row)] p-0.5">
                           <Cell
@@ -163,7 +202,9 @@ export function Tap({ state, nowSec, views, onConnect, onAddFunds, onQuote }: Pr
                             label={cell ? label(cell, strike, expiry, own) : ""}
                             value={formatMoney(own?.value)}
                             change={own?.change}
-                            state={cell && taps.states[cell.series.id]}
+                            called={call && !own ? formatMultiple(callMultiple(termsOf(call.terms), BigInt(call.ask))) : undefined}
+                            blocked={free && (roundOf(expiry) !== nextRound || call !== undefined)}
+                            state={cell && (free ? calls.states : taps.states)[cell.series.id]}
                             onTap={onTap}
                           />
                         </td>
@@ -195,9 +236,9 @@ export function Tap({ state, nowSec, views, onConnect, onAddFunds, onQuote }: Pr
             {spot !== undefined && !loading ? "No prices right now" : empty}
           </p>
         )}
-        {closing && closingPrice !== undefined && <RevealNote phase={closing.phase} price={closingPrice} settlement={settlement} stakes={stakes} quoteDecimals={quoteDecimals} />}
-        <p role="status" className={`min-h-5 px-1 pt-2 text-sm ${unlockError || taps.notice?.failed ? "text-danger" : "text-ink-2"}`}>
-          {unlockError ?? taps.notice?.text}
+        {closing && closingPrice !== undefined && <RevealNote phase={closing.phase} price={closingPrice} settlement={settlement} stakes={stakes} calls={closingCalls} quoteDecimals={quoteDecimals} />}
+        <p role="status" className={`min-h-5 px-1 pt-2 text-sm ${unlockError || (free ? calls : taps).notice?.failed ? "text-danger" : "text-ink-2"}`}>
+          {unlockError ?? (free ? calls : taps).notice?.text}
         </p>
       </section>
 
@@ -230,12 +271,8 @@ export function Tap({ state, nowSec, views, onConnect, onAddFunds, onQuote }: Pr
         </section>
       )}
 
-      <div className="flex flex-col gap-2 rounded-md border border-rule bg-surface p-4 sm:p-6">
-        <AmountPicker value={budget} quoteDecimals={quoteDecimals} onChange={setBudget} />
-        <p className="text-sm text-ink-2">
-          Each tap buys one option for about {formatUsd(budget, quoteDecimals).replace(/\.00$/, "")}. Max loss {formatUsd(maxLossOf(budget), quoteDecimals, "up")} a tap.
-        </p>
-      </div>
+      <TapMode free={free} left={left} budget={budget} quoteDecimals={quoteDecimals} onFree={setFree} onBudget={setBudget} />
+      {free && <FreeCalls calls={data.calls ?? []} left={left} accountId={wallet?.accountId} nowSec={nowSec} quoteDecimals={quoteDecimals} />}
       <p className="pb-6 text-center font-mono text-[10px] font-medium tracking-[0.14em] text-ink-3 uppercase">Signed in your browser · settled on NEAR Intents</p>
     </div>
   );

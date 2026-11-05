@@ -25,13 +25,13 @@ interface Props {
   label: string;
   value: string | undefined;
   change: number | undefined;
-  called?: string;
-  blocked?: boolean;
+  called: string | undefined;
+  blocked: boolean;
   state: TapState | undefined;
   onTap: (cell: GridCell) => void;
 }
 
-export function Cell({ cell, label, value, change, called, blocked = false, state, onTap }: Props) {
+export function Cell({ cell, label, value, change, called, blocked, state, onTap }: Props) {
   const winning = cell?.winning ?? false;
   const last = useRef(winning);
   const [flips, setFlips] = useState(0);
