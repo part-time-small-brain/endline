@@ -1,4 +1,4 @@
-import { buyDiffs, capped, type Diff, type QuoteResponse, readPayload, type Series, sellDiffs, unmatched, YEAR_MS } from "@near-options/sdk";
+import { buyDiffs, capped, type Diff, type QuoteResponse, readPayload, type Series, sellDiffs, unmatched, YEAR_MS } from "@endline/sdk";
 import { KeyPair } from "near-api-js";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { loadConfig } from "./config.ts";

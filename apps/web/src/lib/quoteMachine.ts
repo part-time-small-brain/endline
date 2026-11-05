@@ -1,4 +1,4 @@
-import type { Quote } from "@near-options/sdk";
+import type { Quote } from "@endline/sdk";
 import type { Leg } from "./tradeCheck.ts";
 
 // a quote with the legs checked against it, so the card can never show another quote's

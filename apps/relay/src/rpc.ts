@@ -1,4 +1,4 @@
-import { Amount, CLAIM_WINDOW_SEC, Config as ContractConfig, readPayload, Series, Settlement, type SignedPayload } from "@near-options/sdk";
+import { Amount, CLAIM_WINDOW_SEC, Config as ContractConfig, readPayload, Series, Settlement, type SignedPayload } from "@endline/sdk";
 import { Account, getTransactionLastResult, JsonRpcProvider, type KeyPairString } from "near-api-js";
 import { z } from "zod";
 import type { Config } from "./config.ts";

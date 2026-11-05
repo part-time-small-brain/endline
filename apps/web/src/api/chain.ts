@@ -1,4 +1,4 @@
-import { Config, Settlement, type Timing } from "@near-options/sdk";
+import { Config, Settlement, type Timing } from "@endline/sdk";
 import { z } from "zod";
 import type { SettlementView } from "../lib/status.ts";
 

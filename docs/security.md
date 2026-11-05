@@ -72,7 +72,7 @@ Every rule here comes from a real loss. Contract changes must keep all of them. 
 
 ## Monitoring
 
-Built: `pnpm --filter @near-options/mm start monitor` ([mm README](../apps/mm/README.md#settlement-monitor)), every minute, deduplicated, log + optional webhook, with a `RESOLVED` message when a condition clears (`FINAL` when a flagged price goes final):
+Built: `pnpm --filter @endline/mm start monitor` ([mm README](../apps/mm/README.md#settlement-monitor)), every minute, deduplicated, log + optional webhook, with a `RESOLVED` message when a condition clears (`FINAL` when a flagged price goes final):
 - Proposed price more than 20 bps from the Deribit reference (the oracle vetoes at 50), or no reference, while still before `final_at`. Prints the `override_settlement` command with the price left as `<price>`.
 - No settlement by expiry + `oracle_window_sec`. Prints the `propose_settlement` command.
 - NEAR balance minus storage cost below 2 NEAR, for the options contract, the intents contract and the relayer.
@@ -85,4 +85,4 @@ Not built yet:
 
 ## Sources
 
-Full evidence and links in `.research/prior-art.md`, `.research/near-intents-internals.md`, `.research/oracle.md`.
+Full evidence and links are in our research notes, which are not published.

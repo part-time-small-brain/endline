@@ -1,4 +1,4 @@
-import { buyDiffs, type Diff, isListed, maxPayout, type QuoteEvent, type Series, sellDiffs, termsOf } from "@near-options/sdk";
+import { buyDiffs, type Diff, isListed, maxPayout, type QuoteEvent, type Series, sellDiffs, termsOf } from "@endline/sdk";
 import type { IntentsState } from "./chain.ts";
 import type { Settings } from "./config.ts";
 import type { Inventory } from "./inventory.ts";

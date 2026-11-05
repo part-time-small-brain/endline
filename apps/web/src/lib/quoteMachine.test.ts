@@ -1,4 +1,4 @@
-import type { Quote } from "@near-options/sdk";
+import type { Quote } from "@endline/sdk";
 import { describe, expect, it } from "vitest";
 import { type CheckedQuote, type Phase, reduce, shouldPrefetch } from "./quoteMachine.ts";
 

@@ -1,4 +1,4 @@
-import type { OptionKind } from "@near-options/sdk";
+import type { OptionKind } from "@endline/sdk";
 import { ArrowsVertical, CaretUpDown } from "@phosphor-icons/react";
 import { m, useReducedMotion, useSpring } from "motion/react";
 import { type KeyboardEvent, type PointerEvent, useId, useLayoutEffect, useRef, useState } from "react";

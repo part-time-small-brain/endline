@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import { Config as ConfigView, type Intent, type OptionKind, payload, Series, Settlement } from "@near-options/sdk";
+import { Config as ConfigView, type Intent, type OptionKind, payload, Series, Settlement } from "@endline/sdk";
 import { Account, JsonRpcProvider, teraToGas } from "near-api-js";
 import { z } from "zod";
 import type { Config } from "./config.ts";

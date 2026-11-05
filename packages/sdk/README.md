@@ -1,6 +1,6 @@
 # SDK
 
-Shared TypeScript for relay, MM and web. Source only, no build step: import `@near-options/sdk`.
+Shared TypeScript for relay, MM and web. Source only, no build step: import `@endline/sdk`.
 
 | File | What |
 |---|---|
@@ -16,6 +16,6 @@ Shared TypeScript for relay, MM and web. Source only, no build step: import `@ne
 Series ids and payout math are tested against `testdata/vectors.json`, shared with the Rust contract. Signing is tested byte for byte against `@defuse-protocol/intents-sdk`. Trade flow: [docs/rfq.md](../../docs/rfq.md).
 
 ```bash
-pnpm --filter @near-options/sdk test
-pnpm --filter @near-options/sdk typecheck
+pnpm --filter @endline/sdk test
+pnpm --filter @endline/sdk typecheck
 ```

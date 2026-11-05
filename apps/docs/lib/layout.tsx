@@ -6,14 +6,13 @@ export const sourceMarkdown = sourceUrl ? `Source: [GitHub](${sourceUrl})` : "So
 
 function Wordmark() {
   return (
-    <span className="wordmark" aria-label="near options">
-      near
-      <svg width={22} height={22} viewBox="0 0 24 24" aria-hidden="true">
-        <path d="M5 12a7 7 0 0 1 14 0z" fill="var(--up)" />
-        <path d="M5 12a7 7 0 0 0 14 0z" fill="var(--down)" />
-        <rect x="1" y="11" width="22" height="2" rx="1" fill="currentColor" />
+    <span className="wordmark">
+      <svg width={24} height={20} viewBox="0 0 48 40" fill="none" strokeWidth={3} strokeLinecap="square" aria-hidden="true">
+        <path d="M3 11V3h8M37 3h8v8M45 29v8h-8M11 37H3v-8" stroke="currentColor" />
+        <path d="M10 20h14" stroke="var(--up)" strokeWidth={4} />
+        <path d="M24 20h14" stroke="var(--down)" strokeWidth={4} />
       </svg>
-      options
+      endline
     </span>
   );
 }

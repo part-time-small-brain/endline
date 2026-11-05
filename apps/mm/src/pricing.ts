@@ -1,4 +1,4 @@
-import { capped, type Series, YEAR_MS } from "@near-options/sdk";
+import { capped, type Series, YEAR_MS } from "@endline/sdk";
 import type { Settings } from "./config.ts";
 import { type Book, type SeriesMark, strikeUsd, widthUsd } from "./portfolio.ts";
 

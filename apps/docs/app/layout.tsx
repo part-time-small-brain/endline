@@ -4,8 +4,8 @@ import { Provider } from "@/components/provider";
 import "./global.css";
 
 export const metadata: Metadata = {
-  title: { template: "%s · near-options docs", default: "near-options docs" },
-  description: "Up/Down options on BTC and ETH, settled through NEAR Intents.",
+  title: { template: "%s · Endline docs", default: "Endline docs" },
+  description: "Endline: BTC & ETH options on NEAR Intents.",
 };
 
 export default function Layout({ children }: { children: ReactNode }) {

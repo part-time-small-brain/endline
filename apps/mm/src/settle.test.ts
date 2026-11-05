@@ -1,4 +1,4 @@
-import type { Series } from "@near-options/sdk";
+import type { Series } from "@endline/sdk";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { requests, settleCommand } from "./settle.ts";
 

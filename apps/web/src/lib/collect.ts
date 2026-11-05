@@ -1,4 +1,4 @@
-import { MIN_RELAYED_PAYOUT_USD } from "@near-options/sdk";
+import { MIN_RELAYED_PAYOUT_USD } from "@endline/sdk";
 
 const MAX_TOKENS = 10;
 

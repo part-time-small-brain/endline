@@ -1,4 +1,4 @@
-# near-options docs
+# Endline docs
 
 Cross-chain BTC/ETH options settled through NEAR Intents. Fund from any chain, buy a call or put with one signature, get paid automatically at expiry.
 

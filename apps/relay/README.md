@@ -5,9 +5,9 @@ Runs the RFQ auction between users and market makers, settles trades with `inten
 ## Run
 
 ```bash
-pnpm --filter @near-options/relay start
-pnpm --filter @near-options/relay test
-pnpm --filter @near-options/relay typecheck
+pnpm --filter @endline/relay start
+pnpm --filter @endline/relay test
+pnpm --filter @endline/relay typecheck
 ```
 
 At startup the relay checks that the RPC is on `NETWORK_ID` and that `OPTIONS_ID`'s `get_config` uses `INTENTS_ID` and `QUOTE_ASSET`, and exits otherwise. Testnet values and a full-stack run: [docs/system.md](../../docs/system.md#testnet-from-scratch).

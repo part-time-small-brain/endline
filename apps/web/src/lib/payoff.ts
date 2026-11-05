@@ -1,4 +1,4 @@
-import { capPrice, longPayout, type Terms } from "@near-options/sdk";
+import { capPrice, longPayout, type Terms } from "@endline/sdk";
 
 export function breakeven(t: Terms, size: bigint, premium: bigint): bigint | null {
   const up = t.kind === "call";

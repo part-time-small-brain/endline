@@ -1,10 +1,10 @@
-# near-options
+# Endline
 
-Bet on BTC or ETH going up or down by a date. Each bet is a European, cash-settled option with a capped payout, fully backed in USDC, that lives and trades inside NEAR Intents. Live on NEAR testnet; mainnet (with deposits from any chain via 1Click) is built but not deployed yet.
+Pick where BTC and ETH end. Fund from any chain, max loss is what you pay. Each position is a European, cash-settled option with a capped payout, fully backed in USDC, that lives and trades inside NEAR Intents. Live on NEAR testnet; mainnet (with deposits from any chain via 1Click) is built but not deployed yet.
 
 ## The problem
 
-Crypto options trade on centralized venues or inside one chain's DeFi, and an options chain (strikes, greeks, margin) is unreadable for most people. near-options turns an option into "BTC Up $81,000 by tomorrow, pay $25", shows the most you can lose and win before you sign, and, with auto-collect on, pays a win of $1 or more into your balance without another signature.
+Crypto options trade on centralized venues or inside one chain's DeFi, and an options chain (strikes, greeks, margin) is unreadable for most people. Endline turns an option into "BTC Up $81,000 by tomorrow, pay $25", shows the most you can lose and win before you sign, and, with auto-collect on, pays a win of $1 or more into your balance without another signature.
 
 ## How NEAR fits
 
@@ -31,10 +31,10 @@ Live app: https://salvador-developmental-privileges-division.trycloudflare.com/a
    The header shows your balance.
 3. Click Add funds → "Get 100 test USDC". The balance goes up by $100 within seconds. Once per account and IP per 24 h.
 4. Tap the sentence slots: Tomorrow, BTC, above, a price to beat and $25. Check the full-payout threshold and Max loss, then click "Buy Up · $25". The first time, your wallet asks for one signature that lets you get prices for 24 h (no funds move). The confirm sheet then shows the firm price, the exact swap you'll sign and a countdown. Click "Buy for $X" and sign. You see "You're in" and can turn on auto-collect (one more signature).
-5. Open Positions. The bet shows Paid, Value now and P&L. Click "Sell back", then "Sell back for $X", and sign: the USDC lands in your balance.
-6. Settlement: "Today" with a clock time in the end-date list is a bet ending within ~4 h (quoting stops 60 s before the end). About 10 minutes after the end the price is proposed (median of 7 exchanges) and it is final 2 minutes later. A win of $1 or more with auto-collect is then paid into your balance within a minute; otherwise the position shows Collect.
+5. Open Positions. The position shows Paid, Value now and P&L. Click "Sell back", then "Sell back for $X", and sign: the USDC lands in your balance.
+6. Settlement: "Today" with a clock time in the end-date list is an option ending within ~4 h (quoting stops 60 s before the end). About 10 minutes after the end the price is proposed (median of 7 exchanges) and it is final 2 minutes later. A win of $1 or more with auto-collect is then paid into your balance within a minute; otherwise the position shows Collect.
 
-Without a wallet: `pnpm install && VITE_MOCK=1 pnpm --filter @near-options/web dev`, open http://localhost:5173/app, Connect → Demo wallet: the whole app against mock services with a $250 balance.
+Without a wallet: `pnpm install && VITE_MOCK=1 pnpm --filter @endline/web dev`, open http://localhost:5173/app, Connect → Demo wallet: the whole app against mock services with a $250 balance.
 
 ## Deployed
 

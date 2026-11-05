@@ -1,4 +1,4 @@
-import { readPayload } from "@near-options/sdk";
+import { readPayload } from "@endline/sdk";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { demoWallet } from "./demo.ts";
 import { cachedSession, forgetSession, signSession } from "./session.ts";

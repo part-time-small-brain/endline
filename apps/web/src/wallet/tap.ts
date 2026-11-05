@@ -1,4 +1,4 @@
-import { implicitSigner, readPayload, type SignedPayload, type Unsigned } from "@near-options/sdk";
+import { implicitSigner, readPayload, type SignedPayload, type Unsigned } from "@endline/sdk";
 import { base58, base64 } from "@scure/base";
 import type { Wallet } from "./wallet.ts";
 

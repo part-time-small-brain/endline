@@ -1,4 +1,4 @@
-import { CLAIM_WINDOW_SEC, defaultExpiry, EXPIRY_TIME_OF_DAY, listedWidth, type OptionKind, SECONDS_PER_DAY, type Series, seriesId, strikeStepCents } from "@near-options/sdk";
+import { CLAIM_WINDOW_SEC, defaultExpiry, EXPIRY_TIME_OF_DAY, listedWidth, type OptionKind, SECONDS_PER_DAY, type Series, seriesId, strikeStepCents } from "@endline/sdk";
 import type { ListingTerms } from "./chain.ts";
 import type { Underlying } from "./market.ts";
 

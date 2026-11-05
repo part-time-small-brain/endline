@@ -1,4 +1,4 @@
-import { longPayout, type OptionKind } from "@near-options/sdk";
+import { longPayout, type OptionKind } from "@endline/sdk";
 import { CaretUpDown } from "@phosphor-icons/react";
 import { m } from "motion/react";
 import { type KeyboardEvent, type PointerEvent, type ReactNode, useRef, useState } from "react";

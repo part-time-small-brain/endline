@@ -13,7 +13,7 @@ WORKDIR /app
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json ./
 COPY packages packages
 COPY apps apps
-RUN chmod -R a+rX /app && pnpm install --frozen-lockfile --filter '!@near-options/docs'
+RUN chmod -R a+rX /app && pnpm install --frozen-lockfile --filter '!@endline/docs'
 
 FROM deps AS app
 RUN mkdir /data && chown node:node /data
@@ -23,11 +23,11 @@ USER node
 
 FROM deps AS web-build
 ARG VITE_NETWORK VITE_RPC_URL VITE_INTENTS_ID VITE_OPTIONS_ID VITE_QUOTE_ASSET
-RUN pnpm --filter @near-options/web build
+RUN pnpm --filter @endline/web build
 
 FROM deps AS docs-build
 ARG DOCS_BASE_PATH=/docs
-RUN pnpm install --frozen-lockfile --filter @near-options/docs && pnpm --filter @near-options/docs build
+RUN pnpm install --frozen-lockfile --filter @endline/docs && pnpm --filter @endline/docs build
 
 FROM caddy:2.11.7-alpine@sha256:eb4d35b7452d1ab6171fbdbe8d9275b2301dad6dad92115d91e19fb9b24d510f AS web
 COPY deploy/Caddyfile /etc/caddy/Caddyfile

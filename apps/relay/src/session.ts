@@ -1,4 +1,4 @@
-import { type QuoteRequest, readPayload, type SignedPayload } from "@near-options/sdk";
+import { type QuoteRequest, readPayload, type SignedPayload } from "@endline/sdk";
 import { HttpError } from "./relay.ts";
 import { type Chain, Rejected } from "./rpc.ts";
 

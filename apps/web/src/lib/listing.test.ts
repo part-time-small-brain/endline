@@ -1,4 +1,4 @@
-import { type ListedSeries, type SeriesListing, seriesId } from "@near-options/sdk";
+import { type ListedSeries, type SeriesListing, seriesId } from "@endline/sdk";
 import { describe, expect, it } from "vitest";
 import { verifiedListing } from "./listing.ts";
 

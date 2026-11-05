@@ -1,4 +1,4 @@
-import { type ListedSeries, maxPayout, type Quote, termsOf } from "@near-options/sdk";
+import { type ListedSeries, maxPayout, type Quote, termsOf } from "@endline/sdk";
 import { useEffect, useRef } from "react";
 import { useApp } from "../app/context.ts";
 import { useData } from "../app/data.tsx";

@@ -1,5 +1,5 @@
 import { setTimeout as sleep } from "node:timers/promises";
-import { CLAIM_WINDOW_SEC, closeOptions, intentsAssetId, shortTokenId, writeOptions } from "@near-options/sdk";
+import { CLAIM_WINDOW_SEC, closeOptions, intentsAssetId, shortTokenId, writeOptions } from "@endline/sdk";
 import { Chain } from "./chain.ts";
 import type { Config } from "./config.ts";
 import { indexPrice } from "./deribit.ts";

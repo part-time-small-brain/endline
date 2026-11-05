@@ -1,4 +1,4 @@
-import { capPrice, type ListedSeries, termsOf } from "@near-options/sdk";
+import { capPrice, type ListedSeries, termsOf } from "@endline/sdk";
 import { formatPrice } from "./money.ts";
 
 export function seriesTitle(series: ListedSeries, quoteDecimals: number): string {

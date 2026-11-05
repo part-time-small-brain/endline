@@ -1,4 +1,4 @@
-import type { Payload, Quote } from "@near-options/sdk";
+import type { Payload, Quote } from "@endline/sdk";
 
 const MAX_DEADLINE_SLACK_MS = 5_000;
 

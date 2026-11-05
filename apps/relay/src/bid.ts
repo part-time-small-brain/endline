@@ -11,7 +11,7 @@ import {
   sellDiffs,
   termsOf,
   unmatched,
-} from "@near-options/sdk";
+} from "@endline/sdk";
 import { z } from "zod";
 import type { Chain } from "./rpc.ts";
 

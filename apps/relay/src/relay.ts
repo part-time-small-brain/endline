@@ -19,7 +19,7 @@ import {
   type StatusUpdate,
   tokenDiff,
   toSign,
-} from "@near-options/sdk";
+} from "@endline/sdk";
 import type { z } from "zod";
 import { type Auctions, MAX_WAIT_MS } from "./auction.ts";
 import { type Bid, legs } from "./bid.ts";

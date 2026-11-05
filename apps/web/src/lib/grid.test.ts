@@ -1,4 +1,4 @@
-import type { ListedSeries, OptionKind } from "@near-options/sdk";
+import type { ListedSeries, OptionKind } from "@endline/sdk";
 import { describe, expect, it } from "vitest";
 import { buildGrid, rowOf } from "./grid.ts";
 

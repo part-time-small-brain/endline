@@ -1,4 +1,4 @@
-import type { OptionKind } from "@near-options/sdk";
+import type { OptionKind } from "@endline/sdk";
 import { formatChance } from "../../lib/money.ts";
 import { pickWithArrows } from "../Chips.tsx";
 import { SideGlyph } from "../Glyphs.tsx";

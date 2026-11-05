@@ -18,7 +18,7 @@ export function Nav() {
       aria-label="Main"
       className="fixed top-3 left-1/2 z-40 flex -translate-x-1/2 items-center gap-1 rounded-full bg-surface/75 p-1 pl-4 shadow-[inset_0_0_0_1px_rgb(255_255_255/0.08),0_8px_24px_rgb(14_20_32/0.08)] ring-1 ring-ink/5 backdrop-blur-xl backdrop-saturate-150 lg:top-6"
     >
-      <a href="#top" onClick={jump} aria-label="near·options, back to top" className="mr-2 rounded-lg lg:mr-4">
+      <a href="#top" onClick={jump} aria-label="Endline, back to top" className="mr-2 rounded-lg lg:mr-4">
         <Wordmark />
       </a>
       {SECTIONS.map(({ id, label }) => (

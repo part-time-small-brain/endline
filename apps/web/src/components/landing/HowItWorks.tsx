@@ -1,4 +1,4 @@
-import { longPayout } from "@near-options/sdk";
+import { longPayout } from "@endline/sdk";
 import type { ReactNode } from "react";
 import { formatChance, formatPrice, formatUsd, toUnits } from "../../lib/money.ts";
 import { chance } from "../../lib/odds.ts";

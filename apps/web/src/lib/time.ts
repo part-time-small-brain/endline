@@ -1,4 +1,4 @@
-import { EXPIRY_TIME_OF_DAY, SECONDS_PER_DAY as DAY_SEC } from "@near-options/sdk";
+import { EXPIRY_TIME_OF_DAY, SECONDS_PER_DAY as DAY_SEC } from "@endline/sdk";
 
 const local = (options: Intl.DateTimeFormatOptions) => new Intl.DateTimeFormat(undefined, options);
 const weekday = local({ weekday: "short" });

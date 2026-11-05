@@ -1,4 +1,4 @@
-import type { ListedSeries, Mark, OptionKind } from "@near-options/sdk";
+import type { ListedSeries, Mark, OptionKind } from "@endline/sdk";
 import { payoutMultiple, type Ticket, ticket } from "./ticket.ts";
 
 export interface GridCell {

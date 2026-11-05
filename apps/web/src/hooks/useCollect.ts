@@ -1,4 +1,4 @@
-import { CLAIM_WINDOW_SEC, exerciseOptions, type Diff, payload, type SignedPayload, toSign } from "@near-options/sdk";
+import { CLAIM_WINDOW_SEC, exerciseOptions, type Diff, payload, type SignedPayload, toSign } from "@endline/sdk";
 import { useCallback, useState } from "react";
 import { refusedOr } from "../api/relay.ts";
 import { useApp } from "../app/context.ts";

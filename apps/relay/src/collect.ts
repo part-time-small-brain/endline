@@ -1,5 +1,5 @@
 import { isDeepStrictEqual } from "node:util";
-import { exerciseOptions, type Fill, type Intent, longPayout, MIN_RELAYED_PAYOUT_USD, maxPayout, parseTokenId, readPayload, relayedTransfer, type Series, type SignedPayload, termsOf, transferFee } from "@near-options/sdk";
+import { exerciseOptions, type Fill, type Intent, longPayout, MIN_RELAYED_PAYOUT_USD, maxPayout, parseTokenId, readPayload, relayedTransfer, type Series, type SignedPayload, termsOf, transferFee } from "@endline/sdk";
 import type { Claims } from "./claims.ts";
 import type { Config } from "./config.ts";
 import type { Fills } from "./fills.ts";

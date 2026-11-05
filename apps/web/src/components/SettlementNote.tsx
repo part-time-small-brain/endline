@@ -1,4 +1,4 @@
-import { longPayout, termsOf } from "@near-options/sdk";
+import { longPayout, termsOf } from "@endline/sdk";
 import type { ReactNode } from "react";
 import type { PositionView } from "../app/usePositions.ts";
 import { formatPrice, formatUsd } from "../lib/money.ts";

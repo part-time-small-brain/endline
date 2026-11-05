@@ -1,4 +1,4 @@
-import { capPrice, maxPayout } from "@near-options/sdk";
+import { capPrice, maxPayout } from "@endline/sdk";
 import { CaretDown, Info } from "@phosphor-icons/react";
 import type { ReactNode } from "react";
 import type { useTicket } from "../app/useTicket.ts";

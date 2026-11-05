@@ -9,25 +9,25 @@ x-app: &app
 services:
   relay:
     <<: *app
-    command: pnpm --filter @near-options/relay start
+    command: pnpm --filter @endline/relay start
     environment: [NETWORK_ID, NEAR_RPC_URL, INTENTS_ID, OPTIONS_ID, QUOTE_ASSET, RELAYER_ACCOUNT_ID, RELAYER_PRIVATE_KEY, MM_API_KEYS, FAUCET, ONECLICK_JWT, PORT=8787, DATA_DIR=/data, TRUST_PROXY=true]
     volumes: [relay-data:/data]
   mm:
     <<: *app
-    command: pnpm --filter @near-options/mm start
+    command: pnpm --filter @endline/mm start
     environment: [NETWORK_ID, NEAR_RPC_URL, INTENTS_ID, OPTIONS_ID, MM_ACCOUNT_ID, MM_PRIVATE_KEY, MM_API_KEY, ALERT_WEBHOOK_URL, RELAY_WS_URL=ws://relay:8787/mm]
     depends_on: [relay]
   lister:
     <<: *app
-    command: pnpm --filter @near-options/mm start list
+    command: pnpm --filter @endline/mm start list
     environment: [NEAR_RPC_URL, INTENTS_ID, OPTIONS_ID, MM_ACCOUNT_ID, MM_PRIVATE_KEY]
   monitor:
     <<: *app
-    command: pnpm --filter @near-options/mm start monitor
+    command: pnpm --filter @endline/mm start monitor
     environment: [NETWORK_ID, NEAR_RPC_URL, INTENTS_ID, OPTIONS_ID, RELAYER_ACCOUNT_ID, ALERT_WEBHOOK_URL, "HEALTH_URL=${HEALTH_URL:-http://web/health}"]
   proposer:
     <<: *app
-    command: pnpm --filter @near-options/mm start propose
+    command: pnpm --filter @endline/mm start propose
     environment: [NEAR_RPC_URL, OPTIONS_ID, "ORACLE_ACCOUNT_ID=${ORACLE_ACCOUNT_ID:-$RELAYER_ACCOUNT_ID}", "ORACLE_PRIVATE_KEY=${ORACLE_PRIVATE_KEY:-$RELAYER_PRIVATE_KEY}"]
   web:
     image: near-options-web

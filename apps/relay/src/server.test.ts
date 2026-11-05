@@ -2,7 +2,7 @@ import { mkdtempSync } from "node:fs";
 import { type AddressInfo, connect as rawConnect } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { Quote, QuoteEvent } from "@near-options/sdk";
+import type { Quote, QuoteEvent } from "@endline/sdk";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { WebSocket } from "ws";
 import { Auctions } from "./auction.ts";

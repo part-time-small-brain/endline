@@ -1,4 +1,4 @@
-import { toSign, type QuoteRequest, type StatusUpdate } from "@near-options/sdk";
+import { toSign, type QuoteRequest, type StatusUpdate } from "@endline/sdk";
 import type { Page, Route } from "@playwright/test";
 import { expect, handleOf, money, term, test } from "./fixtures.ts";
 

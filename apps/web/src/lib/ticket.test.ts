@@ -1,4 +1,4 @@
-import { longPayout } from "@near-options/sdk";
+import { longPayout } from "@endline/sdk";
 import { describe, expect, it } from "vitest";
 import { goodCase, payoutMultiple, type Ticket, ticket } from "./ticket.ts";
 

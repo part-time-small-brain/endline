@@ -1,4 +1,4 @@
-import { CLAIM_WINDOW_SEC, closeOptions, intentsAssetId, type Series } from "@near-options/sdk";
+import { CLAIM_WINDOW_SEC, closeOptions, intentsAssetId, type Series } from "@endline/sdk";
 import { expect, it, vi } from "vitest";
 import type { Config } from "./config.ts";
 import { listCommand } from "./list.ts";

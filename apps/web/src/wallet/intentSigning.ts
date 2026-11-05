@@ -1,4 +1,4 @@
-import type { SignedPayload, Unsigned } from "@near-options/sdk";
+import type { SignedPayload, Unsigned } from "@endline/sdk";
 import { base58, base64, hex } from "@scure/base";
 
 type Nep413 = Extract<Unsigned, { standard: "nep413" }>;

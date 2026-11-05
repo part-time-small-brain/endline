@@ -1,4 +1,4 @@
-import { buyDiffs, type Fill, intentsAssetId, isListed, longPayout, MIN_RELAYED_PAYOUT_USD, payload, type Quote, readPayload, type Series, sellDiffs, type StatusUpdate, termsOf, tokenDiff, toSign } from "@near-options/sdk";
+import { buyDiffs, type Fill, intentsAssetId, isListed, longPayout, MIN_RELAYED_PAYOUT_USD, payload, type Quote, readPayload, type Series, sellDiffs, type StatusUpdate, termsOf, tokenDiff, toSign } from "@endline/sdk";
 import { base58 } from "@scure/base";
 import type { Chain } from "../api/chain.ts";
 import type { Market } from "../api/market.ts";

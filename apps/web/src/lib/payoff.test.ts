@@ -1,4 +1,4 @@
-import { capPrice, longPayout, type Terms } from "@near-options/sdk";
+import { capPrice, longPayout, type Terms } from "@endline/sdk";
 import { describe, expect, it } from "vitest";
 import { breakeven, costOf, sizeForBudget } from "./payoff.ts";
 

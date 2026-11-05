@@ -1,5 +1,5 @@
 {
-  "name": "@near-options/mm",
+  "name": "@endline/mm",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "@defuse-protocol/intents-sdk": "^0.92.0",
-    "@near-options/sdk": "workspace:*",
+    "@endline/sdk": "workspace:*",
     "@nktkas/hyperliquid": "^0.33.3",
     "near-api-js": "^7.3.1",
     "viem": "^2.57.10",

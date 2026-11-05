@@ -1,4 +1,4 @@
-import { MmMessage, type Mark, type QuoteEvent, type QuoteResponse, RelayMessage, type StatusUpdate } from "@near-options/sdk";
+import { MmMessage, type Mark, type QuoteEvent, type QuoteResponse, RelayMessage, type StatusUpdate } from "@endline/sdk";
 import WebSocket from "ws";
 
 const RECONNECT_MS = 2_000;

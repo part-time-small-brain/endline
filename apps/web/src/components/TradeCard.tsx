@@ -1,4 +1,4 @@
-import type { ListedSeries } from "@near-options/sdk";
+import type { ListedSeries } from "@endline/sdk";
 import { capLabel, seriesTitle } from "../lib/labels.ts";
 import { formatToken } from "../lib/money.ts";
 import { formatEnds, formatUtc } from "../lib/time.ts";

@@ -1,4 +1,4 @@
-import { ChartLine, Plus, SignOut, Stack } from "@phosphor-icons/react";
+import { ChartLine, Plus, SignOut, Stack, Wallet } from "@phosphor-icons/react";
 import { useApp } from "../app/context.ts";
 import { useData } from "../app/data.tsx";
 import { Link } from "../app/router.tsx";
@@ -82,7 +82,7 @@ export function Header({ route, open, toCollect, onConnect, onAddFunds }: Props)
   return (
     <header className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 px-4 py-1.5 sm:min-h-16 sm:px-6 sm:py-0 near:border-b near:border-rule">
       <div className="flex shrink-0 items-center gap-3">
-        <Link href={PATHS.landing} aria-label="near·options home" className="-m-2 rounded-lg p-2 sm:m-0 sm:p-0">
+        <Link href={PATHS.landing} aria-label="Endline home" className="-m-2 rounded-lg p-2 sm:m-0 sm:p-0">
           <span className="hidden sm:inline">
             <Wordmark />
           </span>
@@ -117,7 +117,7 @@ export function Header({ route, open, toCollect, onConnect, onAddFunds }: Props)
               button={
                 <>
                   <span className="grid size-11 place-items-center rounded-[10px] bg-ink text-on-ink xl:size-10">
-                    <Mark size={22} />
+                    <Wallet size={22} weight="bold" aria-hidden="true" />
                   </span>
                   <span className="hidden xl:inline">{short(wallet.accountId)}</span>
                 </>

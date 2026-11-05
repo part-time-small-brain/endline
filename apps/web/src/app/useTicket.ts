@@ -1,4 +1,4 @@
-import { defaultExpiry, type ListedSeries, longPayout, type OptionKind } from "@near-options/sdk";
+import { defaultExpiry, type ListedSeries, longPayout, type OptionKind } from "@endline/sdk";
 import { useState } from "react";
 import type { Side } from "../components/trade/DirectionPicker.tsx";
 import { parseBudget, toNumber, toUnits } from "../lib/money.ts";

@@ -1,4 +1,4 @@
-import type { QuoteResponse } from "@near-options/sdk";
+import type { QuoteResponse } from "@endline/sdk";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Auctions, MAX_WAIT_MS, MIN_WAIT_MS } from "./auction.ts";
 import type { Bid } from "./bid.ts";

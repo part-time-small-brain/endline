@@ -1,4 +1,4 @@
-import { capped, YEAR_MS } from "@near-options/sdk";
+import { capped, YEAR_MS } from "@endline/sdk";
 import { describe, expect, it } from "vitest";
 import { SETTINGS, testDesk } from "./fixtures/desk.ts";
 import { contractPrice, premiumUsd, toQuoteUnits } from "./pricing.ts";

@@ -4,7 +4,7 @@ Rules for every human and AI agent working in this repo. Short on purpose. Read 
 
 ## What this is
 
-Cross-chain crypto options settled through NEAR Intents. European, cash-settled BTC/ETH calls and puts with a capped payout, fully collateralized in USDC. Option series are NEP-245 tokens that trade inside `intents.near` via `token_diff`. Start with `docs/README.md`, then `docs/system.md`.
+Endline: cross-chain crypto options settled through NEAR Intents. European, cash-settled BTC/ETH calls and puts with a capped payout, fully collateralized in USDC. Option series are NEP-245 tokens that trade inside `intents.near` via `token_diff`. Start with `docs/README.md`, then `docs/system.md`.
 
 ## Layout
 
@@ -32,9 +32,9 @@ cargo test -p options -p oracle
 cargo clippy --workspace --all-targets -- -D warnings
 cargo fmt --all
 pnpm install && pnpm -r test && pnpm -r typecheck
-pnpm --filter @near-options/web build
-pnpm --filter @near-options/web test:e2e
-pnpm --filter @near-options/docs build
+pnpm --filter @endline/web build
+pnpm --filter @endline/web test:e2e
+pnpm --filter @endline/docs build
 
 (cd contracts/options && cargo near build non-reproducible-wasm)
 cargo build -p oracle --target wasm32-wasip2 --release

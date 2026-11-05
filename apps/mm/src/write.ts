@@ -1,4 +1,4 @@
-import { Amount, writeOptions } from "@near-options/sdk";
+import { Amount, writeOptions } from "@endline/sdk";
 import { Chain } from "./chain.ts";
 import type { Config } from "./config.ts";
 

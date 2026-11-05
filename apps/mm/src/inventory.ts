@@ -1,4 +1,4 @@
-import type { Diff } from "@near-options/sdk";
+import type { Diff } from "@endline/sdk";
 
 export const CHAIN_LAG_MS = 3_000;
 

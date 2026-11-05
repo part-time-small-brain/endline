@@ -1,4 +1,4 @@
-import { payload, SignedPayload, tokenDiff, toSign, type Unsigned } from "@near-options/sdk";
+import { payload, SignedPayload, tokenDiff, toSign, type Unsigned } from "@endline/sdk";
 import { base58, base64 } from "@scure/base";
 import { describe, expect, it } from "vitest";
 import { erc191Signed, nep413Signed } from "./intentSigning.ts";

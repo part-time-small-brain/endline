@@ -1,4 +1,4 @@
-import { defaultExpiry, isListed, type Mark, type OptionKind, type Series } from "@near-options/sdk";
+import { defaultExpiry, isListed, type Mark, type OptionKind, type Series } from "@endline/sdk";
 import { useState } from "react";
 import type { PricePoint } from "../../api/market.ts";
 import { useData } from "../../app/data.tsx";

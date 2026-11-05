@@ -1,20 +1,20 @@
-# @near-options/web
+# @endline/web
 
 The consumer app: pick BTC/ETH, Up or Down, a date, a price to beat and a dollar amount, then buy with one signature (the first quote also asks for a [session](../../docs/rfq.md#sessions-and-open-quotes) signature, valid 24 h). Trade defaults to Lite for every user; a header Lite/Pro/Tap toggle (kept in `localStorage`, Lite when unset) opens the existing chart ticket or the tap grid. Flows, copy and the quote countdown follow [docs/ux.md](../../docs/ux.md).
 
 ## Run
 
 ```bash
-VITE_MOCK=1 pnpm --filter @near-options/web dev
-pnpm --filter @near-options/web test
-pnpm --filter @near-options/web test:e2e
-pnpm --filter @near-options/web typecheck
-pnpm --filter @near-options/web build
+VITE_MOCK=1 pnpm --filter @endline/web dev
+pnpm --filter @endline/web test
+pnpm --filter @endline/web test:e2e
+pnpm --filter @endline/web typecheck
+pnpm --filter @endline/web build
 ```
 
 Mock mode needs no backend: a demo wallet with $250, a mock relay on the real protocol types (its marks and quotes are Black-76 at a fixed vol per asset, ±1.5 vol points), and positions in every state (active, settling, proposed price, ready to collect, expired). NEAR and EVM wallets work too; signatures are real, settlement is fake.
 
-`test:e2e` runs the Playwright suite in `e2e/` against its own dev servers (Chromium): the mock at 1440 and 390 wide, light and dark; a testnet-like mock (`VITE_MOCK=1 VITE_NETWORK=testnet`: faucet, copy leaks); and a live config whose relay, RPC and Deribit answers the tests stub per route (landing with no relay, ticket with no or some marks). `Math.random` is seeded and the page clock starts at `E2E_NOW` (default `2026-11-04T12:00:00Z`), so the mock market is the same on every run. First run: `pnpm --filter @near-options/web exec playwright install chromium`.
+`test:e2e` runs the Playwright suite in `e2e/` against its own dev servers (Chromium): the mock at 1440 and 390 wide, light and dark; a testnet-like mock (`VITE_MOCK=1 VITE_NETWORK=testnet`: faucet, copy leaks); and a live config whose relay, RPC and Deribit answers the tests stub per route (landing with no relay, ticket with no or some marks). `Math.random` is seeded and the page clock starts at `E2E_NOW` (default `2026-11-04T12:00:00Z`), so the mock market is the same on every run. First run: `pnpm --filter @endline/web exec playwright install chromium`.
 
 Against testnet with a running relay and MM: [docs/system.md](../../docs/system.md#testnet-from-scratch). On testnet there is no 1Click: the deposit sheet's "Get 100 test USDC" calls the relay's `POST /faucet` (once a day per account and IP).
 

@@ -37,9 +37,9 @@ Deribit must list options on it (the market maker prices from Deribit's vol) and
 
 Options need a seller. The market maker is that seller:
 1. **Creates inventory.** It locks USDC in the contract, the most each option can pay (its width), and gets long + short tokens. Nobody can buy an option until someone has written it.
-2. **Prices it.** A capped bet is two options, one at the strike and one at the cap, each priced with Black-76 on Deribit's volatility, plus a spread. The spread is the house's income.
+2. **Prices it.** A capped Up or Down is two options, one at the strike and one at the cap, each priced with Black-76 on Deribit's volatility, plus a spread. The spread is the house's income.
 3. **Takes the other side.** It sells longs to buyers and buys them back from sellers.
-4. **Hedges.** Selling calls leaves it short BTC. It offsets that with a Hyperliquid perp, so it earns the spread instead of betting on direction. Off unless a key is set.
+4. **Hedges.** Selling calls leaves it short BTC. It offsets that with a Hyperliquid perp, so it earns the spread instead of taking a view on direction. Off unless a key is set.
 
 It can't run away with user money: every option is fully collateralized inside the contract from the moment it exists.
 
@@ -95,14 +95,14 @@ Use `https://rpc.testnet.fastnear.com`. `rpc.testnet.near.org` is deprecated and
 | What | How |
 |---|---|
 | Tests, lint, builds | [AGENTS.md#commands](../AGENTS.md#commands) |
-| Web with no backend | `VITE_MOCK=1 pnpm --filter @near-options/web dev` |
-| Settlement monitor | `NEAR_RPC_URL=… OPTIONS_ID=… pnpm --filter @near-options/mm start monitor` ([mm README](../apps/mm/README.md#settlement-monitor)) |
-| Mainnet settler | `NEAR_RPC_URL=… OPTIONS_ID=… RELAYER_ACCOUNT_ID=… RELAYER_PRIVATE_KEY=… pnpm --filter @near-options/mm start settle` ([mm README](../apps/mm/README.md#mainnet-settler)). Not in compose: the hosted stack is testnet |
+| Web with no backend | `VITE_MOCK=1 pnpm --filter @endline/web dev` |
+| Settlement monitor | `NEAR_RPC_URL=… OPTIONS_ID=… pnpm --filter @endline/mm start monitor` ([mm README](../apps/mm/README.md#settlement-monitor)) |
+| Mainnet settler | `NEAR_RPC_URL=… OPTIONS_ID=… RELAYER_ACCOUNT_ID=… RELAYER_PRIVATE_KEY=… pnpm --filter @endline/mm start settle` ([mm README](../apps/mm/README.md#mainnet-settler)). Not in compose: the hosted stack is testnet |
 | Full stack on testnet | Below. Env meanings: [relay](../apps/relay/README.md#env), [mm](../apps/mm/README.md#env), [web](../apps/web/README.md#env) |
 
 ### Hosting
 
-The testnet stack runs 24/7 on a home server reached over Tailscale, behind a Cloudflare quick tunnel: no open ports, server IP hidden. Quick-tunnel URLs change on restart; a named tunnel on our own domain replaces it before judging.
+The testnet stack runs 24/7 on a single Docker host reached over SSH, behind a Cloudflare quick tunnel: no open ports, server IP hidden. Quick-tunnel URLs change on restart; a named tunnel on our own domain replaces it before judging.
 
 | Container | Role |
 |---|---|
@@ -136,27 +136,27 @@ Each container gets only its own variables from `deploy/.env` (template: `deploy
    near contract call-function as-transaction intents.<root>.testnet add_public_key \
      json-args '{"public_key":"ed25519:…"}' prepaid-gas '30 Tgas' attached-deposit '1 yoctoNEAR' sign-as <mm>.testnet …
    ```
-5. **Create a series.** The lister (`pnpm --filter @near-options/mm start list`, MM env) keeps a rolling set listed and stocked. One-off: `scripts/demo-series.sh BTC|ETH <minutes-ahead> <strike-usd> <width-usd> call|put <usdc-units>` creates it and has the MM (from `deploy/testnet.json`) write inventory. By hand (anyone): Expiry: unix seconds on a whole minute, at least ~3 min out (the MM stops 60 s before expiry), at most 7 days. Strike and width in USDC units, whole cents; a put's width is below its strike. Only the lister's width (`listedWidth`: 2 strike steps, BTC $2,000 between ~$66.7k and $133k, ETH $40 between ~$1,333 and $3,333) gets quoted; others are listed but never tradable through the relay. Excess deposit is refunded.
+5. **Create a series.** The lister (`pnpm --filter @endline/mm start list`, MM env) keeps a rolling set listed and stocked. One-off: `scripts/demo-series.sh BTC|ETH <minutes-ahead> <strike-usd> <width-usd> call|put <usdc-units>` creates it and has the MM (from `deploy/testnet.json`) write inventory. By hand (anyone): Expiry: unix seconds on a whole minute, at least ~3 min out (the MM stops 60 s before expiry), at most 7 days. Strike and width in USDC units, whole cents; a put's width is below its strike. Only the lister's width (`listedWidth`: 2 strike steps, BTC $2,000 between ~$66.7k and $133k, ETH $40 between ~$1,333 and $3,333) gets quoted; others are listed but never tradable through the relay. Excess deposit is refunded.
    ```bash
    near contract call-function as-transaction opt.<root>.testnet create_series \
      json-args '{"underlying":"BTC","strike":"110000000000","width":"2000000000","expiry":<unix>,"kind":"call"}' \
      prepaid-gas '30 Tgas' attached-deposit '0.1 NEAR' sign-as <you>.testnet …
    ```
-6. **Run relay, MM, web**, one shell each, each starting with the `export` line (values for the shared environment). Write inventory with the MM env set: `pnpm --filter @near-options/mm start write <series_id> <collateral units>`.
+6. **Run relay, MM, web**, one shell each, each starting with the `export` line (values for the shared environment). Write inventory with the MM env set: `pnpm --filter @endline/mm start write <series_id> <collateral units>`.
    ```bash
    export NEAR_RPC_URL=https://rpc.testnet.fastnear.com INTENTS_ID=intents.near-options-dev.testnet \
      OPTIONS_ID=opt3.near-options-dev.testnet QUOTE_ASSET=nep141:usdc.near-options-dev.testnet
 
    NETWORK_ID=testnet DATA_DIR=data RELAYER_ACCOUNT_ID=<relayer>.testnet RELAYER_PRIVATE_KEY=ed25519:… \
-     MM_API_KEYS=<key of 16+ chars> pnpm --filter @near-options/relay start
+     MM_API_KEYS=<key of 16+ chars> pnpm --filter @endline/relay start
 
    MM_ACCOUNT_ID=<mm>.testnet MM_PRIVATE_KEY=ed25519:… RELAY_WS_URL=ws://localhost:8080/mm MM_API_KEY=<same key> \
-     pnpm --filter @near-options/mm start
+     pnpm --filter @endline/mm start
 
    VITE_RELAY_URL=http://localhost:8080 VITE_NETWORK=testnet VITE_RPC_URL=$NEAR_RPC_URL VITE_INTENTS_ID=$INTENTS_ID \
-     VITE_OPTIONS_ID=$OPTIONS_ID VITE_QUOTE_ASSET=$QUOTE_ASSET pnpm --filter @near-options/web dev
+     VITE_OPTIONS_ID=$OPTIONS_ID VITE_QUOTE_ASSET=$QUOTE_ASSET pnpm --filter @endline/web dev
    ```
-7. **Trade.** In the web app, or from a terminal with `apps/mm/src/smoke.ts` ([mm README](../apps/mm/README.md#run)). Use series 1–2 h out and sizes near the trade cap: minutes before expiry, small options are worth under the MM's $1 minimum, so it won't quote or buy them back. For bigger demo trades raise `MAX_TRADE_USD` and `MAX_DELTA_USD` on the testnet MM: near expiry a capped bet's delta approaches one per contract.
+7. **Trade.** In the web app, or from a terminal with `apps/mm/src/smoke.ts` ([mm README](../apps/mm/README.md#run)). Use series 1–2 h out and sizes near the trade cap: minutes before expiry, small options are worth under the MM's $1 minimum, so it won't quote or buy them back. For bigger demo trades raise `MAX_TRADE_USD` and `MAX_DELTA_USD` on the testnet MM: near expiry a capped option's delta approaches one per contract.
 8. **Settle.** The [proposer](../apps/mm/README.md#testnet-proposer) does it; by hand, `<root>` proposes the price from expiry + 10 min (price in USDC units):
    ```bash
    near contract call-function as-transaction opt.<root>.testnet propose_settlement \
@@ -172,8 +172,8 @@ Each container gets only its own variables from `deploy/.env` (template: `deploy
 |---|---|
 | Pages | `apps/docs/content/docs/*.mdx` for users, `developers/*.mdx` for developers. Order: `meta.json` in each folder |
 | Theme | `apps/docs/app/global.css` only |
-| Preview | `pnpm --filter @near-options/docs dev`, then http://localhost:3000/docs |
-| Build | `pnpm --filter @near-options/docs build`: static files, search index (`api/search`), `llms.txt` and `llms-full.txt` in `apps/docs/out` |
+| Preview | `pnpm --filter @endline/docs dev`, then http://localhost:3000/docs |
+| Build | `pnpm --filter @endline/docs build`: static files, search index (`api/search`), `llms.txt` and `llms-full.txt` in `apps/docs/out` |
 | Serving | The `web` image copies `out` to `/srv/docs`; Caddy serves `/docs` and `/docs/*`, with `/docs/404.html` for misses |
 | Base path | `DOCS_BASE_PATH`, default `/docs`. For a `docs.<domain>` root, build with `DOCS_BASE_PATH=` and give it its own Caddy site block |
 

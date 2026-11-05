@@ -1,4 +1,4 @@
-import { verifyDepositQuote } from "@near-options/sdk";
+import { verifyDepositQuote } from "@endline/sdk";
 import { z } from "zod";
 
 const DepositAsset = z.object({ assetId: z.string(), symbol: z.string(), blockchain: z.string(), decimals: z.number().int() });

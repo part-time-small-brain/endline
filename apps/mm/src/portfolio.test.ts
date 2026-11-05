@@ -1,4 +1,4 @@
-import { capped, YEAR_MS } from "@near-options/sdk";
+import { capped, YEAR_MS } from "@endline/sdk";
 import { describe, expect, it } from "vitest";
 import { CALL, DEMO_PUT, long, NOW, PAIRS, PUT, short, USDC } from "./fixtures/desk.ts";
 import { type Book, exposure, liveAssets, type SeriesMark } from "./portfolio.ts";

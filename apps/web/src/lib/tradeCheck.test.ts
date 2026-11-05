@@ -1,4 +1,4 @@
-import type { Payload, Quote } from "@near-options/sdk";
+import type { Payload, Quote } from "@endline/sdk";
 import { describe, expect, it } from "vitest";
 import { checkTrade, type Expected } from "./tradeCheck.ts";
 
