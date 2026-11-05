@@ -1,4 +1,4 @@
-import { toSign, type QuoteRequest, type StatusUpdate } from "@endline/sdk";
+import { type Mark, toSign, type QuoteRequest, type StatusUpdate } from "@endline/sdk";
 import type { Page, Route } from "@playwright/test";
 import { expect, handleOf, money, term, test } from "./fixtures.ts";
 
@@ -634,7 +634,7 @@ test.describe("Tap", () => {
 
   test("a held cell shows what it's worth and its P&L, and glows and flashes each time spot crosses its price to beat", async ({ page }) => {
     let index = 80_650;
-    let marks = [{ series_id: "BTC-5NOV26-81000_83000-C", ask: String(400 * USD), bid: String(380 * USD), vol: 0.4 }];
+    let marks: Mark[] = [{ series_id: "BTC-5NOV26-81000_83000-C", ask: String(400 * USD), bid: String(380 * USD), vol: 0.4 }];
     const token = "nep245:opt.demo.testnet:BTC-5NOV26-81000_83000-C";
     await page.addInitScript(() => {
       (window as unknown as { ethereum: object }).ethereum = {
