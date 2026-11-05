@@ -102,7 +102,7 @@ Use `https://rpc.testnet.fastnear.com`. `rpc.testnet.near.org` is deprecated and
 
 ### Hosting
 
-The testnet stack runs 24/7 on a home server reached over Tailscale, behind a Cloudflare quick tunnel: no open ports, server IP hidden. Quick-tunnel URLs change on restart; a named tunnel on our own domain replaces it before judging.
+The testnet stack runs 24/7 on a single Docker host reached over SSH, behind a Cloudflare quick tunnel: no open ports, server IP hidden. Quick-tunnel URLs change on restart; a named tunnel on our own domain replaces it before judging.
 
 | Container | Role |
 |---|---|

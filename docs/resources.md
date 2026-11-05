@@ -64,7 +64,7 @@ API docs: https://docs.deribit.com. Each venue's public market-data docs are lin
 
 | What | Where |
 |---|---|
-| Research with citations (prior art, intents internals, oracle, RFQ/MM, UX) | `.research/` |
+| Research with citations (prior art, intents internals, oracle, RFQ/MM, UX) | Local research notes (not published) |
 | Deployed testnet account ids | `deploy/testnet.json` |
 | Cross-language test vectors | `testdata/vectors.json` |
 | Recorded API responses for oracle tests | `oracle/tests/fixtures/` |

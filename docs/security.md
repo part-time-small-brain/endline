@@ -85,4 +85,4 @@ Not built yet:
 
 ## Sources
 
-Full evidence and links in `.research/prior-art.md`, `.research/near-intents-internals.md`, `.research/oracle.md`.
+Full evidence and links are in our research notes, which are not published.

@@ -6,13 +6,13 @@ The hosted testnet stack: what's running, how to deploy, and what to do when an 
 
 | What | Where |
 |---|---|
-| Server | Windows box `nero-claw`, Docker Desktop, over Tailscale: `ssh 100.93.105.83` (PowerShell) |
-| Compose dir | `C:\Users\neros\near-options\deploy` (`compose.yaml`, `.env`). Run every server command below from here: `cd near-options\deploy` |
+| Server | A Docker host (Docker Desktop on Windows, PowerShell) reached over SSH: `ssh <server>` |
+| Compose dir | `<deploy-dir>` on the server (`compose.yaml`, `.env`). Run every server command below from here: `cd <deploy-dir>` |
 | Public URL | Cloudflare quick tunnel, changes whenever `tunnel` restarts ([below](#public-url)) |
 | Alerts | `monitor` logs, plus `ALERT_WEBHOOK_URL` when set |
 | Ids | `deploy/testnet.json`. Owner, oracle and relayer: `near-options-dev.testnet`. MM and lister: `near-options-funder-1.testnet` |
 
-From the Mac, run any server command in one go: `ssh 100.93.105.83 "cd near-options/deploy; docker compose ps"`.
+From the Mac, run any server command in one go: `ssh <server> "cd <deploy-dir>; docker compose ps"`.
 
 ## Status and logs
 
@@ -49,9 +49,9 @@ Build on the Mac (OrbStack); the server never builds or pulls. Images go over as
 
 ```bash
 docker compose -f deploy/compose.yaml --env-file deploy/env.example build
-docker save --platform linux/amd64 near-options-app near-options-web | ssh 100.93.105.83 docker load
-scp deploy/compose.yaml 100.93.105.83:near-options/deploy/   # only if it changed
-ssh 100.93.105.83 "cd near-options/deploy; docker compose up -d --no-build --pull never relay mm lister monitor proposer web"
+docker save --platform linux/amd64 near-options-app near-options-web | ssh <server> docker load
+scp deploy/compose.yaml <server>:<deploy-dir>/   # only if it changed
+ssh <server> "cd <deploy-dir>; docker compose up -d --no-build --pull never relay mm lister monitor proposer web"
 ```
 
 - `env.example` holds the testnet ids that get baked into the web build; no secrets go into an image. The `Caddyfile` is baked into `near-options-web` too: a change ships with the image.
