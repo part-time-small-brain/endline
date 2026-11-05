@@ -128,8 +128,7 @@ export function HeroDots({ still }: { still: boolean }) {
       <canvas ref={ref} aria-hidden="true" className="pointer-events-none absolute inset-0 size-full" />
       <div
         ref={lineRef}
-        aria-hidden="true"
-        className="pointer-events-none absolute top-0 left-0 h-0.5 bg-linear-to-r from-transparent via-ink to-transparent opacity-0"
+        className="pointer-events-none absolute top-0 left-0 h-[2px] bg-linear-to-r from-transparent via-ink to-transparent opacity-0"
         style={{ width: REACH.x * 2 }}
       />
     </>
