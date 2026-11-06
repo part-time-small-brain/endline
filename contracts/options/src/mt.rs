@@ -148,7 +148,7 @@ impl Contract {
     }
 }
 
-fn unused_amounts(amounts: &[U128], to_intents: bool) -> Vec<u128> {
+pub(crate) fn unused_amounts(amounts: &[U128], to_intents: bool) -> Vec<u128> {
     let full = amounts.iter().map(|a| a.0).collect();
     let answer = match env::promise_result_checked(0, 4096) {
         Err(PromiseError::Failed) => return full,
@@ -187,7 +187,7 @@ impl Contract {
         let key = (token_id.to_string(), account_id.clone());
         let balance = self.balances.get(&key).copied().unwrap_or(0);
         require!(balance >= amount, "insufficient balance");
-        if balance == amount {
+        if balance == amount && *account_id != self.intents_id {
             self.balances.remove(&key);
         } else {
             self.balances.insert(key, balance - amount);
@@ -244,7 +244,8 @@ impl Contract {
             receiver_id != self.intents_id && receiver_id != env::current_account_id(),
             "use mt_transfer_call to send to intents or to this contract"
         );
-        self.transfer_from_caller(&receiver_id, &token_ids, &amounts, memo);
+        self.transfer_from_caller(&receiver_id, &token_ids, &amounts, memo)
+            .unwrap_or_else(|reason| env::panic_str(&reason));
     }
 
     fn transfer_call(
@@ -259,7 +260,23 @@ impl Contract {
             receiver_id != self.intents_id || msg.is_empty() || msg.parse::<AccountId>().is_ok(),
             "deposits to intents take an empty msg or an account id"
         );
-        let sender_id = self.transfer_from_caller(&receiver_id, &token_ids, &amounts, memo);
+        let sender_id = match self.transfer_from_caller(&receiver_id, &token_ids, &amounts, memo) {
+            Ok(sender_id) => sender_id,
+            Err(reason) => {
+                env::log_str(&reason);
+                let intents_id = self.intents_id.clone();
+                for (token_id, amount) in token_ids.iter().zip(&amounts) {
+                    self.internal_transfer(
+                        &receiver_id,
+                        &intents_id,
+                        token_id,
+                        amount.0,
+                        Some("storage credit short"),
+                    );
+                }
+                return PromiseOrValue::Value(vec![U128(0); token_ids.len()]);
+            }
+        };
         let previous_owner_ids = vec![sender_id.clone(); token_ids.len()];
         let resolve_gas =
             Gas::from_tgas(GAS_MT_RESOLVE_BASE_TGAS + GAS_MT_RESOLVE_PER_TOKEN_TGAS * token_ids.len() as u64);
@@ -287,7 +304,7 @@ impl Contract {
         token_ids: &[String],
         amounts: &[U128],
         memo: Option<String>,
-    ) -> AccountId {
+    ) -> Result<AccountId, String> {
         require!(
             !token_ids.is_empty() && token_ids.len() <= MAX_BATCH,
             "batch size"
@@ -301,9 +318,10 @@ impl Contract {
         self.balances.flush();
         if sender_id == self.intents_id {
             assert_one_yocto();
+            self.charge_storage_credit(receiver_id, storage_before)?;
         } else {
             charge_storage(storage_before, ONE_YOCTO);
         }
-        sender_id
+        Ok(sender_id)
     }
 }

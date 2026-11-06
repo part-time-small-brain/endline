@@ -11,6 +11,7 @@ const CONTRACT: u128 = 100_000_000;
 const WIDTH: u128 = 100_000_000;
 const DAY: u64 = 86_400;
 const ONE_YOCTO: NearToken = NearToken::from_yoctonear(1);
+const STORAGE_DEPOSIT: NearToken = NearToken::from_millinear(10);
 const MAX_GAS: Gas = Gas::from_tgas(300);
 const NEP413_TAG: u32 = (1 << 31) + 413;
 const NONCE_MAGIC: [u8; 4] = [0x56, 0x28, 0xf6, 0xc6];
@@ -23,6 +24,7 @@ struct Env {
     opt: Contract,
     usdc: Contract,
     fake: Contract,
+    wnear: Contract,
     alice: Account,
     series: String,
 }
@@ -44,6 +46,32 @@ impl Env {
             .await?
             .json()?;
         Ok(v.parse()?)
+    }
+
+    async fn ledger_balance(&self, owner: &AccountId, token_id: &str) -> anyhow::Result<u128> {
+        let v: String = self
+            .opt
+            .view("mt_balance_of")
+            .args_json(json!({"account_id": owner, "token_id": token_id}))
+            .await?
+            .json()?;
+        Ok(v.parse()?)
+    }
+
+    async fn storage_deposit(
+        &self,
+        payer: &Account,
+        account_id: &AccountId,
+        deposit: NearToken,
+    ) -> anyhow::Result<()> {
+        payer
+            .call(self.opt.id(), "storage_deposit")
+            .args_json(json!({"account_id": account_id}))
+            .deposit(deposit)
+            .transact()
+            .await?
+            .into_result()?;
+        Ok(())
     }
 
     async fn locked(&self) -> anyhow::Result<u128> {
@@ -152,7 +180,17 @@ fn signed_transfers(
         .iter()
         .map(|(receiver_id, amount)| json!({"intent": "transfer", "receiver_id": receiver_id, "tokens": {asset: amount.to_string()}}))
         .collect();
-    let message = json!({"deadline": DEADLINE, "intents": transfers, "signer_id": signer_id}).to_string();
+    signed_intents(key, signer_id, intents, transfers, nonce)
+}
+
+fn signed_intents(
+    key: &SigningKey,
+    signer_id: &str,
+    intents: &AccountId,
+    list: Vec<Value>,
+    nonce: [u8; 32],
+) -> Value {
+    let message = json!({"deadline": DEADLINE, "intents": list, "signer_id": signer_id}).to_string();
     let mut nep413 = NEP413_TAG.to_le_bytes().to_vec();
     borsh_string(&mut nep413, &message);
     nep413.extend(nonce);
@@ -295,6 +333,7 @@ async fn setup() -> anyhow::Result<Env> {
         opt,
         usdc,
         fake,
+        wnear,
         alice,
         series,
     })
@@ -449,34 +488,49 @@ async fn withdraw_with_msg_never_loses_options_at_tight_gas() -> anyhow::Result<
             total += env
                 .intents_balance(env.alice.id(), &env.option_asset(token))
                 .await?;
-            let ledger: String = env
-                .opt
-                .view("mt_balance_of")
-                .args_json(json!({"account_id": env.alice.id(), "token_id": token}))
-                .await?
-                .json()?;
-            total += ledger.parse::<u128>()?;
+            total += env.ledger_balance(env.alice.id(), token).await?;
         }
         anyhow::Ok(total)
     };
     let before = held().await?;
-    let mut reached_opt = false;
-    for tx_gas in (100..=200).step_by(4) {
-        let outcome = env
-            .alice
-            .call(env.intents.id(), "mt_withdraw")
-            .args_json(json!({"token": env.opt.id(), "receiver_id": env.alice.id(), "token_ids": tokens, "amounts": vec!["1000"; tokens.len()], "msg": "x"}))
-            .deposit(ONE_YOCTO)
-            .gas(Gas::from_tgas(tx_gas))
-            .transact()
-            .await?;
-        reached_opt |= outcome
-            .receipt_outcomes()
-            .iter()
-            .any(|r| r.executor_id == *env.opt.id());
-        assert_eq!(held().await?, before, "options lost at {tx_gas} TGas");
+    for credit in [false, true] {
+        if credit {
+            env.storage_deposit(&env.alice, env.alice.id(), NearToken::from_near(1))
+                .await?;
+        }
+        let mut reached_opt = false;
+        let mut short_of_credit = false;
+        for tx_gas in (100..=200).step_by(4) {
+            let outcome = env
+                .alice
+                .call(env.intents.id(), "mt_withdraw")
+                .args_json(json!({"token": env.opt.id(), "receiver_id": env.alice.id(), "token_ids": tokens, "amounts": vec!["1000"; tokens.len()], "msg": "x"}))
+                .deposit(ONE_YOCTO)
+                .gas(Gas::from_tgas(tx_gas))
+                .transact()
+                .await?;
+            reached_opt |= outcome
+                .receipt_outcomes()
+                .iter()
+                .any(|r| r.executor_id == *env.opt.id());
+            short_of_credit |= outcome
+                .logs()
+                .iter()
+                .any(|l| l.contains("more yoctoNEAR of storage credit"));
+            assert_eq!(
+                held().await?,
+                before,
+                "options lost at {tx_gas} TGas, credit {credit}"
+            );
+        }
+        assert!(reached_opt, "intents never called the options contract");
+        assert_eq!(short_of_credit, !credit);
+        if !credit {
+            for token in &tokens {
+                assert_eq!(env.ledger_balance(env.alice.id(), token).await?, 0);
+            }
+        }
     }
-    assert!(reached_opt, "intents never called the options contract");
     Ok(())
 }
 
@@ -491,6 +545,8 @@ async fn ledger_options_reach_intents_only_as_plain_deposits() -> anyhow::Result
     )
     .await?
     .into_result()?;
+    env.storage_deposit(&env.alice, env.alice.id(), STORAGE_DEPOSIT)
+        .await?;
     env.alice
         .call(env.intents.id(), "mt_withdraw")
         .args_json(json!({"token": env.opt.id(), "receiver_id": env.alice.id(), "token_ids": [env.series], "amounts": [CONTRACT.to_string()]}))
@@ -518,13 +574,10 @@ async fn ledger_options_reach_intents_only_as_plain_deposits() -> anyhow::Result
 
     assert_eq!(env.intents_balance(env.alice.id(), &long).await?, CONTRACT / 4);
     assert_eq!(env.intents_balance(bob.id(), &long).await?, CONTRACT / 4);
-    let ledger: String = env
-        .opt
-        .view("mt_balance_of")
-        .args_json(json!({"account_id": env.alice.id(), "token_id": env.series}))
-        .await?
-        .json()?;
-    assert_eq!(ledger.parse::<u128>()?, CONTRACT / 2);
+    assert_eq!(
+        env.ledger_balance(env.alice.id(), &env.series).await?,
+        CONTRACT / 2
+    );
     Ok(())
 }
 
@@ -724,5 +777,162 @@ async fn derived_key_pays_from_its_implicit_account_without_registration() -> an
     );
     assert_panicked_with(&execute(&forged).await?, "doesn't exist for account");
     assert_eq!(balances().await?, expected);
+    Ok(())
+}
+
+async fn write_and_add_bob(env: &Env) -> anyhow::Result<(Account, Vec<String>)> {
+    env.send_to_opt(
+        &[&asset(&env.usdc)],
+        &[WIDTH],
+        json!({"action": "write", "series_id": env.series}),
+    )
+    .await?
+    .into_result()?;
+    let bob = env
+        .worker
+        .root_account()?
+        .create_subaccount("bob")
+        .initial_balance(NearToken::from_near(5))
+        .transact()
+        .await?
+        .into_result()?;
+    Ok((bob, vec![env.series.clone(), format!("{}-SHORT", env.series)]))
+}
+
+#[tokio::test]
+async fn options_leave_intents_for_a_new_ledger_account_only_with_its_storage_paid() -> anyhow::Result<()> {
+    let env = setup().await?;
+    let (bob, tokens) = write_and_add_bob(&env).await?;
+    let long = env.option_asset(&env.series);
+    let amounts = vec![(CONTRACT / 2).to_string(); 2];
+    let storage = || async { anyhow::Ok(env.opt.view_account().await?.storage_usage) };
+
+    let before = storage().await?;
+    let unpaid = env
+        .alice
+        .call(env.intents.id(), "mt_withdraw")
+        .args_json(
+            json!({"token": env.opt.id(), "receiver_id": bob.id(), "token_ids": tokens, "amounts": amounts}),
+        )
+        .deposit(ONE_YOCTO)
+        .gas(MAX_GAS)
+        .transact()
+        .await?;
+    assert_panicked_with(&unpaid, &format!("{} needs", bob.id()));
+    assert_eq!(env.intents_balance(env.alice.id(), &long).await?, CONTRACT);
+    assert_eq!(env.ledger_balance(bob.id(), &env.series).await?, 0);
+    assert_eq!(storage().await?, before);
+
+    let root = env.worker.root_account()?;
+    for account in [root.id(), env.intents.id()] {
+        root.call(env.wnear.id(), "storage_deposit")
+            .args_json(json!({"account_id": account}))
+            .deposit(NearToken::from_millinear(10))
+            .transact()
+            .await?
+            .into_result()?;
+    }
+    root.call(env.wnear.id(), "near_deposit")
+        .deposit(NearToken::from_near(1))
+        .transact()
+        .await?
+        .into_result()?;
+    root.call(env.wnear.id(), "ft_transfer_call")
+        .args_json(json!({"receiver_id": env.intents.id(), "amount": STORAGE_DEPOSIT.as_yoctonear().to_string(), "msg": env.alice.id()}))
+        .deposit(ONE_YOCTO)
+        .gas(MAX_GAS)
+        .transact()
+        .await?
+        .into_result()?;
+    let key = SigningKey::from_bytes(&Sha256::digest(b"alice intents key").into());
+    env.alice
+        .call(env.intents.id(), "add_public_key")
+        .args_json(json!({"public_key": ed25519_id(&key)}))
+        .deposit(ONE_YOCTO)
+        .transact()
+        .await?
+        .into_result()?;
+    let salt = hex::decode(env.intents.view("current_salt").await?.json::<String>()?)?;
+    let withdraw = json!({
+        "intent": "mt_withdraw",
+        "token": env.opt.id(),
+        "receiver_id": bob.id(),
+        "token_ids": tokens,
+        "amounts": amounts,
+        "storage_deposit": STORAGE_DEPOSIT.as_yoctonear().to_string(),
+    });
+    let signed = signed_intents(
+        &key,
+        env.alice.id().as_str(),
+        env.intents.id(),
+        vec![withdraw],
+        versioned_nonce(&salt, 3),
+    );
+    env.alice
+        .call(env.intents.id(), "execute_intents")
+        .args_json(json!({"signed": [signed]}))
+        .gas(MAX_GAS)
+        .transact()
+        .await?
+        .into_result()?;
+
+    assert_eq!(env.intents_balance(env.alice.id(), &long).await?, CONTRACT / 2);
+    assert_eq!(env.ledger_balance(bob.id(), &env.series).await?, CONTRACT / 2);
+    let added = storage().await? - before;
+    let credit: Value = env
+        .opt
+        .view("storage_balance_of")
+        .args_json(json!({"account_id": bob.id()}))
+        .await?
+        .json()?;
+    assert_eq!(
+        credit["available"].as_str().unwrap().parse::<u128>()?,
+        STORAGE_DEPOSIT.as_yoctonear() - added as u128 * 10u128.pow(19)
+    );
+    Ok(())
+}
+
+#[tokio::test]
+async fn payout_to_an_account_new_to_intents_arrives_and_nothing_goes_claimable() -> anyhow::Result<()> {
+    let env = setup().await?;
+    let (bob, tokens) = write_and_add_bob(&env).await?;
+    let usdc = asset(&env.usdc);
+    env.storage_deposit(&bob, bob.id(), STORAGE_DEPOSIT).await?;
+    env.alice
+        .call(env.intents.id(), "mt_withdraw")
+        .args_json(json!({"token": env.opt.id(), "receiver_id": bob.id(), "token_ids": tokens, "amounts": vec![CONTRACT.to_string(); 2]}))
+        .deposit(ONE_YOCTO)
+        .gas(MAX_GAS)
+        .transact()
+        .await?
+        .into_result()?;
+    assert_eq!(env.intents_balance(bob.id(), &usdc).await?, 0);
+
+    let close = bob
+        .call(env.opt.id(), "burn_pair")
+        .args_json(json!({"series_id": env.series, "amount": CONTRACT.to_string()}))
+        .deposit(ONE_YOCTO)
+        .gas(MAX_GAS)
+        .transact()
+        .await?;
+    assert!(close.is_success(), "{:?}", close.failures());
+    let payout = close
+        .receipt_outcomes()
+        .iter()
+        .find(|r| r.executor_id == *env.intents.id())
+        .unwrap()
+        .gas_burnt;
+    assert!(
+        payout.as_gas() * 2 <= Gas::from_tgas(20).as_gas(),
+        "intents mt_transfer to a new account burnt {payout}"
+    );
+    assert_eq!(env.intents_balance(bob.id(), &usdc).await?, WIDTH);
+    let claimable: String = env
+        .opt
+        .view("get_claimable")
+        .args_json(json!({"account_id": bob.id(), "asset": usdc}))
+        .await?
+        .json()?;
+    assert_eq!(claimable, "0");
     Ok(())
 }

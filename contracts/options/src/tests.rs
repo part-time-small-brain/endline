@@ -2,7 +2,7 @@ use near_sdk::json_types::U128;
 use near_sdk::mock::MockAction;
 use near_sdk::serde_json::{self, json, Value};
 use near_sdk::test_utils::{get_created_receipts, get_logs, VMContextBuilder};
-use near_sdk::{testing_env, AccountId, NearToken, PromiseResult, RuntimeFeesConfig};
+use near_sdk::{testing_env, AccountId, NearToken, PromiseOrValue, PromiseResult, RuntimeFeesConfig};
 
 use crate::math::Terms;
 use crate::series::{self, OptionKind};
@@ -146,6 +146,13 @@ fn settle(c: &mut Contract, price_usd: u128) -> u64 {
     ctx(oracle(), MANUAL_AT, 1);
     c.propose_settlement("BTC".into(), EXPIRY, U128(price_usd * USD));
     MANUAL_AT + 3_600
+}
+
+fn withdraw_from_intents(c: &mut Contract, to: AccountId, token: &str, amount: u128) {
+    ctx(to.clone(), T0, DEPOSIT);
+    c.storage_deposit(None, None);
+    ctx(intents(), T0, 1);
+    c.mt_transfer(to, token.into(), U128(amount), None, None);
 }
 
 fn bal(c: &Contract, who: AccountId, token: &str) -> u128 {
@@ -583,7 +590,7 @@ fn closing_an_up_and_a_down_pays_one_usdc_total_and_debits_each_series() {
 }
 
 #[test]
-fn close_events_report_one_usdc_payout_under_version_0_2_0() {
+fn close_events_report_one_usdc_payout_under_endline_1_0_0() {
     let mut c = setup();
     let id = create(&mut c, 110_000, W, OptionKind::Call);
     write(&mut c, USDC_ASSET, W * USD, &id);
@@ -599,9 +606,9 @@ fn close_events_report_one_usdc_payout_under_version_0_2_0() {
         .iter()
         .filter_map(|l| l.strip_prefix("EVENT_JSON:"))
         .map(|j| serde_json::from_str::<Value>(j).unwrap())
-        .find(|e| e["standard"] == "near-options" && e["event"] == "exercise")
+        .find(|e| e["standard"] == "endline" && e["event"] == "exercise")
         .unwrap();
-    assert_eq!(event["version"], "0.2.0");
+    assert_eq!(event["version"], "1.0.0");
     assert_eq!(u(&event["data"]["payout"]), 6_000 * USD);
 }
 
@@ -656,8 +663,7 @@ fn ledger_holder_exercises_directly() {
     let mut c = setup();
     let id = create(&mut c, 110_000, W, OptionKind::Call);
     write(&mut c, USDC_ASSET, W * USD, &id);
-    ctx(intents(), T0, 1);
-    c.mt_transfer(alice(), id.clone(), U128(BTC), None, None);
+    withdraw_from_intents(&mut c, alice(), &id, BTC);
 
     let now = settle(&mut c, 116_000);
     ctx(alice(), now, 1);
@@ -702,21 +708,80 @@ fn only_failed_payout_becomes_claimable() {
         (receiver, &args["receiver_id"], u(&args["amount"])),
         (&intents(), &json!("alice.near"), 500)
     );
+    assert_eq!(args["memo"], "endline payout");
     panics_with("nothing claimable", || {
         c.withdraw_claimable(alice(), USDC_ASSET.into())
     });
 }
 
+fn delivered(c: &mut Contract, id: &str, result: PromiseResult) -> (u128, u128) {
+    callback_ctx(T0, result);
+    c.on_options_delivered(alice(), vec![id.into(), short(id)], vec![U128(BTC), U128(BTC)]);
+    (
+        c.get_undelivered(alice(), id.into()).0,
+        c.get_undelivered(alice(), short(id)).0,
+    )
+}
+
 #[test]
-fn rejected_delivery_returns_options_to_owner_on_ledger() {
+fn failed_delivery_stays_on_intents_and_is_recorded_for_retry() {
     let mut c = setup();
     let id = create(&mut c, 110_000, W, OptionKind::Call);
     write(&mut c, USDC_ASSET, W * USD, &id);
-    callback_ctx(T0, PromiseResult::Failed);
-    c.on_options_delivered(alice(), vec![id.clone(), short(&id)], vec![U128(BTC), U128(BTC)]);
-    assert_eq!(bal(&c, intents(), &id), 0);
-    assert_eq!(bal(&c, alice(), &id), BTC);
-    assert_eq!(bal(&c, alice(), &short(&id)), BTC);
+    assert_eq!(delivered(&mut c, &id, PromiseResult::Failed), (BTC, BTC));
+    assert_eq!(bal(&c, intents(), &id), BTC);
+    assert_eq!(bal(&c, alice(), &id), 0);
+    let event: Value = serde_json::from_str(get_logs()[0].strip_prefix("EVENT_JSON:").unwrap()).unwrap();
+    assert_eq!(event["event"], "delivery_failed");
+    assert_eq!(
+        event["data"],
+        json!({"owner_id": "alice.near", "token_ids": [id, short(&id)], "amounts": [BTC.to_string(), BTC.to_string()]})
+    );
+}
+
+#[test]
+fn delivery_records_what_intents_leaves_unused_up_to_the_amount_sent() {
+    let mut c = setup();
+    let id = create(&mut c, 110_000, W, OptionKind::Call);
+    write(&mut c, USDC_ASSET, W * USD, &id);
+    let unused = format!("[\"40\",\"{}\"]", 2 * BTC).into_bytes();
+    assert_eq!(
+        delivered(&mut c, &id, PromiseResult::Successful(unused)),
+        (40, BTC)
+    );
+    assert_eq!(bal(&c, intents(), &id), BTC);
+}
+
+#[test]
+fn anyone_can_retry_a_failed_delivery_and_a_failed_retry_is_recorded_again() {
+    let mut c = setup();
+    let id = create(&mut c, 110_000, W, OptionKind::Call);
+    write(&mut c, USDC_ASSET, W * USD, &id);
+    delivered(&mut c, &id, PromiseResult::Failed);
+
+    ctx(acc("bob.near"), T0, 1);
+    c.retry_delivery(alice(), vec![id.clone(), short(&id)]);
+    let deposits = calls("mt_on_transfer");
+    assert_eq!(deposits.len(), 1);
+    assert_eq!(deposits[0].0, intents());
+    assert_eq!(deposits[0].1["sender_id"], "opt.near");
+    assert_eq!(deposits[0].1["msg"], "alice.near");
+    assert_eq!(deposits[0].1["token_ids"], json!([id, short(&id)]));
+    assert_eq!(
+        deposits[0].1["amounts"],
+        json!([BTC.to_string(), BTC.to_string()])
+    );
+    assert_eq!(calls("on_options_delivered")[0].1["owner_id"], "alice.near");
+    panics_with("nothing undelivered for", || {
+        c.retry_delivery(alice(), vec![id.clone()])
+    });
+
+    assert_eq!(
+        delivered(&mut c, &id, PromiseResult::Successful(b"[\"0\",\"0\"]".to_vec())),
+        (0, 0)
+    );
+    assert_eq!(delivered(&mut c, &id, PromiseResult::Failed), (BTC, BTC));
+    assert_eq!(bal(&c, intents(), &id), BTC);
 }
 
 #[test]
@@ -780,12 +845,16 @@ fn override_after_final_rejected() {
 }
 
 #[test]
-fn successful_delivery_never_refunds_even_with_odd_result() {
+fn successful_delivery_never_records_anything_with_an_odd_result() {
     let mut c = setup();
     let id = create(&mut c, 110_000, W, OptionKind::Call);
     write(&mut c, USDC_ASSET, W * USD, &id);
-    callback_ctx(T0, PromiseResult::Successful(b"\"not a vec\"".to_vec()));
-    c.on_options_delivered(alice(), vec![id.clone(), short(&id)], vec![U128(BTC), U128(BTC)]);
+    for odd in [&b"\"not a vec\""[..], b"[\"5\"]", b"[\"0\",\"0\"]"] {
+        assert_eq!(
+            delivered(&mut c, &id, PromiseResult::Successful(odd.to_vec())),
+            (0, 0)
+        );
+    }
     assert_eq!(bal(&c, alice(), &id), 0);
     assert_eq!(bal(&c, intents(), &id), BTC);
 }
@@ -854,8 +923,7 @@ fn plain_transfer_to_intents_rejected() {
     let mut c = setup();
     let id = create(&mut c, 110_000, W, OptionKind::Call);
     write(&mut c, USDC_ASSET, W * USD, &id);
-    ctx(intents(), T0, 1);
-    c.mt_transfer(alice(), id.clone(), U128(BTC), None, None);
+    withdraw_from_intents(&mut c, alice(), &id, BTC);
     ctx(alice(), T0, 1);
     c.mt_transfer(intents(), id, U128(BTC), None, None);
 }
@@ -866,8 +934,7 @@ fn ledger_transfer_to_new_account_pays_storage() {
     let mut c = setup();
     let id = create(&mut c, 110_000, W, OptionKind::Call);
     write(&mut c, USDC_ASSET, W * USD, &id);
-    ctx(intents(), T0, 1);
-    c.mt_transfer(alice(), id.clone(), U128(BTC), None, None);
+    withdraw_from_intents(&mut c, alice(), &id, BTC);
     ctx(alice(), T0, 1);
     c.mt_transfer(acc("bob.near"), id, U128(1), None, None);
 }
@@ -877,8 +944,7 @@ fn ledger_transfer_with_storage_deposit_succeeds() {
     let mut c = setup();
     let id = create(&mut c, 110_000, W, OptionKind::Call);
     write(&mut c, USDC_ASSET, W * USD, &id);
-    ctx(intents(), T0, 1);
-    c.mt_transfer(alice(), id.clone(), U128(BTC), None, None);
+    withdraw_from_intents(&mut c, alice(), &id, BTC);
     ctx(alice(), T0, 10u128.pow(22));
     c.mt_transfer(acc("bob.near"), id.clone(), U128(1), None, None);
     assert_eq!(bal(&c, acc("bob.near"), &id), 1);
@@ -915,12 +981,103 @@ fn the_first_write_adds_no_storage_the_contract_pays_for() {
 }
 
 #[test]
+fn the_intents_row_survives_reaching_zero_so_the_next_write_adds_no_storage() {
+    let mut c = setup();
+    let id = create(&mut c, 110_000, W, OptionKind::Put);
+    write(&mut c, USDC_ASSET, W * USD, &id);
+    withdraw_from_intents(&mut c, alice(), &id, BTC);
+    ctx(intents(), T0, 0);
+    let before = near_sdk::env::storage_usage();
+    c.mt_on_transfer(
+        alice(),
+        vec![alice()],
+        vec![USDC_ASSET.into()],
+        vec![U128(W * USD)],
+        json!({"action": "write", "series_id": id}).to_string(),
+    );
+    c.balances.flush();
+    assert_eq!(near_sdk::env::storage_usage(), before);
+    assert_eq!(bal(&c, intents(), &id), BTC);
+}
+
+#[test]
+fn intents_withdrawals_to_new_rows_are_paid_from_the_receivers_storage_credit() {
+    let mut c = setup();
+    let id = create(&mut c, 110_000, W, OptionKind::Call);
+    write(&mut c, USDC_ASSET, W * USD, &id);
+    let bob = acc("bob.near");
+    assert!(c.storage_balance_of(bob.clone()).is_none());
+    ctx(alice(), T0, DEPOSIT);
+    let credit = c.storage_deposit(Some(bob.clone()), None).available.0;
+    assert!(credit > 0 && credit < DEPOSIT);
+    assert_eq!(c.storage_balance_of(bob.clone()).unwrap().total.0, credit);
+    ctx(alice(), T0, DEPOSIT);
+    let topped_up = c.storage_deposit(Some(bob.clone()), None).available.0;
+    assert_eq!(topped_up, credit + DEPOSIT);
+    let credit = topped_up;
+
+    let tokens = vec![id.clone(), short(&id)];
+    let send = |c: &mut Contract, to: &AccountId| {
+        ctx(intents(), T0, 1);
+        let before = near_sdk::env::storage_usage();
+        c.mt_batch_transfer(to.clone(), tokens.clone(), vec![U128(1), U128(1)], None, None);
+        (near_sdk::env::storage_usage() - before) as u128
+    };
+    let rows = send(&mut c, &bob);
+    let left = c.storage_balance_of(bob.clone()).unwrap().available.0;
+    assert!(rows > 0);
+    assert_eq!(
+        left,
+        credit - rows * near_sdk::env::storage_byte_cost().as_yoctonear()
+    );
+    send(&mut c, &bob);
+    assert_eq!(c.storage_balance_of(bob.clone()).unwrap().available.0, left);
+    assert_eq!(bal(&c, bob, &short(&id)), 2);
+
+    panics_with("carol.near needs", || {
+        send(&mut c, &acc("carol.near"));
+    });
+    ctx(acc("dave.near"), T0, 1);
+    panics_with("attach at least", || {
+        c.storage_deposit(None, None);
+    });
+    panics_with("registration_only is not supported", || {
+        c.storage_deposit(None, Some(true));
+    });
+}
+
+#[test]
+fn an_intents_withdraw_with_msg_short_of_storage_credit_answers_nothing_used() {
+    let mut c = setup();
+    let id = create(&mut c, 110_000, W, OptionKind::Call);
+    write(&mut c, USDC_ASSET, W * USD, &id);
+    let tokens = vec![id.clone(), short(&id)];
+    let carol = acc("carol.near");
+    let held = bal(&c, intents(), &id);
+    ctx(intents(), T0, 1);
+    let before = near_sdk::env::storage_usage();
+    let answer = c.mt_batch_transfer_call(
+        carol.clone(),
+        tokens,
+        vec![U128(1), U128(1)],
+        None,
+        None,
+        "go".into(),
+    );
+    c.balances.flush();
+    assert!(
+        matches!(answer, PromiseOrValue::Value(ref used) if used.iter().all(|u| u.0 == 0) && used.len() == 2)
+    );
+    assert_eq!(near_sdk::env::storage_usage(), before);
+    assert_eq!((bal(&c, carol, &id), bal(&c, intents(), &id)), (0, held));
+}
+
+#[test]
 fn deposits_to_intents_take_only_a_plain_msg() {
     let mut c = setup();
     let id = create(&mut c, 110_000, W, OptionKind::Call);
     write(&mut c, USDC_ASSET, W * USD, &id);
-    ctx(intents(), T0, 1);
-    c.mt_transfer(alice(), id.clone(), U128(BTC), None, None);
+    withdraw_from_intents(&mut c, alice(), &id, BTC);
     ctx(alice(), T0, DEPOSIT);
     let execute =
         json!({"receiver_id": "alice.near", "execute_intents": [], "refund_if_fails": true}).to_string();
@@ -943,8 +1100,7 @@ fn resolve_refunds_what_the_receiver_leaves_unused_up_to_its_balance() {
     let mut c = setup();
     let id = create(&mut c, 110_000, W, OptionKind::Call);
     write(&mut c, USDC_ASSET, W * USD, &id);
-    ctx(intents(), T0, 1);
-    c.mt_transfer(acc("bob.near"), id.clone(), U128(1_000), None, None);
+    withdraw_from_intents(&mut c, acc("bob.near"), &id, 1_000);
     let mut resolve = |receiver: AccountId, result: PromiseResult, amount: u128| {
         callback_ctx(T0, result);
         c.mt_resolve_transfer(vec![alice()], receiver, vec![id.clone()], vec![U128(amount)])[0].0
@@ -1020,7 +1176,7 @@ fn request_matches_outlayer_contract_shape() {
     let input: Value = serde_json::from_str(args["input_data"].as_str().unwrap()).unwrap();
     assert_eq!(
         input,
-        json!({"index": "btc_usd", "expiry": EXPIRY, "quote_decimals": 6, "max_dev_bps": 50})
+        json!({"index": "btc_usd", "expiry": EXPIRY, "quote_decimals": 6, "max_dev_bps": 20})
     );
     let callback = calls("on_settlement_result");
     assert_eq!(callback[0].1["requested_at"], SETTLE_AT);
