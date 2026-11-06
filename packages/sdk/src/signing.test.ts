@@ -1,5 +1,4 @@
 import { createIntentSignerNEP413, createIntentSignerViem } from "@defuse-protocol/intents-sdk";
-import { ed25519 } from "@noble/curves/ed25519.js";
 import { describe, expect, it } from "vitest";
 import { payload, sessionPayload, tokenDiff } from "./intents.ts";
 import { readPayload, SignedPayload, toSign, type Unsigned } from "./signing.ts";
@@ -61,5 +60,7 @@ describe("what the wallet signs", () => {
   it("refuses intents the verifier would run but we never build", () => {
     const p = { ...intent("alice.near"), intents: [{ intent: "add_public_key", public_key: "ed25519:x" }] };
     expect(() => readPayload({ standard: "erc191", payload: JSON.stringify(p) })).toThrow();
+    const bare = { ...intent("alice.near"), intents: [{ intent: "transfer", receiver_id: "bob.near", tokens: { "nep141:usdc.near": "1" } }] };
+    expect(() => readPayload({ standard: "erc191", payload: JSON.stringify(bare) })).toThrow();
   });
 });

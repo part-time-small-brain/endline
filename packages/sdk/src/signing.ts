@@ -1,5 +1,3 @@
-import { ed25519 } from "@noble/curves/ed25519.js";
-import { base64 } from "@scure/base";
 import { z } from "zod";
 import { Payload } from "./intents.ts";
 

@@ -11,8 +11,8 @@ export const Intent = z.discriminatedUnion("intent", [
     intent: z.literal("transfer"),
     receiver_id: z.string(),
     tokens: z.record(z.string(), z.string()),
-    msg: z.string().exactOptional(),
-    min_gas: z.string().exactOptional(),
+    msg: z.string(),
+    min_gas: z.string(),
   }),
 ]);
 export type Intent = z.infer<typeof Intent>;

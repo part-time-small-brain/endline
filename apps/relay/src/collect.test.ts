@@ -190,9 +190,6 @@ describe("gasless collect", () => {
 
 describe("gasless sends whose execute call errored", () => {
   const NOW = (FINAL_AT + 61) * 1000;
-  const sends = [
-    ["an exercise", (collector: Collector, s: SignedPayload) => collector.execute(s), (signer?: string) => signed([exercise], { signer })],
-  ] as const;
   beforeEach(() => {
     vi.useFakeTimers();
     vi.setSystemTime(NOW);
@@ -200,7 +197,7 @@ describe("gasless sends whose execute call errored", () => {
   });
   afterEach(() => vi.useRealTimers());
 
-  it.each(sends)("answers %s that ran as sent, by the signer's nonce, so the user never signs it again", async (_, send, make) => {
+  it("answers an exercise that ran as sent, by the signer's nonce, so the user never signs it again", async () => {
     const { chain, collector, executed, settle } = setup();
     settle();
     const execute = chain.execute;
@@ -209,32 +206,32 @@ describe("gasless sends whose execute call errored", () => {
       throw new Error("Internal server error");
     });
     const nonceRead = vi.spyOn(chain, "isNonceUsed");
-    const s = make();
-    expect(await send(collector, s)).toBe("");
+    const s = signed([exercise]);
+    expect(await collector.execute(s)).toBe("");
     expect(nonceRead).toHaveBeenCalledWith("alice.test", readPayload(s).nonce);
     expect(executed).toHaveLength(1);
   });
 
-  it.each(sends)("fails %s only once a final block is past the deadline with the nonce unused, never on a read error, and holds the signer's lock until then", async (_, send, make) => {
+  it("fails an exercise only once a final block is past the deadline with the nonce unused, never on a read error, and holds the signer's lock until then", async () => {
     const { chain, collector, executed, settle } = setup();
     settle();
     vi.spyOn(chain, "execute").mockRejectedValueOnce(new Error("Request timeout"));
-    const s = make();
+    const s = signed([exercise]);
     const deadline = Date.parse(readPayload(s).deadline);
     vi.spyOn(chain, "finalTimeMs").mockImplementation(async () => {
       if (Date.now() > deadline + 5_000 && Date.now() < deadline + 12_000) throw new Error("rpc down");
       return Date.now() - 1_000;
     });
     let result: unknown;
-    void send(collector, s).then((tx) => (result = tx), (error: unknown) => (result = error));
+    void collector.execute(s).then((tx) => (result = tx), (error: unknown) => (result = error));
     await vi.advanceTimersByTimeAsync(deadline - Date.now() - 60_000);
     expect(result).toBeUndefined();
-    expect(await httpStatus(send(collector, make()))).toBe(409);
+    expect(await httpStatus(collector.execute(signed([exercise])))).toBe(409);
     await vi.advanceTimersByTimeAsync(60_000 + 11_000);
     expect(result).toBeUndefined();
     await vi.advanceTimersByTimeAsync(6_000);
     expect(result).toMatchObject({ message: "Request timeout" });
-    expect(await send(collector, make())).toBe("tx1");
+    expect(await collector.execute(signed([exercise]))).toBe("tx1");
     expect(executed).toHaveLength(1);
   });
 });

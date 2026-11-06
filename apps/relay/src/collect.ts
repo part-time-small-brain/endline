@@ -1,5 +1,5 @@
 import { isDeepStrictEqual } from "node:util";
-import { exerciseOptions, type Fill, type Intent, longPayout, MIN_RELAYED_PAYOUT_USD, maxPayout, parseTokenId, readPayload, type Series, type SignedPayload, termsOf } from "@endline/sdk";
+import { exerciseOptions, type Fill, longPayout, MIN_RELAYED_PAYOUT_USD, maxPayout, parseTokenId, readPayload, type Series, type SignedPayload, termsOf } from "@endline/sdk";
 import type { Claims } from "./claims.ts";
 import type { Config } from "./config.ts";
 import type { Fills } from "./fills.ts";
@@ -13,13 +13,10 @@ const MAX_DEADLINE_MS = 10 * 60_000;
 // intents rechecks the deadline on-chain, and near-api-js retries a send for up to ~85 s: a payload that expires first burns our gas
 const MIN_DEADLINE_MS = 2 * 60_000;
 
-interface Sent {
+interface Exercise {
   signerId: string;
   nonce: string;
   deadlineMs: number;
-}
-
-interface Exercise extends Sent {
   tokens: Record<string, bigint>;
 }
 
@@ -31,20 +28,15 @@ interface Leg {
   amount: bigint;
 }
 
-function readSigned(signed: SignedPayload, intentsId: string): { sent: Sent; intents: Intent[] } | undefined {
-  const { signer_id, nonce, deadline, verifying_contract, intents } = readPayload(signed);
-  const deadlineMs = Date.parse(deadline);
-  if (verifying_contract !== intentsId || !Number.isFinite(deadlineMs) || new Date(deadlineMs).toISOString() !== deadline) return undefined;
-  return { sent: { signerId: signer_id, nonce, deadlineMs }, intents };
-}
-
 function readExercise(signed: SignedPayload, config: Settings): Exercise | undefined {
   try {
-    const read = readSigned(signed, config.INTENTS_ID);
-    const [intent, ...extra] = read?.intents ?? [];
-    if (!read || intent?.intent !== "transfer" || extra.length > 0) return undefined;
+    const { signer_id, nonce, deadline, verifying_contract, intents } = readPayload(signed);
+    const [intent, ...extra] = intents;
+    const deadlineMs = Date.parse(deadline);
+    if (verifying_contract !== config.INTENTS_ID || intent?.intent !== "transfer" || extra.length > 0) return undefined;
+    if (!Number.isFinite(deadlineMs) || new Date(deadlineMs).toISOString() !== deadline) return undefined;
     const tokens = Object.fromEntries(Object.entries(intent.tokens).map(([asset, amount]) => [asset, BigInt(amount)]));
-    return isDeepStrictEqual(intent, exerciseOptions(config.OPTIONS_ID, tokens)) ? { ...read.sent, tokens } : undefined;
+    return isDeepStrictEqual(intent, exerciseOptions(config.OPTIONS_ID, tokens)) ? { signerId: signer_id, nonce, deadlineMs, tokens } : undefined;
   } catch {
     return undefined;
   }
@@ -147,7 +139,7 @@ export class Collector {
     return legs;
   }
 
-  private async submit(signed: SignedPayload, { signerId, nonce, deadlineMs }: Sent, settleByNonce: boolean): Promise<string> {
+  private async submit(signed: SignedPayload, { signerId, nonce, deadlineMs }: Exercise, settleByNonce: boolean): Promise<string> {
     for (const [key, deadline] of this.submitted) if (deadline < Date.now()) this.submitted.delete(key);
     const key = `${signerId}:${nonce}`;
     if (this.submitted.has(key)) throw new HttpError(409, "this payload was already submitted");

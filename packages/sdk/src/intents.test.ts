@@ -110,12 +110,12 @@ describe("intents", () => {
 
   it("write and exercise messages match what the contract parses", () => {
     const write = writeOptions("opt.near", USDC, 95_000_000_000n, "BTC-27NOV26-95000_93000-P");
-    expect(JSON.parse(write.intent === "transfer" ? (write.msg ?? "") : "")).toEqual({ action: "write", series_id: "BTC-27NOV26-95000_93000-P" });
+    expect(JSON.parse(write.intent === "transfer" ? write.msg : "")).toEqual({ action: "write", series_id: "BTC-27NOV26-95000_93000-P" });
     const exercise = exerciseOptions("opt.near", { [LONG]: 5n });
-    expect(exercise.intent === "transfer" && JSON.parse(exercise.msg ?? "")).toEqual({ action: "exercise" });
+    expect(exercise.intent === "transfer" && JSON.parse(exercise.msg)).toEqual({ action: "exercise" });
     for (const action of ["redeem", "burn_pair"] as const) {
       const close = closeOptions("opt.near", action, { [`${LONG}-SHORT`]: 5n });
-      expect(close.intent === "transfer" && JSON.parse(close.msg ?? "")).toEqual({ action });
+      expect(close.intent === "transfer" && JSON.parse(close.msg)).toEqual({ action });
     }
   });
 
