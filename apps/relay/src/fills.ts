@@ -5,24 +5,36 @@ import { parseJson } from "./json.ts";
 
 export class Fills {
   private file: string;
+  private accounts = new Map<string, Fill[]>();
 
   constructor(private dir: string) {
     this.file = join(dir, "fills.jsonl");
   }
 
-  async append(fill: Fill): Promise<void> {
-    await mkdir(this.dir, { recursive: true });
-    await appendFile(this.file, `${JSON.stringify(fill)}\n`);
-  }
-
-  async byAccount(accountId: string): Promise<Fill[]> {
+  async load(): Promise<void> {
     const text = await readFile(this.file, "utf8").catch((error: NodeJS.ErrnoException) => {
       if (error.code === "ENOENT") return "";
       throw error;
     });
-    return text.split("\n").flatMap((line) => {
+    for (const line of text.split("\n")) {
       const fill = Fill.safeParse(parseJson(line));
-      return fill.success && fill.data.account_id === accountId ? [fill.data] : [];
-    });
+      if (fill.success) this.remember(fill.data);
+    }
+  }
+
+  async append(fill: Fill): Promise<void> {
+    await mkdir(this.dir, { recursive: true });
+    await appendFile(this.file, `${JSON.stringify(fill)}\n`);
+    this.remember(fill);
+  }
+
+  byAccount(accountId: string): Fill[] {
+    return [...(this.accounts.get(accountId) ?? [])];
+  }
+
+  private remember(fill: Fill): void {
+    const fills = this.accounts.get(fill.account_id);
+    if (fills) fills.push(fill);
+    else this.accounts.set(fill.account_id, [fill]);
   }
 }

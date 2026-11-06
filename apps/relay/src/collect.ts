@@ -1,5 +1,5 @@
 import { isDeepStrictEqual } from "node:util";
-import { exerciseOptions, type Fill, type Intent, longPayout, MIN_RELAYED_PAYOUT_USD, maxPayout, parseTokenId, readPayload, relayedTransfer, type Series, type SignedPayload, termsOf, transferFee } from "@endline/sdk";
+import { exerciseOptions, type Fill, type Intent, longPayout, MIN_RELAYED_PAYOUT_USD, maxPayout, parseTokenId, readPayload, relayedTransfer, type Series, type Settlement, type SignedPayload, termsOf, transferFee } from "@endline/sdk";
 import type { Claims } from "./claims.ts";
 import type { Config } from "./config.ts";
 import type { Fills } from "./fills.ts";
@@ -77,6 +77,7 @@ export class Collector {
   private claiming: Exercise[] = [];
   private submitted = new Map<string, number>();
   private sending = new Set<string>();
+  private final = new Map<string, Settlement>();
 
   constructor(
     private chain: Chain,
@@ -119,7 +120,7 @@ export class Collector {
       const legs = await this.legs(exercise);
       const maxTotal = legs.reduce((sum, { series, amount }) => sum + maxPayout(termsOf(series), amount), 0n);
       if (maxTotal < (await this.minPayout())) throw new HttpError(400, "auto-collect needs a max payout of at least $1");
-      const bought = relayBuys(await this.fills.byAccount(exercise.signerId));
+      const bought = relayBuys(this.fills.byAccount(exercise.signerId));
       for (const { asset, series, amount } of legs) {
         const mine = open.filter((other) => other.signerId === exercise.signerId && other.tokens[asset] !== undefined);
         const claimed = mine.reduce((sum, other) => sum + (other.tokens[asset] ?? 0n), amount);
@@ -201,8 +202,10 @@ export class Collector {
     const nowSec = Date.now() / 1000;
     let total = 0n;
     for (const { series, amount } of legs) {
-      const settlement = await this.chain.settlement(series.underlying, series.expiry);
+      const key = `${series.underlying}:${series.expiry}`;
+      const settlement = this.final.get(key) ?? (await this.chain.settlement(series.underlying, series.expiry));
       if (!settlement || nowSec < settlement.final_at + FINAL_MARGIN_SEC) return undefined;
+      this.final.set(key, settlement);
       total += longPayout(termsOf(series), amount, BigInt(settlement.price));
     }
     return total;

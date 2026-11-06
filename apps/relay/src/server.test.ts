@@ -114,6 +114,20 @@ describe("http", () => {
     }
   });
 
+  it("rate limits fill reads per IP in their own bucket, so polling them never blocks a trade", async () => {
+    const limited = createRelayServer(relay, fills, hub, collector, oneClick, calls);
+    await new Promise<void>((resolve) => limited.listen(0, "127.0.0.1", resolve));
+    const url = `http://127.0.0.1:${(limited.address() as AddressInfo).port}`;
+    const read = async () => (await fetch(`${url}/fills/alice.test`)).status;
+    try {
+      for (let i = 0; i < 60; i++) expect(await read()).toBe(200);
+      expect(await read()).toBe(429);
+      expect((await fetch(`${url}/quote`, { method: "POST", body: "{" })).status).toBe(400);
+    } finally {
+      await new Promise((resolve) => limited.close(resolve));
+    }
+  });
+
   it("refuses a /deposit-quote a page on another origin could send without a preflight", async () => {
     const response = await fetch(`http://${base}/deposit-quote`, { method: "POST", body: "{}", headers: { "content-type": "text/plain" } });
     expect(response.status).toBe(415);
