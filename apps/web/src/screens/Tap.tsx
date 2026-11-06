@@ -215,11 +215,9 @@ export function Tap({ state, nowSec, views, onConnect, onAddFunds, onQuote }: Pr
           </p>
         )}
         {closing && <RevealNote closing={closing} price={closingPrice} stakes={stakes} calls={closingCalls} quoteDecimals={quoteDecimals} />}
-        {free && (
-          <p role="status" className={`min-h-5 px-1 pt-2 text-sm ${calls.notice?.failed ? "text-danger" : "text-ink-2"}`}>
-            {calls.notice?.text}
-          </p>
-        )}
+        <p role="status" className={`min-h-5 px-1 pt-2 text-sm ${free && calls.notice?.failed ? "text-danger" : "text-ink-2"}`}>
+          {free && calls.notice?.text}
+        </p>
       </section>
 
       <TapMode free={free} left={left} budget={budget} quoteDecimals={quoteDecimals} onFree={setFree} onBudget={setBudget} />

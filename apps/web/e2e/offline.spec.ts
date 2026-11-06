@@ -876,6 +876,7 @@ test.describe("Tap", () => {
 
   test("a buy the balance can't cover opens Add funds, never a quote", async ({ page }) => {
     await freeCalls(page);
+    await expect(page.getByRole("button", { name: "Balance, add funds", includeHidden: true })).not.toHaveText("…");
     await page.getByRole("radio", { name: /^Buy/ }).click();
     await page.getByRole("table").getByRole("button", { name: /^Up · BTC ends above \$81,000 · Tomorrow / }).click();
     await expect(page.getByRole("dialog", { name: "Add funds" })).toBeVisible();
