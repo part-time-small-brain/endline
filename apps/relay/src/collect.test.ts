@@ -6,7 +6,7 @@ import { type Fill, type Intent, payload, readPayload, relayedTransfer, type Sig
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Claims } from "./claims.ts";
 import { Collector } from "./collect.ts";
-import { Rejected } from "./rpc.ts";
+import { Rejected, Unsettled } from "./rpc.ts";
 import { fakeChain, httpStatus, INTENTS, MIN_WRITE, nep413, OPTION, OPTIONS, SALT, SERIES, USDC } from "./test-fakes.ts";
 
 const SHORT = `${OPTION}-SHORT`;
@@ -37,7 +37,7 @@ const fill = (account_id: string, side: Fill["side"], size: bigint): Fill => ({
   tx_hash: "tx",
   at_ms: 0,
 });
-const boughtPlenty = { byAccount: async (account: string) => Array.from({ length: 20 }, () => fill(account, "buy", 10n ** 17n)) };
+const boughtPlenty = { byAccount: (account: string) => Array.from({ length: 20 }, () => fill(account, "buy", 10n ** 17n)) };
 
 function setup(fills = boughtPlenty) {
   const fake = fakeChain();
@@ -65,6 +65,20 @@ describe("gasless collect", () => {
     vi.setSystemTime((FINAL_AT + 60) * 1000);
     expect(await collector.execute(early)).toBe("tx1");
     expect(executed).toHaveLength(1);
+  });
+
+  it("reads a settlement until it is final, then never again, so forged payloads can't repeat the view", async () => {
+    const { chain, collector, settle } = setup();
+    const read = vi.spyOn(chain, "settlement");
+    settle(SERIES.strike);
+    vi.setSystemTime((FINAL_AT + 59) * 1000);
+    expect(await httpStatus(collector.execute(signed([exercise])))).toBe(409);
+    settle();
+    vi.setSystemTime((FINAL_AT + 60) * 1000);
+    expect(await collector.execute(signed([exercise]))).toBe("tx1");
+    const forged = { ...signed([exercise], { signer: "mallory.test" }), signature: "ed25519:bad" } as SignedPayload;
+    for (let i = 0; i < 5; i++) expect(await httpStatus(collector.execute(forged))).toBe(422);
+    expect(read).toHaveBeenCalledTimes(2);
   });
 
   it("sends a signed exercise on-chain once, however often and concurrently it is posted", async () => {
@@ -149,9 +163,10 @@ describe("gasless collect", () => {
   });
 
   it("pays gas only for a total payout of at least $1", async () => {
+    const under = setup();
+    under.settle("110099000000");
+    expect(await httpStatus(under.collector.execute(signed([exercise])))).toBe(400);
     const { collector, executed, settle } = setup();
-    settle("110099000000");
-    expect(await httpStatus(collector.execute(signed([exercise])))).toBe(400);
     settle("110100000000");
     expect(await collector.execute(signed([exercise]))).toBe("tx1");
     expect(executed).toHaveLength(1);
@@ -264,25 +279,35 @@ describe("gasless sends whose execute call errored", () => {
   });
   afterEach(() => vi.useRealTimers());
 
-  it.each(sends)("answers %s that ran as sent, by the signer's nonce, so the user never signs it again", async (_, send, make) => {
+  it.each(sends)("answers %s whose relayer transaction ran as sent, with that transaction, so the user never signs it again", async (_, send, make) => {
     const { chain, collector, executed, settle } = setup();
     settle();
     const execute = chain.execute;
     vi.spyOn(chain, "execute").mockImplementationOnce(async (batch) => {
-      await execute(batch);
-      throw new Error("Internal server error");
+      throw new Unsettled([await execute(batch)], new Error("Internal server error"));
     });
-    const nonceRead = vi.spyOn(chain, "isNonceUsed");
-    const s = make();
-    expect(await send(collector, s)).toBe("");
-    expect(nonceRead).toHaveBeenCalledWith("alice.test", readPayload(s).nonce);
+    expect(await send(collector, make())).toBe("tx1");
     expect(executed).toHaveLength(1);
   });
 
-  it.each(sends)("fails %s only once a final block is past the deadline with the nonce unused, never on a read error, and holds the signer's lock until then", async (_, send, make) => {
+  it.each(sends)("fails %s whose relayer transaction failed, even though the signer burned the nonce with another payload", async (_, send, make) => {
     const { chain, collector, executed, settle } = setup();
     settle();
-    vi.spyOn(chain, "execute").mockRejectedValueOnce(new Error("Request timeout"));
+    const execute = chain.execute;
+    const s = make();
+    const burn = nep413({ ...readPayload(s), intents: [] });
+    vi.spyOn(chain, "execute").mockImplementationOnce(async (batch) => {
+      await execute([burn]);
+      return execute(batch);
+    });
+    await expect(send(collector, s)).rejects.toThrow("nonce already used");
+    expect(executed).toEqual([[burn]]);
+  });
+
+  it.each(sends)("fails %s of unknown outcome only once a final block is past the deadline with its transaction still unknown, never on a read error, and holds the signer's lock until then", async (_, send, make) => {
+    const { chain, collector, executed, settle } = setup();
+    settle();
+    vi.spyOn(chain, "execute").mockRejectedValueOnce(new Unsettled(["lost"], new Error("Request timeout")));
     const s = make();
     const deadline = Date.parse(readPayload(s).deadline);
     vi.spyOn(chain, "finalTimeMs").mockImplementation(async () => {
@@ -368,7 +393,7 @@ describe("auto-collect claims", () => {
 
   it("takes claims only on options the signer bought here, net of what they sold", async () => {
     const fills: Fill[] = [];
-    const { collector, claims } = setup({ byAccount: async (account: string) => fills.filter((f) => f.account_id === account) });
+    const { collector, claims } = setup({ byAccount: (account: string) => fills.filter((f) => f.account_id === account) });
     expect(await httpStatus(collector.claim(claimed([exercise])))).toBe(409);
     fills.push(fill("alice.test", "buy", 2n * BigInt(AMOUNT)), fill("alice.test", "sell", BigInt(AMOUNT)), fill("bob.test", "buy", BigInt(AMOUNT)));
     await collector.claim(claimed([exercise]));
@@ -377,7 +402,7 @@ describe("auto-collect claims", () => {
   });
 
   it("takes one claim per buy, so a single trade can't be split to fill the queue", async () => {
-    const { collector, claims } = setup({ byAccount: async (account: string) => [fill(account, "buy", 100n * BigInt(AMOUNT))] });
+    const { collector, claims } = setup({ byAccount: (account: string) => [fill(account, "buy", 100n * BigInt(AMOUNT))] });
     await collector.claim(signed([exercise]));
     expect(await httpStatus(collector.claim(signed([exercise])))).toBe(409);
     expect(claims.all()).toHaveLength(1);
@@ -474,6 +499,15 @@ describe("auto-collect claims", () => {
     const padded = { ...good, payload: { ...good.payload, message: ` ${good.payload.message}` } };
     writeFileSync(join(dir, "claims.json"), JSON.stringify([padded]));
     await claims.load();
+    await expect(collector.claim(claimed([exercise], { signer: "bob.test" }))).resolves.toBeUndefined();
+  });
+
+  it("caps open claims per signer, so one account can't fill the queue, also under concurrent posts", async () => {
+    const { collector, claims } = setup({ byAccount: (account: string) => Array.from({ length: 150 }, () => fill(account, "buy", 10n ** 17n)) });
+    const results = await Promise.allSettled(Array.from({ length: 110 }, () => collector.claim(claimed([exercise]))));
+    expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(100);
+    expect(claims.all()).toHaveLength(100);
+    expect(await httpStatus(collector.claim(claimed([exercise])))).toBe(409);
     await expect(collector.claim(claimed([exercise], { signer: "bob.test" }))).resolves.toBeUndefined();
   });
 

@@ -1,8 +1,11 @@
+import { createHash } from "node:crypto";
 import { CLAIM_WINDOW_SEC } from "@endline/sdk";
-import { Account, JsonRpcProvider, KeyPair } from "near-api-js";
+import { Account, baseEncode, JsonRpcProvider, KeyPair } from "near-api-js";
+import { InvalidNonceError, TransactionTimeoutError, UnknownTransactionError } from "near-api-js/rpc-errors";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { loadConfig } from "./config.ts";
-import { nearChain, Refunded } from "./rpc.ts";
+import { type Chain, nearChain, ranTx, Refunded, Unsettled } from "./rpc.ts";
+import { session } from "./test-fakes.ts";
 
 const config = loadConfig({
   NEAR_RPC_URL: "https://rpc.example",
@@ -40,6 +43,71 @@ describe("depositFt", () => {
       expect(error).toBeInstanceOf(Error);
       expect(error).not.toBeInstanceOf(Refunded);
     }
+  });
+});
+
+describe("execute", () => {
+  it("hands back every transaction it signed when a send errors, also one re-signed after a stale key nonce", async () => {
+    vi.spyOn(JsonRpcProvider.prototype, "viewAccessKey").mockResolvedValue({ nonce: 7n } as never);
+    vi.spyOn(JsonRpcProvider.prototype, "viewBlock").mockResolvedValue({ header: { hash: baseEncode(new Uint8Array(32)) } } as never);
+    const sent: string[] = [];
+    vi.spyOn(JsonRpcProvider.prototype, "sendTransactionUntil").mockImplementation(async (tx) => {
+      sent.push(baseEncode(createHash("sha256").update(tx.transaction.encode()).digest()));
+      if (sent.length === 1) throw new InvalidNonceError(7, 7, "", "");
+      throw new Error("Request timeout");
+    });
+    const error = await nearChain(config).execute([]).catch((e: unknown) => e);
+    expect(sent).toHaveLength(2);
+    expect(error).toBeInstanceOf(Unsettled);
+    expect(error).toMatchObject({ message: "Request timeout", txHashes: sent });
+  });
+});
+
+describe("txStatus", () => {
+  it("reads the relayer's transaction at final, and only a transaction the node never saw is unknown", async () => {
+    const view = vi.spyOn(JsonRpcProvider.prototype, "viewTransactionStatus");
+    const chain = nearChain(config);
+    view.mockResolvedValueOnce({ final_execution_status: "FINAL", status: { SuccessValue: "" } } as never);
+    expect(await chain.txStatus("h")).toBe("succeeded");
+    expect(view).toHaveBeenCalledWith({ txHash: "h", accountId: "relayer.test", waitUntil: "NONE" });
+    view.mockResolvedValueOnce({ final_execution_status: "FINAL", status: { Failure: {} } } as never);
+    expect(await chain.txStatus("h")).toBe("failed");
+    view.mockResolvedValueOnce({ final_execution_status: "EXECUTED_OPTIMISTIC", status: { SuccessValue: "" } } as never);
+    expect(await chain.txStatus("h")).toBe("unknown");
+    view.mockRejectedValueOnce(new UnknownTransactionError("h"));
+    expect(await chain.txStatus("h")).toBe("unknown");
+    view.mockRejectedValueOnce(new TransactionTimeoutError());
+    await expect(chain.txStatus("h")).rejects.toBeInstanceOf(TransactionTimeoutError);
+  });
+});
+
+describe("ranTx", () => {
+  const expired = session("alice.test", { deadlineMs: Date.now() - 60_000 });
+  const chainWith = (txStatus: Chain["txStatus"]) => ({ txStatus, finalTimeMs: async () => Date.now() }) as unknown as Chain;
+
+  it("returns a transaction that ran even while another one can't be read", async () => {
+    const chain = chainWith(async (txHash) => {
+      if (txHash === "a") throw new Error("rpc down");
+      return "succeeded";
+    });
+    expect(await ranTx(chain, expired, new Unsettled(["a", "b"], new Error("timeout")), "t")).toBe("b");
+  });
+
+  it("never decides failed on a read error, even past the deadline", async () => {
+    vi.useFakeTimers();
+    let reads = 0;
+    const chain = chainWith(async () => {
+      reads += 1;
+      if (reads === 1) throw new Error("rpc down");
+      return "unknown";
+    });
+    const outcome = ranTx(chain, expired, new Unsettled(["a"], new Error("timeout")), "t");
+    await vi.advanceTimersByTimeAsync(0);
+    expect(reads).toBe(1);
+    await vi.advanceTimersByTimeAsync(3_000);
+    expect(await outcome).toBeUndefined();
+    expect(reads).toBe(2);
+    vi.useRealTimers();
   });
 });
 

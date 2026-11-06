@@ -30,6 +30,7 @@ if (contract.intents_id !== config.INTENTS_ID) throw new Error(`${config.OPTIONS
 if (contract.quote_asset !== config.QUOTE_ASSET) throw new Error(`${config.OPTIONS_ID} quotes in ${contract.quote_asset}, not ${config.QUOTE_ASSET}`);
 
 const fills = new Fills(config.DATA_DIR);
+await fills.load();
 const auctions = new Auctions((event, mmId, response, receivedAt) =>
   checkBid(chain, config.INTENTS_ID, event, mmId, response, receivedAt),
 );

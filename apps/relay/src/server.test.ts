@@ -57,7 +57,7 @@ function raw(request: string): Promise<string> {
 
 function connect(key: string, path = "/mm"): Promise<WebSocket> {
   return new Promise((resolve, reject) => {
-    const socket = new WebSocket(`ws://${base}${path}?key=${encodeURIComponent(key)}`);
+    const socket = new WebSocket(`ws://${base}${path}`, { headers: { authorization: `Bearer ${key}` } });
     sockets.push(socket);
     socket.once("open", () => resolve(socket));
     socket.once("unexpected-response", (_, response) => reject(new Error(`http ${response.statusCode}`)));
@@ -110,6 +110,20 @@ describe("http", () => {
       expect(await statusOf("/claims")).toBe(400);
     } finally {
       vi.useRealTimers();
+      await new Promise((resolve) => limited.close(resolve));
+    }
+  });
+
+  it("rate limits fill reads per IP in their own bucket, so polling them never blocks a trade", async () => {
+    const limited = createRelayServer(relay, fills, hub, collector, oneClick, calls);
+    await new Promise<void>((resolve) => limited.listen(0, "127.0.0.1", resolve));
+    const url = `http://127.0.0.1:${(limited.address() as AddressInfo).port}`;
+    const read = async () => (await fetch(`${url}/fills/alice.test`)).status;
+    try {
+      for (let i = 0; i < 600; i++) expect(await read()).toBe(200);
+      expect(await read()).toBe(429);
+      expect((await fetch(`${url}/quote`, { method: "POST", body: "{" })).status).toBe(400);
+    } finally {
       await new Promise((resolve) => limited.close(resolve));
     }
   });
@@ -238,11 +252,15 @@ describe("market maker socket", () => {
     await expect(connect(key)).rejects.toThrow("http 401");
   });
 
+  it("refuses the key in the URL, where proxies log it", async () => {
+    await expect(connect("", `/mm?key=${KEY}`)).rejects.toThrow("http 401");
+  });
+
   it("survives a refused upgrade whose client resets before the answer", async () => {
     for (let i = 0; i < 20; i++) {
       const [host, port] = base.split(":");
       const socket = rawConnect(Number(port), host, () => {
-        socket.write("GET /mm?key=wrong HTTP/1.1\r\nHost: relay\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 13\r\n\r\n");
+        socket.write("GET /mm HTTP/1.1\r\nHost: relay\r\nAuthorization: Bearer wrong\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 13\r\n\r\n");
         socket.resetAndDestroy();
       });
       socket.on("error", () => {});
