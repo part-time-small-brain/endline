@@ -47,7 +47,6 @@ export function PositionCard({ view, quoteDecimals, nowSec, onSellBack }: Props)
         <div>
           <h3 className="flex items-center gap-2 text-lg font-semibold">
             {seriesTitle(series, quoteDecimals)}
-            {view.tap && <span className="rounded-md bg-well px-1.5 py-0.5 text-xs font-semibold text-ink-2">Tap</span>}
           </h3>
           <p className="text-xs text-ink-2">{capLabel(series, quoteDecimals)}</p>
           <p className="text-sm text-ink-2">

@@ -581,77 +581,6 @@ test.describe("Tap", () => {
     await expect(page.getByRole("dialog")).toBeVisible();
   });
 
-  async function withTapBalance(page: Page) {
-    const state = await quoteFlow(page, false);
-    await page.route("**/claims", (route) => route.fulfill({ json: {} }));
-    await page.getByRole("button", { name: "Set up", exact: true }).click();
-    const sheet = page.getByRole("dialog", { name: "Tap balance" });
-    await sheet.getByRole("button", { name: "Set up with your wallet" }).click();
-    await sheet.getByRole("button", { name: "Sign once more to check" }).click();
-    await expect(sheet.getByText("In your Tap balance")).toBeVisible();
-    await page.keyboard.press("Escape");
-    return state;
-  }
-
-  test("a tap signs only while the firm quote still pays the multiple on the cell, and a refused one shows the new multiple at once", async ({ page }) => {
-    const state = await withTapBalance(page);
-    await page.route("**/rpc", async (route) => {
-      const params = route.request().postDataJSON().params;
-      if (params.method_name !== "mt_batch_balance_of") return route.fallback();
-      const ids: string[] = JSON.parse(Buffer.from(params.args_base64, "base64").toString()).token_ids;
-      await route.fulfill({ json: { jsonrpc: "2.0", id: "web", result: { result: [...Buffer.from(JSON.stringify(ids.map((id) => (id.endsWith("-P") ? "0" : String(250 * USD)))))] } } });
-    });
-    await page.clock.fastForward(10_000);
-    let ask = 400;
-    await page.route("**/marks", (route) => route.fulfill({ json: [{ series_id: "BTC-5NOV26-81000_83000-C", ask: String(ask * USD), bid: String(380 * USD), vol: 0.4 }] }));
-    const cell = page.getByRole("table").getByRole("button", { name: /^Up · BTC ends above \$81,000 · Tomorrow/ });
-    await expect(cell).toHaveAccessibleName(/· pays up to 5\.0×/);
-    await page.clock.pauseAt((await page.evaluate(() => Date.now())) + 1_000);
-    ask = 416;
-    state.premium = 26;
-    await cell.click();
-    await expect(page.getByRole("status").filter({ hasText: "The price moved. Tap again for the new one." })).toBeVisible();
-    await expect(cell).toHaveAccessibleName(/· pays up to 4\.8×/);
-    expect(state.published).toEqual([]);
-    await page.clock.resume();
-    await page.route("https://www.deribit.com/**", (route) => (route.request().url().includes("chart") ? route.fallback() : route.fulfill({ json: { result: { index_price: 81_200 } } })));
-    await page.clock.fastForward(5_000);
-    await expect(cell).toHaveAccessibleName(/· winning now · you hold this$/);
-    state.premium = 25;
-    await cell.click();
-    await expect(page.getByRole("status").filter({ hasText: "Bought BTC Up $81,000 for $25.00." })).toBeVisible();
-    await page.clock.pauseAt((await page.evaluate(() => Date.now())) + 100);
-    await expect.poll(() => cell.evaluate((el) => el.getAnimations().filter((a) => a instanceof CSSTransition).length)).toBe(0);
-    await expect(cell).toHaveCSS("background-color", "rgb(11, 38, 28)");
-    expect(state.published).toEqual(["quote-2"]);
-  });
-
-  test("a move the relay can't confirm never says nothing moved, and rereads both balances", async ({ page }) => {
-    const state = await withTapBalance(page);
-    await page.route("**/health", (route) => route.fulfill({ json: { ok: true, market_makers: 1, relayer_id: "relayer.demo.testnet" } }));
-    await page.evaluate(() => {
-      const fetch = window.fetch.bind(window);
-      window.fetch = (input, init) => (String(input).endsWith("/transfer") ? Promise.resolve(new Response("error code: 524", { status: 524 })) : fetch(input, init));
-    });
-    await page.getByRole("button", { name: "Top up or move" }).click();
-    const sheet = page.getByRole("dialog", { name: "Tap balance" });
-    const reads = state.balanceReads;
-    await sheet.getByRole("button", { name: "Move $25 in" }).click();
-    await expect(sheet.getByRole("alert")).toHaveText("We couldn't confirm this move. Check both balances before you try again.");
-    await expect.poll(() => state.balanceReads).toBeGreaterThan(reads);
-  });
-
-  test("Your taps never offers a bet without a price for $0, nor one the relay won't quote", async ({ page }) => {
-    await withTapBalance(page);
-    const mine = page.getByRole("region", { name: "Your taps" });
-    await expect(mine.getByRole("button", { name: /^Sell \$/ })).toHaveText([/^Sell \$[\d,.]+$/]);
-    await expect(mine.getByRole("button", { name: "Sell unavailable" }).first()).toBeDisabled();
-    const closed = listed.map((s) => (s.id === "BTC-5NOV26-81000_83000-C" ? { ...s, quotable: false } : s));
-    await page.route("**/series", (route) => route.fulfill({ json: { quote_asset: "nep141:usdc.demo.testnet", quote_decimals: 6, series: closed } }));
-    await page.clock.fastForward(15_000);
-    await expect(mine.getByRole("button", { name: /^Sell \$/ })).toHaveCount(0);
-  });
-
   test("a held cell shows what it's worth and its P&L, and glows and flashes each time spot crosses its price to beat", async ({ page }) => {
     let index = 80_650;
     let marks: Mark[] = [{ series_id: "BTC-5NOV26-81000_83000-C", ask: String(400 * USD), bid: String(380 * USD), vol: 0.4 }];
@@ -686,6 +615,8 @@ test.describe("Tap", () => {
     await expect.poll(flashes, { intervals: [50] }).toBe(1);
     await expect(cell).toHaveAccessibleName(/· up \$2\.60 · winning now · you hold this$/);
     await expect.poll(flashes).toBe(0);
+    await expect.poll(() => cell.evaluate((el) => el.getAnimations().filter((a) => a instanceof CSSTransition).length)).toBe(0);
+    await expect(cell).toHaveCSS("background-color", "rgb(11, 38, 28)");
     index = 80_650;
     await page.clock.fastForward(5_000);
     await expect.poll(flashes, { intervals: [50] }).toBe(1);

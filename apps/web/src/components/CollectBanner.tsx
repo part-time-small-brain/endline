@@ -2,7 +2,6 @@ import { Check, X } from "@phosphor-icons/react";
 import { useEffect, useState } from "react";
 import type { PositionView } from "../app/usePositions.ts";
 import { useCollect } from "../hooks/useCollect.ts";
-import { collectTurn } from "../lib/collect.ts";
 import { formatUsd } from "../lib/money.ts";
 import { Button } from "./Button.tsx";
 
@@ -48,9 +47,8 @@ export function CollectBanner({ views, quoteDecimals }: { views: PositionView[];
         className="shrink-0"
         disabled={collect.busy}
         onClick={() => {
-          const turn = collectTurn(ready);
-          setCollecting(turn.reduce((sum, v) => sum + v.payout, 0n));
-          void collect.collect(turn);
+          setCollecting(total);
+          void collect.collect(ready);
         }}
       >
         {collect.busy ? "Confirm in wallet…" : "Collect"}

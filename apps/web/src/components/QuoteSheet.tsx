@@ -56,7 +56,7 @@ export function QuoteSheet({ wallet, series, side, size, budget, onClose, onAddF
             </svg>
           </div>
           <p className="mt-4 text-2xl font-semibold">{buying ? "You're in" : "Sold"}</p>
-          <p className="mt-1 text-ink-2">{buying ? `${seriesTitle(series, quoteDecimals)} · win up to ${winUpTo}` : wallet.kind === "tap" ? "Added to your Tap balance" : "Added to your balance"}</p>
+          <p className="mt-1 text-ink-2">{buying ? `${seriesTitle(series, quoteDecimals)} · win up to ${winUpTo}` : "Added to your balance"}</p>
           {buying && <p className="text-sm text-ink-3">Ends {formatEnds(series.expiry)}</p>}
           {phase.txHash && <TxLink hash={phase.txHash} className="mt-3" />}
         </div>

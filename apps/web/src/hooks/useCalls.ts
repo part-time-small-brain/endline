@@ -8,7 +8,7 @@ import { formatMultiple } from "../lib/money.ts";
 import { useWallet } from "../wallet/context.tsx";
 import { cachedSession, forgetSession, signSession } from "../wallet/session.ts";
 import type { Wallet } from "../wallet/wallet.ts";
-import type { TapState } from "./useTaps.ts";
+import type { TapState } from "../components/tap/Cell.tsx";
 
 const SHOWN_MS = 3_000;
 

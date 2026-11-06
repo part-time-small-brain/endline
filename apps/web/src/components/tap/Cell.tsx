@@ -1,6 +1,5 @@
 import { m } from "motion/react";
 import { useEffect, useRef, useState } from "react";
-import type { TapState } from "../../hooks/useTaps.ts";
 import type { GridCell } from "../../lib/grid.ts";
 import { formatMultiple } from "../../lib/money.ts";
 import { SideGlyph } from "../Glyphs.tsx";
@@ -17,6 +16,8 @@ const LOOK = {
     winning: "border-down bg-down-field text-down-ink inset-ring-[1.5px] shadow-[0_0_20px_var(--down-glow)]",
   },
 } as const;
+
+export type TapState = { status: "busy" } | { status: "done" } | { status: "failed" };
 
 const RING = { busy: "animate-pulse", done: "shadow-[0_0_28px_currentColor]!", failed: "ring-2 ring-danger" } as const;
 

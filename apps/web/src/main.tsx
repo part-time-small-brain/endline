@@ -6,7 +6,6 @@ import { DataProvider } from "./app/data.tsx";
 import { type Config, loadConfig } from "./config.ts";
 import { createServices, type Services } from "./services.ts";
 import { WalletProvider } from "./wallet/context.tsx";
-import { TapProvider } from "./wallet/tapBalance.tsx";
 import "./index.css";
 
 const root = createRoot(document.getElementById("root") as HTMLElement);
@@ -24,11 +23,9 @@ try {
     <StrictMode>
       <AppContext.Provider value={{ config, services }}>
         <WalletProvider>
-          <TapProvider>
-            <DataProvider>
-              <App />
-            </DataProvider>
-          </TapProvider>
+          <DataProvider>
+            <App />
+          </DataProvider>
         </WalletProvider>
       </AppContext.Provider>
     </StrictMode>,

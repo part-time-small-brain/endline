@@ -13,20 +13,13 @@ export interface PositionView {
   amount: bigint;
   payout: bigint;
   valueNow: bigint | undefined;
-  tap: boolean;
 }
 
 const ORDER: PositionStatus[] = ["collect", "active", "closed", "settling", "paid", "expired"];
 
-type PositionData = Pick<AppData, "listing" | "balances" | "fills" | "tapBalances" | "tapFills" | "settlements" | "marks" | "timing" | "optionAsset">;
+type PositionData = Pick<AppData, "listing" | "balances" | "fills" | "settlements" | "marks" | "timing" | "optionAsset">;
 
-export function positions(data: PositionData, nowSec: number): PositionView[] | undefined {
-  const main = accountPositions(data, data.balances, data.fills, nowSec, false);
-  const tap = accountPositions(data, data.tapBalances, data.tapFills, nowSec, true) ?? [];
-  return main && [...main, ...tap].sort((a, b) => ORDER.indexOf(a.status) - ORDER.indexOf(b.status) || a.series.expiry - b.series.expiry);
-}
-
-function accountPositions({ listing, settlements, marks, timing, optionAsset }: PositionData, balances: AppData["balances"], fills: AppData["fills"], nowSec: number, tap: boolean): PositionView[] | undefined {
+export function positions({ listing, balances, fills, settlements, marks, timing, optionAsset }: PositionData, nowSec: number): PositionView[] | undefined {
   if (!listing || !balances || !fills || !timing) return undefined;
   return listing.series
     .flatMap((s): PositionView[] => {
@@ -43,9 +36,10 @@ function accountPositions({ listing, settlements, marks, timing, optionAsset }: 
       const payout = final ? longPayout(terms, amount, final.price) : 0n;
       const mark = marks?.[s.id];
       const valueNow = status === "active" && mark ? (held * BigInt(mark.bid ?? 0)) / terms.unit : undefined;
-      const view = { series: s, held, paid: sum("buy", "premium"), received: sum("sell", "premium"), status: positionStatus(status, payout, held, final !== null && nowSec >= final.finalAt + 60), settlement, amount, payout, valueNow, tap };
+      const view = { series: s, held, paid: sum("buy", "premium"), received: sum("sell", "premium"), status: positionStatus(status, payout, held, final !== null && nowSec >= final.finalAt + 60), settlement, amount, payout, valueNow };
       return held > 0n || view.status === "paid" ? [view] : [];
-    });
+    })
+    .sort((a, b) => ORDER.indexOf(a.status) - ORDER.indexOf(b.status) || a.series.expiry - b.series.expiry);
 }
 
 export function valueOf(view: PositionView): bigint | undefined {
@@ -64,16 +58,13 @@ export interface Holding {
 }
 
 export function holding(views: PositionView[], seriesId: string): Holding {
-  const own = views.filter((v) => v.series.id === seriesId);
-  const values = own.map(valueOf);
-  const pnls = own.map(pnlOf);
-  const value = values.some((v) => v !== undefined) ? values.reduce<bigint>((total, v) => total + (v ?? 0n), 0n) : undefined;
-  if (own.length === 0 || pnls.includes(undefined)) return { value, pnl: undefined, change: undefined };
-  const pnl = pnls.reduce<bigint>((total, v) => total + (v ?? 0n), 0n);
-  return { value, pnl, change: Number(pnl) / Number(own.reduce((total, v) => total + v.paid, 0n)) };
+  const view = views.find((v) => v.series.id === seriesId);
+  if (!view) return { value: undefined, pnl: undefined, change: undefined };
+  const pnl = pnlOf(view);
+  return { value: valueOf(view), pnl, change: pnl === undefined ? undefined : Number(pnl) / Number(view.paid) };
 }
 
 export function usePositions(nowSec: number): PositionView[] | undefined {
-  const { listing, balances, fills, tapBalances, tapFills, settlements, marks, timing, optionAsset } = useData();
-  return useMemo(() => positions({ listing, balances, fills, tapBalances, tapFills, settlements, marks, timing, optionAsset }, nowSec), [listing, balances, fills, tapBalances, tapFills, settlements, marks, timing, optionAsset, nowSec]);
+  const { listing, balances, fills, settlements, marks, timing, optionAsset } = useData();
+  return useMemo(() => positions({ listing, balances, fills, settlements, marks, timing, optionAsset }, nowSec), [listing, balances, fills, settlements, marks, timing, optionAsset, nowSec]);
 }

@@ -5,7 +5,6 @@ import { Notice } from "../components/Notice.tsx";
 import { PositionCard } from "../components/PositionCard.tsx";
 import type { QuoteSelection } from "../components/QuoteSheet.tsx";
 import { useWallet } from "../wallet/context.tsx";
-import { useTapPayer } from "../wallet/tapBalance.tsx";
 
 interface Props {
   views: PositionView[] | undefined;
@@ -17,7 +16,6 @@ interface Props {
 
 export function Positions({ views, nowSec, onConnect, onTrade, onQuote }: Props) {
   const { wallet } = useWallet();
-  const { payer, error } = useTapPayer();
   const { quoteDecimals } = useData();
 
   if (!wallet)
@@ -40,16 +38,8 @@ export function Positions({ views, nowSec, onConnect, onTrade, onQuote }: Props)
 
   return (
     <div className="space-y-3 pb-10">
-      {error && (
-        <p role="alert" className="text-sm text-danger">
-          {error}
-        </p>
-      )}
       {views.map((view) => (
-        <PositionCard key={`${view.tap ? "tap" : "main"}:${view.series.id}`} view={view} quoteDecimals={quoteDecimals} nowSec={nowSec} onSellBack={async () => {
-            const seller = view.tap ? await payer() : wallet;
-            if (seller) onQuote({ wallet: seller, series: view.series, side: "sell", size: view.held });
-          }} />
+        <PositionCard key={view.series.id} view={view} quoteDecimals={quoteDecimals} nowSec={nowSec} onSellBack={() => onQuote({ wallet, series: view.series, side: "sell", size: view.held })} />
       ))}
     </div>
   );

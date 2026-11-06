@@ -6,7 +6,6 @@ import { useData } from "../app/data.tsx";
 import type { PositionView } from "../app/usePositions.ts";
 import { collectBatches, minRelayedPayout } from "../lib/collect.ts";
 import { useWallet } from "../wallet/context.tsx";
-import { useTap } from "../wallet/tapBalance.tsx";
 import type { Wallet } from "../wallet/wallet.ts";
 
 const DEADLINE_MS = 7 * 60_000;
@@ -47,7 +46,6 @@ export function useClaim() {
 export function useCollect() {
   const { config, services } = useApp();
   const { wallet } = useWallet();
-  const tap = useTap();
   const { optionAsset, quoteDecimals, reload } = useData();
   const signExercise = useSignExercise();
   const [state, setState] = useState<CollectState>({ busy: false, done: false, error: undefined, txHash: undefined });
@@ -58,14 +56,11 @@ export function useCollect() {
       setState({ busy: true, done: false, error: undefined, txHash: undefined });
       let txHash: string | undefined;
       try {
-        const owners = [views.filter((v) => !v.tap), views.filter((v) => v.tap)];
-        const batches = owners.flatMap((own, i) => collectBatches(own, minRelayedPayout(quoteDecimals)).map((batch) => ({ ...batch, tap: i === 1 })));
-        for (const batch of batches) {
-          const signer = batch.tap ? await tap.unlock() : wallet;
-          const call = signer.call;
+        for (const batch of collectBatches(views, minRelayedPayout(quoteDecimals))) {
+          const call = wallet.call;
           if (!batch.relayed && !call) throw new Error("Payouts under $1 are too small to collect without gas. Collect them from a NEAR wallet.");
           const tokens = Object.fromEntries(batch.views.map((v) => [optionAsset(v.series.id), v.held]));
-          const signed = await signExercise(signer, tokens, Date.now() + DEADLINE_MS);
+          const signed = await signExercise(wallet, tokens, Date.now() + DEADLINE_MS);
           if (batch.relayed) txHash = await refusedOr(services.relay.execute(signed), "We couldn't confirm this collect. Check your balance before you try again.");
           else await call?.({ receiverId: config.intentsId, methodName: "execute_intents", args: { signed: [signed] }, gas: EXECUTE_GAS, deposit: "0" });
         }
@@ -76,7 +71,7 @@ export function useCollect() {
         reload();
       }
     },
-    [wallet, tap, config, services, signExercise, optionAsset, quoteDecimals, reload],
+    [wallet, config, services, signExercise, optionAsset, quoteDecimals, reload],
   );
 
   return { ...state, collect };
