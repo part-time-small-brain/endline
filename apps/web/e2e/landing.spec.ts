@@ -182,7 +182,7 @@ test("every funding chain shows a loaded logo", async ({ page }) => {
   }
 });
 
-test("hero dots split Up and Down around the cursor, fade when it leaves, then idle and follow the theme", async ({ page }) => {
+test("hero dots split Up and Down around the cursor, fade when it leaves, then idle", async ({ page }) => {
   test.skip(test.info().project.use.isMobile === true, "needs a hovering pointer");
   const canvas = hero(page).locator("canvas");
   await canvas.evaluate((element: HTMLCanvasElement) => {
@@ -215,19 +215,6 @@ test("hero dots split Up and Down around the cursor, fade when it leaves, then i
   await expect.poll(() => tints(page, spot.x, spot.y)).toEqual({ above: "none", below: "none" });
   await expect.poll(() => cursorLineOpacity(page)).toBeLessThan(0.01);
   await expect.poll(drawsWhileWaiting).toBe(0);
-
-  const dark = test.info().project.use.colorScheme === "dark";
-  const corner = await canvas.boundingBox();
-  if (!corner) throw new Error("no canvas");
-  const whiteDots = async () => {
-    const data = await pixels(page, corner.x, corner.y, 18, 18);
-    let solidest = 0;
-    for (let i = 4; i < data.length; i += 4) if ((data[i + 3] ?? 0) > (data[solidest + 3] ?? 0)) solidest = i;
-    return (data[solidest] ?? 0) > 128;
-  };
-  expect(await whiteDots()).toBe(dark);
-  await nav.getByTitle(dark ? "Light" : "Dark").click();
-  await expect.poll(whiteDots).toBe(!dark);
 });
 
 test("touch leaves the hero dots alone", async ({ page, context }) => {

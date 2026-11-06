@@ -465,13 +465,13 @@ test("Lite baseline and six popovers fit the viewport and support Escape", async
 });
 
 const look = (page: Page) => page.evaluate(() => [
-  document.documentElement.dataset.look ?? "none",
   getComputedStyle(document.documentElement).backgroundColor,
+  getComputedStyle(document.body).backgroundImage.startsWith("radial-gradient"),
   document.querySelector('meta[name="theme-color"]')?.getAttribute("content"),
 ]);
-const NEAR = ["near", "rgb(10, 10, 10)", "#0a0a0a"];
+const NEAR = ["rgb(10, 10, 10)", true, "#0a0a0a"];
 
-test("every app screen wears the NEAR look in both themes, with no theme switch, and the landing keeps its own", async ({ page }) => {
+test("every screen and the landing wear the one dark dotted look, with no theme switch", async ({ page }) => {
   const themeSwitch = page.getByRole("group", { name: "Theme", exact: true });
   await page.goto("/app");
   await expect(page.getByLabel("Trade sentence")).toBeVisible();
@@ -487,7 +487,8 @@ test("every app screen wears the NEAR look in both themes, with no theme switch,
   expect(await look(page)).toEqual(NEAR);
   await expect(themeSwitch).toBeHidden();
   await page.goto("/");
-  await expect(page.locator("html")).not.toHaveAttribute("data-look", /./);
+  expect(await look(page)).toEqual(NEAR);
+  await expect(themeSwitch).toBeHidden();
 });
 
 test("the price list runs high to low with now marked between the prices either side", async ({ page }) => {

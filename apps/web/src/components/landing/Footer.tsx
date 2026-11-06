@@ -1,7 +1,6 @@
 import { useApp } from "../../app/context.ts";
 import { Link } from "../../app/router.tsx";
 import { Wordmark } from "../Glyphs.tsx";
-import { ThemeSwitch } from "../ThemeSwitch.tsx";
 
 const LINK = "text-ink-2 transition-colors duration-150 hover:text-ink";
 
@@ -22,7 +21,6 @@ export function Footer() {
             GitHub
           </a>
         </nav>
-        <ThemeSwitch />
       </div>
       <div className="mt-8 flex flex-col gap-2 pt-6 text-xs text-ink-2 shadow-[0_-1.5px_0_var(--rule)] sm:flex-row sm:justify-between">
         <p>

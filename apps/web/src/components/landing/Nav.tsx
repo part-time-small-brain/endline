@@ -1,7 +1,6 @@
 import { useApp } from "../../app/context.ts";
 import { Link } from "../../app/router.tsx";
 import { Wordmark } from "../Glyphs.tsx";
-import { ThemeSwitch } from "../ThemeSwitch.tsx";
 import { jump } from "./jump.ts";
 
 const SECTIONS = [
@@ -30,9 +29,6 @@ export function Nav() {
       <a href="/docs" className={LINK}>
         Docs
       </a>
-      <div className="mx-2 hidden lg:block">
-        <ThemeSwitch />
-      </div>
       <Link
         href={paths.trade}
         className="inline-flex h-10 items-center rounded-full bg-ink px-4 text-sm font-semibold whitespace-nowrap text-on-ink transition-[transform,opacity] duration-150 ease-out hover:opacity-90 active:scale-[0.97]"

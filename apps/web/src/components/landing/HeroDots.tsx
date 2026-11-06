@@ -33,11 +33,8 @@ export function HeroDots({ still }: { still: boolean }) {
     let shown = 0;
     let frame = 0;
 
-    const readColors = () => {
-      const style = getComputedStyle(canvas);
-      return { grid: style.getPropertyValue("--grid"), up: style.getPropertyValue("--up"), down: style.getPropertyValue("--down") };
-    };
-    let colors = readColors();
+    const style = getComputedStyle(canvas);
+    const colors = { grid: style.getPropertyValue("--grid"), up: style.getPropertyValue("--up"), down: style.getPropertyValue("--down") };
 
     const circle = (dot: Dot, radius: number) => {
       ctx.moveTo(dot.x + radius, dot.y + dot.lift);
@@ -107,17 +104,11 @@ export function HeroDots({ still }: { still: boolean }) {
 
     const size = new ResizeObserver(resize);
     size.observe(canvas);
-    const theme = new MutationObserver(() => {
-      colors = readColors();
-      wake();
-    });
-    theme.observe(document.documentElement, { attributeFilter: ["data-theme"] });
     area.addEventListener("pointermove", move);
     area.addEventListener("pointerleave", leave);
     return () => {
       cancelAnimationFrame(frame);
       size.disconnect();
-      theme.disconnect();
       area.removeEventListener("pointermove", move);
       area.removeEventListener("pointerleave", leave);
     };

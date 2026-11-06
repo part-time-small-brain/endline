@@ -53,9 +53,7 @@ const seeds = (page: Page) => page.evaluate(() => Object.keys(sessionStorage).fi
 
 test("Tap persists across reload and puts every Up cell above the spot line and every Down cell below it", async ({ page }) => {
   await openTap(page);
-  await expect(page.locator("html")).toHaveAttribute("data-look", "near");
   await page.getByRole("button", { name: "Pro", exact: true }).click();
-  await expect(page.locator("html")).toHaveAttribute("data-look", "near");
   await page.getByRole("button", { name: "Tap", exact: true }).click();
   await page.reload();
   await expect(page.getByRole("button", { name: "Tap", exact: true })).toHaveAttribute("aria-pressed", "true");
