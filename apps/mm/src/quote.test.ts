@@ -12,7 +12,7 @@ import { nep413Signer } from "./signer.ts";
 const MM = "mm.test.near";
 const key = KeyPair.fromRandom("ed25519");
 
-const DEFAULTS = loadConfig({ MM_ACCOUNT_ID: MM, MM_PRIVATE_KEY: key.toString(), NEAR_RPC_URL: "http://rpc", OPTIONS_ID: "opt.test.near" }).settings;
+const DEFAULTS = loadConfig({ MM_ACCOUNT_ID: MM, MM_PRIVATE_KEY: key.toString(), NETWORK_ID: "testnet" }).settings;
 
 describe("default limits on a near-money bet", () => {
   const ONE_BTC = 100_000_000n;

@@ -1,6 +1,7 @@
 import { listedWidth, type Mark, seriesId, toSign, type QuoteRequest, type StatusUpdate } from "@endline/sdk";
 import type { Page, Route } from "@playwright/test";
-import { expect, handleOf, money, term, test } from "./fixtures.ts";
+import testnet from "../../../deploy/testnet.json" with { type: "json" };
+import { expect, handleOf, money, RPC, term, test } from "./fixtures.ts";
 
 const USD = 1_000_000;
 const NOW_MS = Date.parse(process.env.E2E_NOW ?? "2026-11-04T12:00:00Z");
@@ -14,13 +15,13 @@ const listed = [5, 6].flatMap((day) =>
       width: String(2_000 * USD),
       expiry: Date.UTC(2026, 10, day, 8) / 1000,
       underlying_decimals: 8,
-      option_asset: "nep245:opt.demo.testnet:x",
+      option_asset: `nep245:${testnet.options_id}:x`,
       quotable: true,
     })),
   ),
 );
 const view: Record<string, unknown> = {
-  get_config: { intents_id: "intents.demo.testnet", quote_asset: "nep141:usdc.demo.testnet", quote_decimals: 6, timing: { write_cutoff_sec: 1_800 } },
+  get_config: { intents_id: testnet.intents_id, quote_asset: testnet.quote_asset, quote_decimals: 6, timing: { write_cutoff_sec: 1_800 } },
   get_underlyings: [["BTC", { decimals: 8 }]],
 };
 
@@ -29,11 +30,11 @@ test.beforeEach(async ({ page }) => {
 });
 
 async function live(page: Page, marks: () => unknown[] | undefined | "hang", index = () => 80_650, series = listed) {
-  await page.route("**/rpc", (route) => {
+  await page.route(RPC, (route) => {
     const value = view[route.request().postDataJSON().params.method_name];
     route.fulfill({ json: { jsonrpc: "2.0", id: "web", ...(value === undefined ? { error: { message: "unknown" } } : { result: { result: [...Buffer.from(JSON.stringify(value))] } }) } });
   });
-  await page.route("**/series", (route) => route.fulfill({ json: { quote_asset: "nep141:usdc.demo.testnet", quote_decimals: 6, series } }));
+  await page.route("**/series", (route) => route.fulfill({ json: { quote_asset: testnet.quote_asset, quote_decimals: 6, series } }));
   await page.route("**/marks", (route) => {
     const answer = marks();
     if (answer !== "hang") route.fulfill({ json: answer ?? { error: "no market makers" } });
@@ -100,14 +101,14 @@ async function quoteFlow(page: Page, open = true) {
     const signBy = await page.evaluate(() => Date.now() + 20_000);
     const quoteId = `quote-${++state.quotes}`;
     const premium = String(state.premium * USD);
-    const cash = { asset: "nep141:usdc.demo.testnet", amount: premium };
-    const option = { asset: `nep245:opt.demo.testnet:${request.series_id}`, amount: request.size };
+    const cash = { asset: testnet.quote_asset, amount: premium };
+    const option = { asset: `nep245:${testnet.options_id}:${request.series_id}`, amount: request.size };
     const [pay, receive] = request.side === "buy" ? [cash, option] : [option, cash];
     await state.quote(route, {
       quote_id: quoteId, series_id: request.series_id, side: request.side, size: request.size,
       premium, pay, receive, sign_by_ms: signBy,
       payload: toSign(request.signer.standard, {
-        signer_id: request.signer.signer_id, verifying_contract: "intents.demo.testnet", deadline: new Date(signBy + 3_000).toISOString(), nonce: "AA==",
+        signer_id: request.signer.signer_id, verifying_contract: testnet.intents_id, deadline: new Date(signBy + 3_000).toISOString(), nonce: "AA==",
         intents: [{ intent: "token_diff", diff: { [pay.asset]: `-${pay.amount}`, [receive.asset]: receive.amount } }],
       }),
     });
@@ -128,7 +129,7 @@ async function quoteFlow(page: Page, open = true) {
       : { json: { quote_id: id, status, tx_hash: status === "settled" ? "original-fill" : undefined } });
   });
   await live(page, () => [{ series_id: "BTC-5NOV26-81000_83000-C", ask: String(400 * USD), bid: String(380 * USD), vol: 0.4 }]);
-  await page.route("**/rpc", async (route) => {
+  await page.route(RPC, async (route) => {
     const params = route.request().postDataJSON().params;
     const args = JSON.parse(Buffer.from(params.args_base64, "base64").toString());
     const value = params.method_name === "current_salt" ? "00000000"
@@ -403,7 +404,7 @@ for (const status of ["failed", "expired"] as const) {
 const landingHero = (page: Page) => page.getByRole("region", { name: "Pick a side of the line." });
 
 test("with no relay the hero says it can't reach the market and never links a series", async ({ page }) => {
-  await page.route("**/rpc", (route) => route.fulfill({ json: { jsonrpc: "2.0", id: "web", error: { message: "offline" } } }));
+  await page.route(RPC, (route) => route.fulfill({ json: { jsonrpc: "2.0", id: "web", error: { message: "offline" } } }));
   await page.goto("/");
   await page.clock.fastForward(10_000);
   const hero = landingHero(page);
@@ -595,7 +596,7 @@ test.describe("Tap", () => {
 
   test("a tap signs only while the firm quote still pays the multiple on the cell, and a refused one shows the new multiple at once", async ({ page }) => {
     const state = await withTapBalance(page);
-    await page.route("**/rpc", async (route) => {
+    await page.route(RPC, async (route) => {
       const params = route.request().postDataJSON().params;
       if (params.method_name !== "mt_batch_balance_of") return route.fallback();
       const ids: string[] = JSON.parse(Buffer.from(params.args_base64, "base64").toString()).token_ids;
@@ -639,7 +640,7 @@ test.describe("Tap", () => {
       const fetch = window.fetch.bind(window);
       window.fetch = (input, init) => (String(input).endsWith("/claims") ? Promise.resolve(new Response(JSON.stringify({ error: "the claim queue is full" }), { status: 503 })) : fetch(input, init));
     });
-    await page.route("**/rpc", async (route) => {
+    await page.route(RPC, async (route) => {
       const params = route.request().postDataJSON().params;
       if (params.method_name !== "mt_batch_balance_of") return route.fallback();
       const ids: string[] = JSON.parse(Buffer.from(params.args_base64, "base64").toString()).token_ids;
@@ -671,7 +672,7 @@ test.describe("Tap", () => {
     await expect(mine.getByRole("button", { name: /^Sell \$/ })).toHaveText([/^Sell \$[\d,.]+$/]);
     await expect(mine.getByRole("button", { name: "Sell unavailable" }).first()).toBeDisabled();
     const closed = listed.map((s) => (s.id === "BTC-5NOV26-81000_83000-C" ? { ...s, quotable: false } : s));
-    await page.route("**/series", (route) => route.fulfill({ json: { quote_asset: "nep141:usdc.demo.testnet", quote_decimals: 6, series: closed } }));
+    await page.route("**/series", (route) => route.fulfill({ json: { quote_asset: testnet.quote_asset, quote_decimals: 6, series: closed } }));
     await page.clock.fastForward(15_000);
     await expect(mine.getByRole("button", { name: /^Sell \$/ })).toHaveCount(0);
   });
@@ -679,7 +680,7 @@ test.describe("Tap", () => {
   test("a held cell shows what it's worth and its P&L, and glows and flashes each time spot crosses its price to beat", async ({ page }) => {
     let index = 80_650;
     let marks: Mark[] = [{ series_id: "BTC-5NOV26-81000_83000-C", ask: String(400 * USD), bid: String(380 * USD), vol: 0.4 }];
-    const token = "nep245:opt.demo.testnet:BTC-5NOV26-81000_83000-C";
+    const token = `nep245:${testnet.options_id}:BTC-5NOV26-81000_83000-C`;
     await page.addInitScript(() => {
       (window as unknown as { ethereum: object }).ethereum = {
         async request({ method }: { method: string }) {
@@ -692,7 +693,7 @@ test.describe("Tap", () => {
       route.fulfill({ json: [{ quote_id: "q", series_id: "BTC-5NOV26-81000_83000-C", side: "buy", account_id: "0x1111111111111111111111111111111111111111", size: "2000000", premium: String(5 * USD), tx_hash: "tx", at_ms: NOW_MS - 3_600_000 }] }),
     );
     await live(page, () => marks, () => index);
-    await page.route("**/rpc", (route) => {
+    await page.route(RPC, (route) => {
       const params = route.request().postDataJSON().params;
       const args = JSON.parse(Buffer.from(params.args_base64, "base64").toString());
       const value = params.method_name === "mt_batch_balance_of" ? args.token_ids.map((id: string) => (id === token ? "2000000" : "0")) : view[params.method_name];
@@ -727,7 +728,7 @@ test.describe("Tap", () => {
 
   async function heldThroughTheEnd(page: Page, { bothSides = false } = {}) {
     const expiry = Date.UTC(2026, 10, 5, 8) / 1000;
-    const tokens = ["nep245:opt.demo.testnet:BTC-5NOV26-81000_83000-C", ...(bothSides ? ["nep245:opt.demo.testnet:BTC-5NOV26-81000_79000-P"] : [])];
+    const tokens = [`nep245:${testnet.options_id}:BTC-5NOV26-81000_83000-C`, ...(bothSides ? [`nep245:${testnet.options_id}:BTC-5NOV26-81000_79000-P`] : [])];
     const world = { index: 81_500, settlement: null as null | { price: string; final_at: number } };
     await page.addInitScript(() => {
       (window as unknown as { ethereum: object }).ethereum = {
@@ -751,7 +752,7 @@ test.describe("Tap", () => {
     const junkStrike = 500_000n * BigInt(USD);
     const junkWidth = listedWidth(junkStrike, 6);
     const junk = { ...listed[0]!, id: seriesId({ underlying: "BTC", expiry, strike: junkStrike, width: junkWidth, quoteDecimals: 6, kind: "call" }), strike: String(junkStrike), width: String(junkWidth), kind: "call" as const };
-    await page.route("**/series", (route) => route.fulfill({ json: { quote_asset: "nep141:usdc.demo.testnet", quote_decimals: 6, series: [...listed, junk] } }));
+    await page.route("**/series", (route) => route.fulfill({ json: { quote_asset: testnet.quote_asset, quote_decimals: 6, series: [...listed, junk] } }));
     await page.route("https://www.deribit.com/**", (route) =>
       route.fulfill({
         json: route.request().url().includes("chart")
@@ -759,7 +760,7 @@ test.describe("Tap", () => {
           : { result: { index_price: world.index } },
       }),
     );
-    await page.route("**/rpc", (route) => {
+    await page.route(RPC, (route) => {
       const params = route.request().postDataJSON().params;
       const args = JSON.parse(Buffer.from(params.args_base64, "base64").toString());
       const value = params.method_name === "mt_batch_balance_of" ? args.token_ids.map((id: string) => (tokens.includes(id) ? "2000000" : "0")) : params.method_name === "get_settlement" ? world.settlement : view[params.method_name];
@@ -900,7 +901,7 @@ test.describe("Tap", () => {
       { series_id: "BTC-5NOV26-82000_84000-C", ask: String(18_721), vol: 0.4 },
       { series_id: "BTC-6NOV26-82000_84000-C", ask: String(400 * USD), vol: 0.4 },
     ], undefined, series);
-    await page.route("**/rpc", (route) => {
+    await page.route(RPC, (route) => {
       const params = route.request().postDataJSON().params;
       const args = JSON.parse(Buffer.from(params.args_base64, "base64").toString());
       const value = params.method_name === "current_salt" ? "00000000" : params.method_name === "mt_batch_balance_of" ? args.token_ids.map(() => "0") : view[params.method_name];

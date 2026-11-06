@@ -23,11 +23,11 @@ Before quoting, the MM account needs its key registered on the verifier (`add_pu
 Act as a user against a running relay (nep413, so the user key must be registered on the verifier too):
 
 ```bash
-USER_ACCOUNT_ID=… USER_PRIVATE_KEY=ed25519:… NEAR_RPC_URL=… INTENTS_ID=… \
+USER_ACCOUNT_ID=… USER_PRIVATE_KEY=ed25519:… NETWORK_ID=testnet \
   pnpm --filter @endline/mm exec tsx src/smoke.ts <relay-url> <series_id> buy|sell|collect|claim <size>
 ```
 
-All actions need `NEAR_RPC_URL` and `INTENTS_ID`: `buy` and `sell` sign a session first ([Relay API](https://docs.endline.trade/developers/relay-api#a-trade)). `collect` and `claim` also need `OPTIONS_ID`: `collect` sends an exercise to the relay's `/execute`, `claim` stores one valid for 7 days at its `/claims` for auto-collect.
+The RPC and contract ids come from `deploy/<NETWORK_ID>.json`. `buy` and `sell` sign a session first ([Relay API](https://docs.endline.trade/developers/relay-api#a-trade)). `collect` sends an exercise to the relay's `/execute`, `claim` stores one valid for 7 days at its `/claims` for auto-collect.
 
 ## Env
 
@@ -38,10 +38,8 @@ Read from the process environment.
 | `RELAY_WS_URL` | Relay MM socket, e.g. `ws://localhost:8080/mm`. Quoting only |
 | `MM_API_KEY` | One of the relay's `MM_API_KEYS`, sent as `Authorization: Bearer <key>`. Quoting only |
 | `MM_ACCOUNT_ID` | Signer of quotes and writes |
-| `MM_PRIVATE_KEY` | `ed25519:…` key registered for `MM_ACCOUNT_ID` on `INTENTS_ID` |
-| `NEAR_RPC_URL` | NEAR JSON-RPC |
-| `INTENTS_ID` | Verifier, default `intents.near`. The monitor watches its NEAR |
-| `OPTIONS_ID` | Options contract |
+| `MM_PRIVATE_KEY` | `ed25519:…` key registered for `MM_ACCOUNT_ID` on `intents_id` |
+| `NETWORK_ID` | `mainnet` or `testnet`, every command but `settle`. Picks `deploy/<NETWORK_ID>.json`, the only source of `rpc_url`, `intents_id` (the verifier; the monitor watches its NEAR) and `options_id`. No file (mainnet today): the command won't start. The monitor also uses it in the printed `near` commands |
 | `HL_PRIVATE_KEY` | Optional `0x…` Hyperliquid key. Unset: hedges are only logged, never sent. Trades on Hyperliquid testnet unless the NEAR RPC is mainnet |
 | `HL_ACCOUNT_ADDRESS` | Optional `0x…` account whose positions are hedged. Set it when `HL_PRIVATE_KEY` is an API (agent) wallet: positions live on the main account, not the agent's own address. Default: the key's address. The account must hold only this bot's hedges: every position on it counts as one, and a coin with no option market (no spot price) fails the hedge |
 | `SPREAD_VOL_POINTS` | Vol shock priced into each side, default `2` |
@@ -50,13 +48,12 @@ Read from the process environment.
 | `MAX_SERIES_USD` | Max net short/long payout per series, default `5000`. The lister stocks at most this much per series |
 | `MAX_DELTA_USD` | Max net delta per underlying right after a fill, before its hedge, default `50000`. Near expiry a full `MAX_TRADE_USD` trade near the money is up to `MAX_TRADE_USD × spot / width` of delta (~$80k for BTC) and gets refused; demo-size trades fit. Also each hedge order's size limit |
 | `MAX_VEGA_USD` | Max net vega per vol point, default `200` |
-| `NETWORK_ID` | `mainnet` (default) or `testnet`. Monitor only, used in the printed `near` commands |
 | `ALERT_WEBHOOK_URL` | Optional. Monitor only: POSTs each `ALERT`/`RESOLVED`/`FINAL` line as `{"text","content"}` (Slack and Discord incoming webhooks) |
 | `HEALTH_URL` | Optional. Monitor only: the relay's `/health`, directly or through the web origin, checked every minute (`uptime`, `quotes` alerts) |
 | `RELAYER_ACCOUNT_ID` | The relay's gas payer. Monitor: optional, watches its NEAR. Settler: required, signs and pays the requests |
 | `RELAYER_PRIVATE_KEY` | Settler only: the relayer's full-access `ed25519:…` key (a function-call key can't attach the deposit) |
 
-`monitor` needs only `NEAR_RPC_URL`, `OPTIONS_ID`, optionally `INTENTS_ID` and the monitor vars: no account, no key.
+`monitor` needs only `NETWORK_ID` and the monitor vars: no account, no key.
 
 Fixed constants (not env): Hyperliquid taker fee 4.5 bps, carry 7 % a year on the USDC locked, hedge band $50, max Deribit data age 10 s, quote lifetime 25 s.
 
@@ -126,7 +123,7 @@ Burn and redeem cover series that expired up to 7 days ago. Unpaired longs (boug
 |---|---|---|
 | `settle` | Proposal before `final_at` that is off the reference (measured against the lower price) by more than 20 bps, the same tolerance as the oracle's Deribit veto; or that has no reference (Deribit down or no data) | `override_settlement` with `<price>` to fill in (derive it from the [oracle rules](https://docs.endline.trade/developers/oracle#what-it-computes), never paste Deribit), signed by the owner |
 | `missing` | No proposal at expiry + `oracle_window_sec` | `propose_settlement` with `<price>` to fill in, signed by the first `get_oracles` account |
-| `reserve <account>` | `amount − storage_usage × 10^19` yocto below 2 NEAR, for the options contract, `INTENTS_ID` and `RELAYER_ACCOUNT_ID` each | |
+| `reserve <account>` | `amount − storage_usage × 10^19` yocto below 2 NEAR, for the options contract, `intents_id` and `RELAYER_ACCOUNT_ID` each | |
 | `uptime` | `HEALTH_URL` set and it doesn't answer `200` with `{"ok":true}` within 5 s | The URL and the error |
 | `quotes` | `/health` answers with `market_makers: 0`: no MM connected, so nobody gets a quote. Stays open while `uptime` is | |
 | `pending oracle <account> <active_at>`, `pending wasm <sha256> <active_at>`, `pending owner <account>` | Each entry of `get_pending_oracle_changes` and `get_config.pending_owner_id`. Resolves once it takes effect or is withdrawn. `pending` alone: the views can't be read and no `pending` alert is open (open ones stay open). | What changes and when: `active_at` as a date, the owner on `accept_owner` |
@@ -141,8 +138,8 @@ Expiries are read one at a time. Deribit is asked only for expiries with a propo
 
 ## Testnet proposer
 
-`pnpm start propose [--once]` (env: `NEAR_RPC_URL`, `OPTIONS_ID`, `ORACLE_ACCOUNT_ID`, `ORACLE_PRIVATE_KEY` (full-access: `propose_settlement` takes 1 yocto), optional `WASMTIME`). Every minute it reads the contract's `get_oracle_wasm` (none pinned yet: skips the minute), downloads it (30 s timeout) when the pin changes or the cached file no longer matches, and refuses it unless its sha256 matches, then runs it for each expiry past `expiry + oracle_window_sec` (up to a day old) with no price yet, and calls `propose_settlement` with the fixing. Needs `wasmtime` on `PATH` (the Docker image ships it); wasmtime gets only `PATH` from the environment, so the oracle key never reaches it. Refuses a mainnet RPC: mainnet settles through OutLayer.
+`pnpm start propose [--once]` (env: `NETWORK_ID`, `ORACLE_ACCOUNT_ID`, `ORACLE_PRIVATE_KEY` (full-access: `propose_settlement` takes 1 yocto), optional `WASMTIME`). Every minute it reads the contract's `get_oracle_wasm` (none pinned yet: skips the minute), downloads it (30 s timeout) when the pin changes or the cached file no longer matches, and refuses it unless its sha256 matches, then runs it for each expiry past `expiry + oracle_window_sec` (up to a day old) with no price yet, and calls `propose_settlement` with the fixing. Needs `wasmtime` on `PATH` (the Docker image ships it); wasmtime gets only `PATH` from the environment, so the oracle key never reaches it. Refuses a mainnet RPC: mainnet settles through OutLayer.
 
 ## Mainnet settler
 
-`pnpm start settle [--once]` (env: `NEAR_RPC_URL`, `OPTIONS_ID`, `RELAYER_ACCOUNT_ID`, `RELAYER_PRIVATE_KEY`). Refuses to start unless the RPC is on mainnet: testnet settles through the proposer. Every minute it reads the contract's series and `oracle_window_sec`; for each `(underlying, expiry)` with a series, from `expiry + 5 min` until `expiry + oracle_window_sec` (6 h), it reads `get_settlement` and, with no price yet, calls `request_settlement` (0.01 NEAR, 300 TGas; OutLayer refunds all but about 0.0012 NEAR, unless it rejects the call outright and the options contract keeps the deposit). It waits only until the tx is in a final block, not for OutLayer (a run can outlast the RPC's wait): the next try reads the outcome, and the relayer's txs on an explorer show any refusal. One try per key every 10 min, the contract's stale-lock timeout. A failed send is logged, and so is a retry: a key still without a price 10 min after its request means OutLayer failed or the contract logged `settlement rejected`. State is in memory: a restart retries at once. Past the window, the oracle proposes by hand (the monitor's `missing` alert).
+`pnpm start settle [--once]` (env: `RELAYER_ACCOUNT_ID`, `RELAYER_PRIVATE_KEY`). Takes the RPC and options contract from `deploy/mainnet.json`, so it won't start until that file exists, and refuses to start unless the RPC is on mainnet: testnet settles through the proposer. Every minute it reads the contract's series and `oracle_window_sec`; for each `(underlying, expiry)` with a series, from `expiry + 5 min` until `expiry + oracle_window_sec` (6 h), it reads `get_settlement` and, with no price yet, calls `request_settlement` (0.01 NEAR, 300 TGas; OutLayer refunds all but about 0.0012 NEAR, unless it rejects the call outright and the options contract keeps the deposit). It waits only until the tx is in a final block, not for OutLayer (a run can outlast the RPC's wait): the next try reads the outcome, and the relayer's txs on an explorer show any refusal. One try per key every 10 min, the contract's stale-lock timeout. A failed send is logged, and so is a retry: a key still without a price 10 min after its request means OutLayer failed or the contract logged `settlement rejected`. State is in memory: a restart retries at once. Past the window, the oracle proposes by hand (the monitor's `missing` alert).

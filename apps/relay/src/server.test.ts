@@ -23,8 +23,8 @@ const { chain } = fakeChain([{ ...SERIES, expiry: Math.floor(Date.now() / 1000) 
 const fills = new Fills(mkdtempSync(join(tmpdir(), "relay-")));
 const auctions = new Auctions((event, mmId, response, receivedAt) => checkBid(chain, INTENTS, event, mmId, response, receivedAt));
 const hub = new MmHub([KEY], (mmId, response) => auctions.respond(mmId, response));
-const relay = new Relay({ config: { INTENTS_ID: INTENTS, OPTIONS_ID: OPTIONS, QUOTE_ASSET: USDC }, chain, fills, auctions, mms: hub });
-const collector = new Collector(chain, { INTENTS_ID: INTENTS, OPTIONS_ID: OPTIONS, QUOTE_ASSET: USDC, RELAYER_ACCOUNT_ID: "relayer.test" }, new Claims(mkdtempSync(join(tmpdir(), "relay-"))), fills);
+const relay = new Relay({ config: { intents_id: INTENTS, options_id: OPTIONS, quote_asset: USDC }, chain, fills, auctions, mms: hub });
+const collector = new Collector(chain, { intents_id: INTENTS, options_id: OPTIONS, quote_asset: USDC, RELAYER_ACCOUNT_ID: "relayer.test" }, new Claims(mkdtempSync(join(tmpdir(), "relay-"))), fills);
 const oneClick = new OneClick(DEPOSIT.destinationAsset, "jwt");
 const calls = new Calls(chain, relay.sessions, () => hub.marks.best(Date.now()), mkdtempSync(join(tmpdir(), "relay-")));
 const server = createRelayServer(relay, fills, hub, collector, oneClick, calls);

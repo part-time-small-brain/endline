@@ -65,7 +65,7 @@ interface Hold {
 }
 
 interface RelayDeps {
-  config: Pick<Config, "INTENTS_ID" | "OPTIONS_ID" | "QUOTE_ASSET">;
+  config: Pick<Config, "intents_id" | "options_id" | "quote_asset">;
   chain: Chain;
   fills: Fills;
   auctions: Auctions;
@@ -82,7 +82,7 @@ export class Relay {
   private signerQuotes = rateLimit(QUOTES_PER_SIGNER, QUOTE_WINDOW_MS);
 
   constructor(private deps: RelayDeps) {
-    this.sessions = new Sessions(deps.chain, deps.config.INTENTS_ID);
+    this.sessions = new Sessions(deps.chain, deps.config.intents_id);
   }
 
   async series(): Promise<SeriesListing> {
@@ -90,7 +90,7 @@ export class Relay {
     const [all, contract] = await Promise.all([chain.listSeries(), chain.contractConfig()]);
     const oldest = Date.now() / 1000 - CLAIM_WINDOW_SEC;
     return {
-      quote_asset: config.QUOTE_ASSET,
+      quote_asset: config.quote_asset,
       quote_decimals: contract.quote_decimals,
       series: all.filter((series) => series.expiry > oldest).map((series) => ({ ...series, option_asset: this.optionAsset(series), quotable: listed(series, contract) && open(series, contract) })),
     };
@@ -110,7 +110,7 @@ export class Relay {
     if (invited.length === 0) throw new HttpError(503, "no market makers online");
 
     const buying = request.side === "buy";
-    const asset = buying ? config.QUOTE_ASSET : this.optionAsset(series);
+    const asset = buying ? config.quote_asset : this.optionAsset(series);
     // no market maker sells for under $1, so a buyer must hold that much before an auction; the real premium is held after it
     const hold: Hold = { signerId: request.signer.signer_id, asset, amount: buying ? 10n ** BigInt(contract.quote_decimals) : BigInt(request.size) };
     this.quoting.push(hold);
@@ -126,7 +126,7 @@ export class Relay {
         side: request.side,
         size: request.size,
         option_asset: this.optionAsset(series),
-        quote_asset: config.QUOTE_ASSET,
+        quote_asset: config.quote_asset,
         fee_pips: Number(fee),
         deadline_ms: Date.now() + MAX_WAIT_MS,
         terms,
@@ -143,7 +143,7 @@ export class Relay {
 
       const signByMs = bid.deadlineMs - SIGN_MARGIN_MS;
       const userLeg = legs(event, bid.premium).user;
-      const userPayload = payload(config.INTENTS_ID, request.signer.signer_id, signByMs, salt, randomBytes(15), [tokenDiff(userLeg)]);
+      const userPayload = payload(config.intents_id, request.signer.signer_id, signByMs, salt, randomBytes(15), [tokenDiff(userLeg)]);
       const premium = bid.premium.toString();
       const option = { asset: event.option_asset, amount: request.size };
       const cash = { asset: event.quote_asset, amount: premium };
@@ -242,7 +242,7 @@ export class Relay {
   }
 
   private optionAsset(series: Series): string {
-    return intentsAssetId(this.deps.config.OPTIONS_ID, longTokenId(series.id));
+    return intentsAssetId(this.deps.config.options_id, longTokenId(series.id));
   }
 
   private forgetOld(): void {

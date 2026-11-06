@@ -27,6 +27,6 @@ series="$(near contract call-function as-transaction "$opt" create_series \
 echo "series $series expires $(date -u -r "$expiry" +%H:%M) UTC" >&2
 
 cd "$repo/apps/mm"
-NEAR_RPC_URL="$(field rpc_url)" INTENTS_ID="$(field intents_id)" OPTIONS_ID="$opt" MM_ACCOUNT_ID="$mm" \
+NETWORK_ID=testnet MM_ACCOUNT_ID="$mm" \
   MM_PRIVATE_KEY="$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1]))["private_key"])' "$HOME/.near-credentials/testnet/$mm.json")" \
   pnpm start write "$series" "$collateral"

@@ -1,14 +1,13 @@
 import { AccountId } from "@endline/sdk";
+import { readDeployment } from "@endline/sdk/deployment";
 import { z } from "zod";
 
 const positive = (fallback: number) => z.coerce.number().positive().default(fallback);
 
 const Env = z.object({
+  NETWORK_ID: z.enum(["mainnet", "testnet"]),
   MM_ACCOUNT_ID: AccountId,
   MM_PRIVATE_KEY: z.string().regex(/^ed25519:[1-9A-HJ-NP-Za-km-z]+$/, "ed25519:<base58>"),
-  NEAR_RPC_URL: z.url(),
-  INTENTS_ID: AccountId.default("intents.near"),
-  OPTIONS_ID: AccountId,
   HL_PRIVATE_KEY: z.string().regex(/^0x[0-9a-fA-F]{64}$/).optional(),
   HL_ACCOUNT_ADDRESS: z.string().regex(/^0x[0-9a-fA-F]{40}$/).optional(),
   SPREAD_VOL_POINTS: positive(2),
@@ -19,20 +18,19 @@ const Env = z.object({
   MAX_VEGA_USD: positive(200),
 });
 
-const MonitorEnv = Env.pick({ NEAR_RPC_URL: true, INTENTS_ID: true, OPTIONS_ID: true }).extend({
+const MonitorEnv = Env.pick({ NETWORK_ID: true }).extend({
   RELAYER_ACCOUNT_ID: AccountId.optional(),
-  NETWORK_ID: z.enum(["mainnet", "testnet"]).default("mainnet"),
   ALERT_WEBHOOK_URL: z.url().optional(),
   HEALTH_URL: z.url().optional(),
 });
 
-const ProposerEnv = Env.pick({ NEAR_RPC_URL: true, OPTIONS_ID: true }).extend({
+const ProposerEnv = Env.pick({ NETWORK_ID: true }).extend({
   ORACLE_ACCOUNT_ID: AccountId,
   ORACLE_PRIVATE_KEY: z.string().regex(/^ed25519:[1-9A-HJ-NP-Za-km-z]+$/, "ed25519:<base58>"),
   WASMTIME: z.string().min(1).default("wasmtime"),
 });
 
-const SettlerEnv = Env.pick({ NEAR_RPC_URL: true, OPTIONS_ID: true }).extend({
+const SettlerEnv = z.object({
   RELAYER_ACCOUNT_ID: AccountId,
   RELAYER_PRIVATE_KEY: Env.shape.MM_PRIVATE_KEY,
 });
@@ -48,12 +46,13 @@ export type MonitorConfig = ReturnType<typeof loadMonitorConfig>;
 
 export function loadConfig(env: Record<string, string | undefined>) {
   const e = Env.parse(env);
+  const d = readDeployment(e.NETWORK_ID);
   return {
     accountId: e.MM_ACCOUNT_ID,
     privateKey: e.MM_PRIVATE_KEY as `ed25519:${string}`,
-    rpcUrl: e.NEAR_RPC_URL,
-    intentsId: e.INTENTS_ID,
-    optionsId: e.OPTIONS_ID,
+    rpcUrl: d.rpc_url,
+    intentsId: d.intents_id,
+    optionsId: d.options_id,
     hlPrivateKey: e.HL_PRIVATE_KEY as `0x${string}` | undefined,
     hlAccount: e.HL_ACCOUNT_ADDRESS as `0x${string}` | undefined,
     settings: {
@@ -78,10 +77,11 @@ export function loadRelayConfig(env: Record<string, string | undefined>) {
 
 export function loadMonitorConfig(env: Record<string, string | undefined>) {
   const e = MonitorEnv.parse(env);
+  const d = readDeployment(e.NETWORK_ID);
   return {
-    rpcUrl: e.NEAR_RPC_URL,
-    optionsId: e.OPTIONS_ID,
-    intentsId: e.INTENTS_ID,
+    rpcUrl: d.rpc_url,
+    optionsId: d.options_id,
+    intentsId: d.intents_id,
     relayerId: e.RELAYER_ACCOUNT_ID,
     networkId: e.NETWORK_ID,
     webhookUrl: e.ALERT_WEBHOOK_URL,
@@ -93,12 +93,14 @@ export type ProposerConfig = ReturnType<typeof loadProposerConfig>;
 
 export function loadProposerConfig(env: Record<string, string | undefined>) {
   const e = ProposerEnv.parse(env);
-  return { rpcUrl: e.NEAR_RPC_URL, optionsId: e.OPTIONS_ID, oracleAccountId: e.ORACLE_ACCOUNT_ID, oraclePrivateKey: e.ORACLE_PRIVATE_KEY, wasmtime: e.WASMTIME };
+  const d = readDeployment(e.NETWORK_ID);
+  return { rpcUrl: d.rpc_url, optionsId: d.options_id, oracleAccountId: e.ORACLE_ACCOUNT_ID, oraclePrivateKey: e.ORACLE_PRIVATE_KEY, wasmtime: e.WASMTIME };
 }
 
 export type SettlerConfig = ReturnType<typeof loadSettlerConfig>;
 
 export function loadSettlerConfig(env: Record<string, string | undefined>) {
   const e = SettlerEnv.parse(env);
-  return { rpcUrl: e.NEAR_RPC_URL, optionsId: e.OPTIONS_ID, relayerId: e.RELAYER_ACCOUNT_ID, relayerPrivateKey: e.RELAYER_PRIVATE_KEY };
+  const d = readDeployment("mainnet");
+  return { rpcUrl: d.rpc_url, optionsId: d.options_id, relayerId: e.RELAYER_ACCOUNT_ID, relayerPrivateKey: e.RELAYER_PRIVATE_KEY };
 }

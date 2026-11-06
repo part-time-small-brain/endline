@@ -3,6 +3,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { loadConfig } from "./config.ts";
+
+vi.mock("@endline/sdk/deployment", async (load) => {
+  const { readDeployment } = await load<typeof import("@endline/sdk/deployment")>();
+  return { readDeployment: (network: "mainnet" | "testnet") => ({ ...readDeployment("testnet"), network }) };
+});
 import { Faucet } from "./faucet.ts";
 import { Refunded } from "./rpc.ts";
 import { httpStatus } from "./test-fakes.ts";
@@ -22,9 +27,6 @@ afterEach(() => {
 describe("faucet", () => {
   it("refuses to start on mainnet", () => {
     const env = {
-      NEAR_RPC_URL: "https://rpc.example",
-      OPTIONS_ID: "opt.test",
-      QUOTE_ASSET: "nep141:usdc.test",
       RELAYER_ACCOUNT_ID: "relayer.test",
       RELAYER_PRIVATE_KEY: "ed25519:abc",
       MM_API_KEYS: "0123456789abcdef",
