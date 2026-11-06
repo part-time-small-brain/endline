@@ -59,7 +59,7 @@ Both accept only an exercise exactly as the SDK's `exerciseOptions` builds and `
 | Route | Rules |
 |---|---|
 | `/execute` | Expires between 2 and 10 minutes from now. Needs a final price (`now ≥ final_at + 60 s`) and a total payout of at least $1. Simulated, then executed |
-| `/claims` | Only for options you bought through the relay (net of sells), one open claim per buy of that series, with a max payout of at least $1. Your open claims on a token can't exceed that or your balance of it; 1,000 claims in total. Simulated, then stored. Every minute the relay re-simulates each claim, drops ones the verifier refuses (sold, collected, expired, nonce used) or that pay under $1, and submits the rest once final |
+| `/claims` | Only for options you bought through the relay (net of sells), one open claim per buy of that series, with a max payout of at least $1. Your open claims on a token can't exceed that or your balance of it; 20 open claims per account, 1,000 in total. Simulated, then stored. Every minute the relay re-simulates each claim, drops ones the verifier refuses (sold, collected, expired, nonce used) or that pay under $1, and submits the rest once final |
 
 ## Transfer
 
@@ -76,7 +76,7 @@ Body: `{error}`.
 | `402` | Your balance doesn't cover the quote (a buy needs at least $1 of USDC before any market maker is asked), or a free call's caller holds under $1. Deposit first |
 | `403` | Faucet off (mainnet) |
 | `404` | Unknown or forgotten series or quote |
-| `409` | Past the write cutoff, a width no market maker lists at that strike, already published, price not final, payload already submitted or another from the same signer still being sent, claims above the options held or above what you bought through the relay, or a free call that's too late, not on the next round, repeated, or on a cell priced at its full payout |
+| `409` | Past the write cutoff, a width no market maker lists at that strike, already published, price not final, payload already submitted or another from the same signer still being sent, claims above the options held, above what you bought through the relay or over 20 open per account, or a free call that's too late, not on the next round, repeated, or on a cell priced at its full payout |
 | `410` | Quote expired |
 | `413` | Body over 64 KB |
 | `415` | Faucet request not `application/json` |

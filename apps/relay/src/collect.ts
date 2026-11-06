@@ -9,6 +9,7 @@ import { type Chain, ranTx, Rejected } from "./rpc.ts";
 // block time can trail our clock, and an exercise before final_at burns the signer's nonce
 export const FINAL_MARGIN_SEC = 60;
 const MAX_CLAIMS = 1_000;
+const MAX_CLAIMS_PER_ACCOUNT = 20;
 const MAX_DEADLINE_MS = 10 * 60_000;
 // intents rechecks the deadline on-chain, and near-api-js retries a send for up to ~85 s: a payload that expires first burns our gas
 const MIN_DEADLINE_MS = 2 * 60_000;
@@ -111,6 +112,7 @@ export class Collector {
     const stored = this.claims.all().filter((claim) => !isDeepStrictEqual(claim, signed));
     const open = [...this.claiming, ...stored.flatMap((claim) => readExercise(claim, this.config) ?? [])];
     if (open.length >= MAX_CLAIMS) throw new HttpError(503, "the claim queue is full");
+    if (open.filter((other) => other.signerId === exercise.signerId).length >= MAX_CLAIMS_PER_ACCOUNT) throw new HttpError(409, "an account can have at most 20 open claims");
     this.claiming.push(exercise);
     let saved: Promise<void>;
     try {
