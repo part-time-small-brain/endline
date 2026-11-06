@@ -86,10 +86,10 @@ export function HeroDots({ still }: { still: boolean }) {
       canvas.height = Math.round(height * scale);
       ctx.setTransform(scale, 0, 0, scale, 0, 0);
       const box = canvas.getBoundingClientRect();
-      const first = (edge: number) => (((GAP / 2 - edge) % GAP) + GAP) % GAP;
+      const phase = (edge: number) => (((GAP / 2 - edge) % GAP) + GAP) % GAP;
       dots = [];
-      for (let y = first(box.top + scrollY); y < height; y += GAP) {
-        for (let x = first(box.left + scrollX); x < width; x += GAP) dots.push({ x, y, strength: 0, lift: 0, up: false });
+      for (let y = phase(box.top + scrollY); y < height; y += GAP) {
+        for (let x = phase(box.left + scrollX); x < width; x += GAP) dots.push({ x, y, strength: 0, lift: 0, up: false });
       }
       cancelAnimationFrame(frame);
       draw();

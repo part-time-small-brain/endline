@@ -58,7 +58,7 @@ export function Trade({ mode, nowSec, views, onConnect, onAddFunds, onQuote }: P
       {mode === "tap" ? (
         <Tap state={state} nowSec={nowSec} views={views} onConnect={onConnect} onAddFunds={onAddFunds} onQuote={onQuote} />
       ) : mode === "lite" ? (
-        <Lite state={state} nowSec={nowSec} action={action} />
+        <Lite state={state} nowSec={nowSec} action={action} className="mx-auto w-full max-w-2xl flex-1 px-4 pt-3 lg:px-6 lg:pt-6" stickyAction />
       ) : (
         <div data-side={up ? "up" : "down"} className="grid min-h-0 flex-1 grid-cols-1 gap-4 px-4 lg:grid-cols-[minmax(0,1fr)_440px] lg:gap-6 lg:px-6 lg:pt-2 pb-32 lg:pb-6">
           <div className="flex min-h-0 min-w-0 flex-col gap-4">

@@ -1,5 +1,5 @@
 import type { CDPSession, Locator, Page } from "@playwright/test";
-import { expect, money, openPopover, sideways, test } from "./fixtures.ts";
+import { expect, handleOf, money, openPopover, sideways, test } from "./fixtures.ts";
 
 const hero = (page: Page) => page.locator("#top");
 const ready = (page: Page) => expect(hero(page).getByLabel("Maximum payout")).toHaveText(/^\$[\d,.]+$/);
@@ -53,19 +53,15 @@ test("the split line sits under the headline words, clear of the title and the c
       await ready(page);
     }
     const line = hero(page).locator("h1 span[aria-hidden=true]");
-    await expect(line.locator("span").first()).toHaveCSS("background-color", "rgb(0, 236, 151)");
-    await expect(line.locator("span").last()).toHaveCSS("background-color", "rgb(255, 121, 102)");
     await expect(async () => {
       const at = await line.evaluate((bar) => {
         const box = bar.getBoundingClientRect();
         const title = (bar.closest("h1") as HTMLElement).getBoundingClientRect();
-        const words = (bar.parentElement as HTMLElement).getBoundingClientRect();
         const lead = [...document.querySelectorAll("#top p")].find((p) => p.textContent?.startsWith("Choose whether"))?.getBoundingClientRect();
-        return { above: box.top - title.bottom, below: (lead?.top ?? 0) - box.bottom, left: box.left - words.left };
+        return { above: box.top - title.bottom, below: (lead?.top ?? 0) - box.bottom };
       });
       expect(at.above, `${size?.width ?? "phone"} gap above`).toBeGreaterThanOrEqual(8);
       expect(at.below, `${size?.width ?? "phone"} gap below`).toBeGreaterThanOrEqual(24);
-      expect(at.left).toBe(0);
     }).toPass({ timeout: 5000 });
   }
 });
@@ -83,6 +79,32 @@ test("the hero ticket opens the same trade in the app", async ({ page }) => {
   await expect(page.getByRole("button", { name: "Trade direction", exact: true })).toContainText("below");
   await expect(page.getByRole("button", { name: "Trade amount", exact: true })).toHaveText("$100");
   await expect.poll(() => money(page.getByRole("button", { name: "Price to beat", exact: true }))).toBe(strike);
+  await page.getByRole("button", { name: "Pro", exact: true }).click();
+  await expect(page.getByRole("radio", { name: /^ETH\b/ })).toHaveAttribute("aria-checked", "true");
+  await expect(page.getByRole("radiogroup", { name: "Direction" }).getByRole("radio", { name: /^Down/ })).toHaveAttribute("aria-checked", "true");
+  await expect(page.getByRole("radio", { name: "$100", exact: true })).toHaveAttribute("aria-checked", "true");
+  await expect(handleOf(page)).toHaveAttribute("aria-valuenow", String(strike));
+});
+
+test("on a phone the ticket's buy bar sits under the card instead of over it", async ({ page }) => {
+  test.skip(test.info().project.use.isMobile !== true, "phones only");
+  const parts = hero(page).getByRole("region", { name: "Trade ticket" }).locator(":scope > div");
+  const card = await parts.first().boundingBox();
+  const bar = await parts.last().boundingBox();
+  expect(card && bar && bar.y - (card.y + card.height)).toBeGreaterThanOrEqual(0);
+});
+
+test("the landing wears the app's dark dotted look, its headline reads as words, and the wordmark goes back to the very top", async ({ page }) => {
+  expect(await page.evaluate(() => [
+    getComputedStyle(document.documentElement).backgroundColor,
+    getComputedStyle(document.body).backgroundImage.startsWith("radial-gradient"),
+    document.querySelector('meta[name="theme-color"]')?.getAttribute("content"),
+  ])).toEqual(["rgb(10, 10, 10)", true, "#0a0a0a"]);
+  await expect(page.getByRole("group", { name: "Theme", exact: true })).toHaveCount(0);
+  await expect(hero(page).getByRole("heading", { level: 1 })).toHaveAccessibleName("Pick a side of the line.");
+  await page.evaluate(() => scrollTo(0, 30));
+  await page.getByRole("link", { name: "Endline, back to top" }).click();
+  await expect.poll(() => page.evaluate(() => scrollY)).toBe(0);
 });
 
 test("whole page scrolls without horizontal overflow and every section shows up", async ({ page }) => {

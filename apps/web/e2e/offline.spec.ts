@@ -410,6 +410,15 @@ test("with no relay the hero waits for live prices and never links a series", as
   await expect(page.locator('a[href*="series="]')).toHaveCount(0);
 });
 
+test("with markets listed but nothing priced, the landing ticket says so and opens the app without a series", async ({ page }) => {
+  await live(page, () => []);
+  await page.goto("/");
+  const hero = page.locator("#top");
+  await expect(hero.getByRole("status").filter({ hasText: "No prices right now" })).toBeVisible();
+  await expect(hero.getByRole("link", { name: "Open app" })).toHaveAttribute("href", "/app");
+  await expect(page.locator('a[href*="series="]')).toHaveCount(0);
+});
+
 test("without marks from a market maker nothing is offered", async ({ page }) => {
   await live(page, () => []);
   await expect(page.getByText("No prices right now")).toBeVisible();

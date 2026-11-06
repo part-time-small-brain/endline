@@ -18,6 +18,7 @@ interface Props {
   nowSec: number;
   action: ReactNode;
   className?: string;
+  stickyAction?: boolean;
 }
 
 const label = "font-mono text-[0.625rem] font-medium tracking-[0.14em] text-ink-3 uppercase";
@@ -34,7 +35,7 @@ function Meter({ chance, lit, className }: { chance: number; lit: string; classN
   );
 }
 
-export function Lite({ state, nowSec, action, className = "mx-auto w-full max-w-2xl flex-1 px-4 pt-3 lg:px-6 lg:pt-6" }: Props) {
+export function Lite({ state, nowSec, action, className, stickyAction }: Props) {
   const {
     data, quoteDecimals, unit, symbol, symbols, kind, expiry, budget,
     setSymbol, setKind, setExpiry, setSeries, setBudget,
@@ -265,7 +266,7 @@ export function Lite({ state, nowSec, action, className = "mx-auto w-full max-w-
           {!(series && current) && <p role="status" className="mt-3 text-sm text-ink-2">{empty}</p>}
         </div>
 
-        <div className="bottom-0 z-10 -mx-4 mt-3 border-t border-rule bg-page/95 px-4 pt-3.5 pb-[max(1.25rem,env(safe-area-inset-bottom))] backdrop-blur-md sm:mx-0 sm:px-0 [@media(min-height:44rem)]:sticky">
+        <div className={`bottom-0 z-10 -mx-4 mt-3 border-t border-rule bg-page/95 px-4 pt-3.5 pb-[max(1.25rem,env(safe-area-inset-bottom))] backdrop-blur-md sm:mx-0 sm:px-0 ${stickyAction ? "[@media(min-height:44rem)]:sticky" : ""}`}>
           <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 font-mono text-[0.6875rem] tracking-[0.08em] text-ink-3 uppercase">
             <span>
               Max loss <strong className="text-[0.8125rem] font-medium tracking-normal text-ink">{valid ? formatUsd(current.cost, quoteDecimals, "up").replace(/\.00$/, "") : "—"}</strong>

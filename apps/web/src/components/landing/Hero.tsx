@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { useApp } from "../../app/context.ts";
 import { Link } from "../../app/router.tsx";
 import { useTicket } from "../../app/useTicket.ts";
-import { formatUsd, toNumber } from "../../lib/money.ts";
+import { formatToken, formatUsd } from "../../lib/money.ts";
 import { Lite } from "../../screens/Lite.tsx";
 import { HeroDots } from "./HeroDots.tsx";
 import { jump } from "./jump.ts";
@@ -24,7 +24,7 @@ export function Hero({ nowSec }: { nowSec: number }) {
   const state = useTicket(nowSec);
   const { symbol, up, series, current, budget, quoteDecimals, notice } = state;
   const action = series && current && current.size > 0n ? (
-    <Link href={`${paths.trade}?${new URLSearchParams({ series: series.id, pay: String(toNumber(budget, quoteDecimals)) })}`} className={PRIMARY}>
+    <Link href={`${paths.trade}?${new URLSearchParams({ series: series.id, pay: formatToken(budget, quoteDecimals, 2).replaceAll(",", "") })}`} className={PRIMARY}>
       Try {symbol} {up ? "Up" : "Down"} for {formatUsd(budget, quoteDecimals).replace(/\.00$/, "")}
     </Link>
   ) : (
@@ -34,7 +34,7 @@ export function Hero({ nowSec }: { nowSec: number }) {
   );
 
   return (
-    <section id="top" className="relative overflow-x-clip bg-page">
+    <section id="top" className="relative scroll-mt-16 overflow-x-clip bg-page">
       <HeroDots still={reduce === true} />
       <div className="relative mx-auto grid max-w-7xl grid-cols-1 gap-10 px-4 pt-10 pb-16 lg:grid-cols-[minmax(0,1fr)_minmax(0,600px)] lg:items-start lg:gap-12 lg:px-12 lg:pt-16 lg:pb-24">
         <div className="lg:pt-12">
@@ -46,12 +46,10 @@ export function Hero({ nowSec }: { nowSec: number }) {
           </Rise>
           <h1 className="mt-6 text-5xl leading-none font-semibold tracking-[-0.035em] xl:text-7xl">
             <span className="block">
-              <Word index={0}>Pick</Word>
-              <Word index={1}>a</Word>
-              <Word index={2}>side</Word>
+              <Word index={0}>Pick</Word> <Word index={1}>a</Word> <Word index={2}>side</Word>
             </span>
             <span className="block">
-              <Word index={3}>of</Word>
+              <Word index={3}>of</Word>{" "}
               <span className="relative inline-block">
                 <m.span
                   aria-hidden="true"
@@ -63,8 +61,7 @@ export function Hero({ nowSec }: { nowSec: number }) {
                   <span className="flex-1 bg-up" />
                   <span className="flex-1 bg-down" />
                 </m.span>
-                <Word index={4}>the</Word>
-                <Word index={5}>line.</Word>
+                <Word index={4}>the</Word> <Word index={5}>line.</Word>
               </span>
             </span>
           </h1>
@@ -99,7 +96,7 @@ export function Hero({ nowSec }: { nowSec: number }) {
           {notice ? (
             <div aria-busy="true" aria-label="Loading prices" className="h-[34rem] animate-pulse rounded-md border border-rule bg-surface" />
           ) : (
-            <Lite state={state} nowSec={nowSec} action={action} className="w-full" />
+            <Lite state={state} nowSec={nowSec} action={action} />
           )}
         </Rise>
       </div>
@@ -110,7 +107,7 @@ export function Hero({ nowSec }: { nowSec: number }) {
 function Word({ index, children }: { index: number; children: ReactNode }) {
   return (
     <m.span
-      className="mr-[0.24em] inline-block last:mr-0"
+      className="inline-block"
       initial={{ opacity: 0, y: 24, filter: "blur(8px)" }}
       animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
       transition={{ duration: 0.9, ease: EASE_OUT, delay: 0.08 + index * 0.07 }}
