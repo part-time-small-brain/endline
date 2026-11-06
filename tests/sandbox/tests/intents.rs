@@ -492,8 +492,6 @@ async fn withdraw_with_msg_never_loses_options_at_tight_gas() -> anyhow::Result<
         }
         anyhow::Ok(total)
     };
-    env.storage_deposit(&env.alice, env.alice.id(), NearToken::from_near(1))
-        .await?;
     let before = held().await?;
     let mut reached_opt = false;
     for tx_gas in (100..=200).step_by(4) {

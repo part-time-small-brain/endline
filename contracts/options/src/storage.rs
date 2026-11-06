@@ -51,18 +51,23 @@ impl Contract {
 }
 
 impl Contract {
-    pub(crate) fn charge_storage_credit(&mut self, account_id: &AccountId, storage_before: u64) {
+    pub(crate) fn charge_storage_credit(
+        &mut self,
+        account_id: &AccountId,
+        storage_before: u64,
+    ) -> Result<(), String> {
         let cost = storage_cost(storage_before).as_yoctonear();
         if cost == 0 {
-            return;
+            return Ok(());
         }
         let credit = self.storage_credits.get(account_id).copied().unwrap_or(0);
-        let left = credit.checked_sub(cost).unwrap_or_else(|| {
-            env::panic_str(&format!(
+        let left = credit.checked_sub(cost).ok_or_else(|| {
+            format!(
                 "{account_id} needs {} more yoctoNEAR of storage credit: call storage_deposit",
                 cost - credit
-            ))
-        });
+            )
+        })?;
         self.storage_credits.insert(account_id.clone(), left);
+        Ok(())
     }
 }

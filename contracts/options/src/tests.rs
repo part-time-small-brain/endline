@@ -2,7 +2,7 @@ use near_sdk::json_types::U128;
 use near_sdk::mock::MockAction;
 use near_sdk::serde_json::{self, json, Value};
 use near_sdk::test_utils::{get_created_receipts, get_logs, VMContextBuilder};
-use near_sdk::{testing_env, AccountId, NearToken, PromiseResult, RuntimeFeesConfig};
+use near_sdk::{testing_env, AccountId, NearToken, PromiseOrValue, PromiseResult, RuntimeFeesConfig};
 
 use crate::math::Terms;
 use crate::series::{self, OptionKind};
@@ -1040,6 +1040,32 @@ fn intents_withdrawals_to_new_rows_are_paid_from_the_receivers_storage_credit() 
     panics_with("registration_only is not supported", || {
         c.storage_deposit(None, Some(true));
     });
+}
+
+#[test]
+fn an_intents_withdraw_with_msg_short_of_storage_credit_answers_nothing_used() {
+    let mut c = setup();
+    let id = create(&mut c, 110_000, W, OptionKind::Call);
+    write(&mut c, USDC_ASSET, W * USD, &id);
+    let tokens = vec![id.clone(), short(&id)];
+    let carol = acc("carol.near");
+    let held = bal(&c, intents(), &id);
+    ctx(intents(), T0, 1);
+    let before = near_sdk::env::storage_usage();
+    let answer = c.mt_batch_transfer_call(
+        carol.clone(),
+        tokens,
+        vec![U128(1), U128(1)],
+        None,
+        None,
+        "go".into(),
+    );
+    c.balances.flush();
+    assert!(
+        matches!(answer, PromiseOrValue::Value(ref used) if used.iter().all(|u| u.0 == 0) && used.len() == 2)
+    );
+    assert_eq!(near_sdk::env::storage_usage(), before);
+    assert_eq!((bal(&c, carol, &id), bal(&c, intents(), &id)), (0, held));
 }
 
 #[test]

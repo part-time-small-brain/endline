@@ -60,7 +60,7 @@ description: The rules every change keeps, what each actor can do, and the gaps 
 | Quote spam is bounded | Someone holding enough premium can keep a series' inventory reserved without trading |
 | Sessions aren't bound to this app | A session is an empty intents payload, accepted by any service using the same scheme |
 | Removed keys | A removed key keeps quoting until its session deadline (≤ 7 days). Trades still need a fresh signature checked by intents |
-| Withdraw with `msg` | A user-made panic in `mt_batch_transfer_call` on an intents `mt_withdraw` with `msg` can burn that user's own options. So can a receiver short of storage credit: rows a refund empties are removed, and the next withdraw pays for them again |
+| Withdraw with `msg` | A user-made panic in `mt_batch_transfer_call` on an intents `mt_withdraw` with `msg` can burn that user's own options. A receiver short of storage credit is not one of these: the call answers nothing used and intents refunds. Rows a refund empties are removed, and the next withdraw pays for them again |
 | Oracle trust | A whitelisted oracle account or the OutLayer operator can propose any positive price. The defence is the dispute window, the monitor and an owner override in time |
 | Oracle timeouts | The WASM has only a connect timeout. A hanging exchange can push a run past its limit, and someone retries |
 | Owner can stall settlement | With no oracle account and a WASM that never returns a price, markets stay pending and nothing pays out. `burn_pair` still works |
