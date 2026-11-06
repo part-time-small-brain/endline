@@ -395,8 +395,11 @@ async fn a_series_counts_its_open_options_through_real_intents_and_stays_until_a
         .call(env.opt.id(), "delete_series")
         .args_json(json!({"series_ids": [env.series]}))
         .transact()
-        .await?;
-    assert_panicked_with(&early, "can't be deleted yet");
+        .await?
+        .into_result()?
+        .json::<Vec<String>>()?;
+    assert!(early.is_empty());
+    assert!(series().await?.is_object());
     Ok(())
 }
 
