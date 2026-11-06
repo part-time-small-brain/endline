@@ -583,7 +583,7 @@ test.describe("Tap", () => {
 
   async function withTapBalance(page: Page) {
     const state = await quoteFlow(page, false);
-    await page.route("**/claims", (route) => route.fulfill({ json: {} }));
+    await page.route("**/claims", (route) => route.fulfill({ json: { ok: true } }));
     await page.getByRole("button", { name: "Set up", exact: true }).click();
     const sheet = page.getByRole("dialog", { name: "Tap balance" });
     await sheet.getByRole("button", { name: "Set up with your wallet" }).click();
@@ -624,6 +624,23 @@ test.describe("Tap", () => {
     await expect.poll(() => cell.evaluate((el) => el.getAnimations().filter((a) => a instanceof CSSTransition).length)).toBe(0);
     await expect(cell).toHaveCSS("background-color", "rgb(11, 38, 28)");
     expect(state.published).toEqual(["quote-2"]);
+  });
+
+  test("a tap whose auto-collect the relay refuses says so instead of leaving it to look on", async ({ page }) => {
+    await withTapBalance(page);
+    await page.evaluate(() => {
+      const fetch = window.fetch.bind(window);
+      window.fetch = (input, init) => (String(input).endsWith("/claims") ? Promise.resolve(new Response(JSON.stringify({ error: "the claim queue is full" }), { status: 503 })) : fetch(input, init));
+    });
+    await page.route("**/rpc", async (route) => {
+      const params = route.request().postDataJSON().params;
+      if (params.method_name !== "mt_batch_balance_of") return route.fallback();
+      const ids: string[] = JSON.parse(Buffer.from(params.args_base64, "base64").toString()).token_ids;
+      await route.fulfill({ json: { jsonrpc: "2.0", id: "web", result: { result: [...Buffer.from(JSON.stringify(ids.map((id) => (id.endsWith("-P") ? "0" : String(250 * USD)))))] } } });
+    });
+    await page.clock.fastForward(10_000);
+    await page.getByRole("table").getByRole("button", { name: /^Up · BTC ends above \$81,000 · Tomorrow/ }).click();
+    await expect(page.getByRole("status").filter({ hasText: "Bought BTC Up $81,000 for $25.00, but auto-collect is off (the claim queue is full). Collect it in Positions once the price is final." })).toBeVisible();
   });
 
   test("a move the relay can't confirm never says nothing moved, and rereads both balances", async ({ page }) => {

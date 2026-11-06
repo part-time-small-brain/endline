@@ -55,7 +55,7 @@ export function useTaps(owner: string | undefined) {
   );
 
   const trade = useCallback(
-    async (payer: Wallet, { series, size, stake, multiple }: TapOrder, at: number): Promise<bigint> => {
+    async (payer: Wallet, { series, size, stake, multiple }: TapOrder, at: number): Promise<{ paid: bigint; autoCollect: Promise<string | undefined> }> => {
       if (at !== generation.current) throw new Cancelled();
       const session = await (cachedSession(payer, config.intentsId) ?? signSession(payer, config.intentsId, services.chain.salt));
       const signer = { standard: payer.standard, signer_id: payer.accountId };
@@ -72,8 +72,11 @@ export function useTaps(owner: string | undefined) {
       const update = await finalStatus(services.relay, quote.quote_id, published, giveUpAt);
       if (!update) throw new Error("This trade's status is unknown. Check Positions before tapping it again.");
       if (update.status !== "settled") throw new Error("Not filled. Nothing was charged.");
-      void claim(payer, optionAsset(series.id), size, series.expiry).catch(() => undefined);
-      return BigInt(quote.premium);
+      const autoCollect = claim(payer, optionAsset(series.id), size, series.expiry).then(
+        () => undefined,
+        (error: unknown) => (error instanceof Error ? error.message : "the relay refused it"),
+      );
+      return { paid: BigInt(quote.premium), autoCollect };
     },
     [config, services, optionAsset, claim],
   );
@@ -93,7 +96,11 @@ export function useTaps(owner: string | undefined) {
         setTimeout(() => setStates((current) => (current[id] === state ? Object.fromEntries(Object.entries(current).filter(([key]) => key !== id)) : current)), SHOWN_MS);
       };
       queue.current = queue.current.then(() => trade(payer, order, at)).then(
-        (paid) => finish({ status: "done" }, `Bought ${seriesTitle(order.series, quoteDecimals)} for ${formatUsd(paid, quoteDecimals)}.`),
+        ({ paid, autoCollect }) => {
+          const bought = `Bought ${seriesTitle(order.series, quoteDecimals)} for ${formatUsd(paid, quoteDecimals)}`;
+          finish({ status: "done" }, `${bought}.`);
+          void autoCollect.then((reason) => reason && setNotice({ text: `${bought}, but auto-collect is off (${reason}). Collect it in Positions once the price is final.`, failed: true }));
+        },
         (error: unknown) => {
           if (error instanceof Cancelled) busy.current.delete(id);
           else finish({ status: "failed" }, messageOf(error));
