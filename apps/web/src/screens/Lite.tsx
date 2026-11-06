@@ -19,8 +19,8 @@ interface Props {
   action: ReactNode;
 }
 
-const label = "font-mono text-[0.625rem] font-medium tracking-[0.14em] text-ink-3 uppercase";
-const legend = "before:pointer-events-none before:absolute before:-top-[0.4375rem] before:left-2 before:bg-surface before:px-1 before:font-mono before:text-[0.625rem] before:leading-[0.875rem] before:font-medium before:tracking-[0.14em] before:uppercase";
+const label = "eyebrow text-ink-3";
+const legend = "before:pointer-events-none before:absolute before:-top-[0.4375rem] before:left-2 before:bg-surface before:px-1 before:eyebrow before:leading-[0.875rem]";
 
 const Caret = () => <CaretDown size="0.44em" weight="bold" aria-hidden="true" className="shrink-0 opacity-50" />;
 
@@ -59,7 +59,7 @@ export function Lite({ state, nowSec, action }: Props) {
   const ladder = [...strikes].reverse();
   const onTop = (s: (typeof strikes)[number]) => spot === undefined || BigInt(s.strike) >= spot;
   const nowLine = (
-    <div aria-hidden="true" className="flex h-6 items-center gap-2 px-3 font-mono text-[0.625rem] font-medium tracking-[0.12em] text-teal uppercase">
+    <div aria-hidden="true" className="flex h-6 items-center gap-2 px-3 eyebrow text-teal">
       <span className="size-1.5 rounded-full bg-teal shadow-[0_0_8px_var(--teal)]" />
       Now {spotLabel}
       <span className="flex-1 border-t border-dashed border-teal/60" />
@@ -274,7 +274,7 @@ export function Lite({ state, nowSec, action }: Props) {
             </span>
           </div>
           <div className="mt-3 w-full *:w-full">{action}</div>
-          <p className="mt-2.5 text-center font-mono text-[0.625rem] tracking-[0.12em] text-ink-3 uppercase">Settles on NEAR Intents</p>
+          <p className="mt-2.5 text-center eyebrow text-ink-3">Settles on NEAR Intents</p>
         </div>
       </section>
     </div>

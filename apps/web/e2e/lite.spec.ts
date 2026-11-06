@@ -469,23 +469,38 @@ const look = (page: Page) => page.evaluate(() => [
   getComputedStyle(document.documentElement).backgroundColor,
   document.querySelector('meta[name="theme-color"]')?.getAttribute("content"),
 ]);
-const NEAR = ["near", "rgb(10, 10, 10)", "#0a0a0a"];
+const NEAR = { Dark: ["near", "rgb(10, 10, 10)", "#0a0a0a"], Light: ["near", "rgb(242, 241, 233)", "#f2f1e9"] };
 
-test("every app screen wears the NEAR look in both themes, with no theme switch, and the landing keeps its own", async ({ page }) => {
-  const themeSwitch = page.getByRole("group", { name: "Theme", exact: true });
+async function chooseTheme(page: Page, isMobile: boolean, theme: "Light" | "Dark") {
+  if (!isMobile) return page.getByRole("group", { name: "Theme", exact: true }).getByTitle(theme).click();
+  const cycle = page.getByRole("button", { name: /^Theme: / });
+  for (let i = 0; i < 3 && !(await cycle.getAttribute("aria-label"))?.startsWith(`Theme: ${theme}.`); i++) await cycle.click();
+}
+
+test("every app screen wears the NEAR look in the theme picked in the header, kept after reload, and the landing keeps its own", async ({ page, isMobile }) => {
   await page.goto("/app");
   await expect(page.getByLabel("Trade sentence")).toBeVisible();
-  expect(await look(page)).toEqual(NEAR);
-  await expect(themeSwitch).toBeHidden();
+  await chooseTheme(page, isMobile, "Dark");
+  expect(await look(page)).toEqual(NEAR.Dark);
+  await chooseTheme(page, isMobile, "Light");
+  expect(await look(page)).toEqual(NEAR.Light);
   for (const mode of ["Pro", "Tap", "Lite"]) {
     await page.getByRole("button", { name: mode, exact: true }).click();
-    expect(await look(page), mode).toEqual(NEAR);
-    await expect(themeSwitch).toBeHidden();
+    expect(await look(page), mode).toEqual(NEAR.Light);
   }
   await page.getByRole("link", { name: /Positions/ }).click();
   await expect(page).toHaveURL(/\/positions$/);
-  expect(await look(page)).toEqual(NEAR);
-  await expect(themeSwitch).toBeHidden();
+  expect(await look(page)).toEqual(NEAR.Light);
+  await page.reload();
+  expect(await look(page)).toEqual(NEAR.Light);
+  if (isMobile) {
+    await page.goto("/app");
+    await connectDemo(page);
+    await expect(page.getByRole("button", { name: /^Theme: / })).toBeHidden();
+    await page.getByRole("button", { name: /^Account / }).click();
+    await page.getByRole("group", { name: "Theme", exact: true }).getByTitle("Dark").click();
+    expect(await look(page)).toEqual(NEAR.Dark);
+  }
   await page.goto("/");
   await expect(page.locator("html")).not.toHaveAttribute("data-look", /./);
 });

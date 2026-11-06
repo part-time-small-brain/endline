@@ -1,6 +1,6 @@
 # @endline/web
 
-The consumer app: pick BTC/ETH, Up or Down, a date, a price to beat and a dollar amount, then buy with one signature (the first quote also asks for a [session](https://docs.endline.trade/developers/relay-api#a-trade) signature, valid 24 h and kept for the tab in `sessionStorage["session:<standard>:<account>"]`). Trade defaults to Lite for every user; a header Lite/Pro/Tap toggle (kept in `localStorage`, Lite when unset) opens the existing chart ticket or the tap grid. User guide: [Quickstart](https://docs.endline.trade/quickstart).
+The consumer app: pick BTC/ETH, Up or Down, a date, a price to beat and a dollar amount, then buy with one signature (the first quote also asks for a [session](https://docs.endline.trade/developers/relay-api#a-trade) signature, valid 24 h and kept for the tab in `sessionStorage["session:<intentsId>:<standard>:<account>"]`). Trade defaults to Lite for every user; a header Lite/Pro/Tap toggle (kept in `localStorage`, Lite when unset) opens the existing chart ticket or the tap grid. User guide: [Quickstart](https://docs.endline.trade/quickstart).
 
 ## Run
 

@@ -14,7 +14,7 @@
       var near = location.pathname.replace(/\/+$/, "") !== "" || "%VITE_APP_URL%" === location.origin;
       document.documentElement.dataset.theme = theme;
       if (near) document.documentElement.dataset.look = "near";
-      document.querySelector('meta[name="theme-color"]').content = near ? "#0a0a0a" : theme === "dark" ? "#000000" : "#dee3ea";
+      document.querySelector('meta[name="theme-color"]').content = theme === "dark" ? (near ? "#0a0a0a" : "#000000") : near ? "#f2f1e9" : "#dee3ea";
       })();
     </script>
   </head>

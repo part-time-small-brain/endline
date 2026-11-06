@@ -22,7 +22,7 @@ export function FreeCalls({ calls, accountId, nowSec, quoteDecimals }: Props) {
   return (
     <section aria-label="Free calls" className="flex flex-col gap-4 rounded-md border border-rule bg-surface p-4 sm:p-6">
       <div className="flex flex-col gap-2">
-        <h2 className="font-mono text-[10px] font-medium tracking-[0.14em] text-ink-3 uppercase">Your free calls</h2>
+        <h2 className="eyebrow text-ink-3">Your free calls</h2>
         {calls.length === 0 && <p className="text-sm text-ink-2">Tap a cell in the next round to call it. No money moves.</p>}
         {calls.map((c) => (
           <p key={c.series_id} className="flex items-center justify-between gap-3 text-sm">
@@ -52,7 +52,7 @@ function Board({ title, rows, you }: { title: string; rows: Standing[]; you: Sta
   const extra = you && !shown.some((s) => s.account_id === you.account_id) ? you : undefined;
   return (
     <div>
-      <h3 className="mb-2 font-mono text-[10px] font-medium tracking-[0.14em] text-ink-3 uppercase">{title}</h3>
+      <h3 className="mb-2 eyebrow text-ink-3">{title}</h3>
       {rows.length === 0 ? (
         <p className="text-sm text-ink-2">No results yet.</p>
       ) : (

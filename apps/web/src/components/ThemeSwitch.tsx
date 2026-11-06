@@ -9,6 +9,23 @@ const OPTIONS: { value: ThemeChoice; label: string; Icon: typeof Sun }[] = [
   { value: "system", label: "Match system", Icon: CircleHalf },
 ];
 
+export function ThemeCycle() {
+  const choice = useTheme();
+  const at = OPTIONS.findIndex(({ value }) => value === choice);
+  const { Icon, label } = OPTIONS[at]!;
+  const next = OPTIONS[(at + 1) % OPTIONS.length]!;
+  return (
+    <button
+      type="button"
+      onClick={() => setTheme(next.value)}
+      aria-label={`Theme: ${label}. Switch to ${next.label}`}
+      className="grid size-11 place-items-center rounded-xl text-ink-2 transition-colors duration-150 hover:text-ink"
+    >
+      <Icon size={18} weight="bold" aria-hidden="true" />
+    </button>
+  );
+}
+
 export function ThemeSwitch() {
   const name = useId();
   const choice = useTheme();

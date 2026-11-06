@@ -75,7 +75,7 @@ function Shell({ route, onConnect, onAddFunds, onQuote }: {
       <main className="flex min-h-0 flex-1 flex-col">
         {route === "trade" && <Trade mode={mode} nowSec={nowSec} views={views} onConnect={onConnect} onAddFunds={onAddFunds} onQuote={onQuote} />}
         {route === "positions" && (
-          <div className="mx-auto w-full max-w-2xl px-4 pt-2 pb-10 lg:px-6">
+          <div className="mx-auto w-full max-w-2xl px-4 pt-3 pb-10 lg:px-6 lg:pt-6">
             <Positions views={views} nowSec={nowSec} onConnect={onConnect} onTrade={() => navigate(paths.trade)} onQuote={onQuote} />
           </div>
         )}

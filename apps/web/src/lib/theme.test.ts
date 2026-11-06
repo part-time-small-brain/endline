@@ -24,10 +24,12 @@ describe("theme", () => {
     expect(script).toContain(`"${THEME_KEY}"`);
     const css = readFileSync(new URL("../index.css", import.meta.url), "utf8");
     const page = (block: string) => new RegExp(`${block}\\s*{[^}]*--page:\\s*(#[0-9a-f]{6})`).exec(css)?.[1];
-    const pageColor = { light: page(":root"), dark: page('\\[data-theme="dark"\\]'), near: page('\\[data-look="near"\\]') };
+    const pageColor = { light: page(":root"), dark: page('\\[data-theme="dark"\\]'), near: page('\\[data-look="near"\\]'), nearLight: page('\\[data-look="near"\\]\\[data-theme="light"\\]') };
     expect(pageColor.light).toMatch(/^#/);
     expect(pageColor.dark).toMatch(/^#/);
     expect(pageColor.near).toMatch(/^#/);
+    expect(pageColor.nearLight).toMatch(/^#/);
+    expect(pageColor.nearLight).not.toBe(pageColor.near);
     const run = (stored: string | null, prefersDark: boolean, pathname = "/", mode: string | null = null, origin = "https://example.com", appUrl = "%VITE_APP_URL%") => {
       const root = { dataset: {} as Record<string, string> };
       const meta = { content: "" };
@@ -48,8 +50,9 @@ describe("theme", () => {
     for (const pathname of ["/", "/app", "/app/", "/app//", "/app/positions", "/apps", "/nope"])
       for (const mode of [null, "lite", "pro", "Pro", "tap"]) {
         const near = routeOf(pathname) !== "landing";
-        expect(run("light", false, pathname, mode), `${pathname} ${mode}`).toEqual(near ? { theme: "light", look: "near", bar: pageColor.near } : { theme: "light", bar: pageColor.light });
+        expect(run("light", false, pathname, mode), `${pathname} ${mode}`).toEqual(near ? { theme: "light", look: "near", bar: pageColor.nearLight } : { theme: "light", bar: pageColor.light });
       }
+    expect(run("dark", false, "/app")).toEqual({ theme: "dark", look: "near", bar: pageColor.near });
     const app = "https://app.example.com";
     expect(run("light", false, "/", null, app, app).look).toBe("near");
     expect(run("light", false, "/", null, "https://example.com", app).look).toBeUndefined();

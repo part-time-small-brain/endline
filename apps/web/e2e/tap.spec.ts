@@ -172,6 +172,7 @@ test("free calls with the demo wallet: call a cell of the next round, see it cal
   await page.getByRole("radio", { name: /^Free call/ }).click();
   await expect(page.getByRole("radio", { name: /^Free call/ })).toContainText("10 of 10 left this round");
   await cells(page).filter({ hasText: /^[1-9]\.\d×$/ }).and(page.getByRole("button", { name: / · Tomorrow / })).first().click();
+  await expect(page.getByRole("status").filter({ hasText: "Confirm in your wallet. One signature proves this wallet is yours for 24 h. No funds move." })).toBeVisible();
   await expect(page.getByRole("status").filter({ hasText: /^Called BTC (Up|Down) \$[\d,]+ at \d+\.\d×\.$/ })).toBeVisible({ timeout: 10_000 });
   await expect(page.getByRole("radio", { name: /^Free call/ })).toContainText("9 of 10 left this round");
   await expect(grid(page).getByRole("button", { name: / · you called this$/ })).toHaveCount(1);

@@ -602,7 +602,14 @@ test.describe("Tap", () => {
     await expect(page.getByRole("status").filter({ hasText: "Bought BTC Up $81,000 for $25.00." })).toBeVisible();
     await page.clock.pauseAt((await page.evaluate(() => Date.now())) + 100);
     await expect.poll(() => cell.evaluate((el) => el.getAnimations().filter((a) => a instanceof CSSTransition).length)).toBe(0);
-    await expect(cell).toHaveCSS("background-color", "rgb(11, 38, 28)");
+    const upField = await page.evaluate(() => {
+      const probe = document.body.appendChild(document.createElement("div"));
+      probe.className = "bg-up-field";
+      const color = getComputedStyle(probe).backgroundColor;
+      probe.remove();
+      return color;
+    });
+    await expect(cell).toHaveCSS("background-color", upField);
     expect(state.published).toEqual(["quote-2"]);
   });
 
