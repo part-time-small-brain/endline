@@ -162,6 +162,22 @@ describe("http", () => {
     expect([call.status, await call.json()]).toEqual([503, { error: "no price for this cell right now" }]);
   });
 
+  it("counts free calls per client network behind the proxy: IPv4 address, IPv6 /48", async () => {
+    const add = vi.spyOn(calls, "add");
+    const proxied = createRelayServer(relay, fills, hub, collector, oneClick, calls, undefined, true);
+    await new Promise<void>((resolve) => proxied.listen(0, "127.0.0.1", resolve));
+    const body = JSON.stringify({ series_id: SERIES.id, signer: { standard: "nep413", signer_id: "alice.near" }, session: session("alice.near") });
+    try {
+      for (const ip of ["2001:db8:1:1::1", "2001:db8:1:ffff::1", "2001:db8:2::1", "1.2.3.4"]) {
+        await fetch(`http://127.0.0.1:${(proxied.address() as AddressInfo).port}/calls`, { method: "POST", body, headers: { "content-type": "application/json", "x-forwarded-for": `6.6.6.6, ${ip}` } });
+      }
+      expect(add.mock.calls.map(([, client]) => client)).toEqual(["2001:db8:1", "2001:db8:1", "2001:db8:2", "1.2.3.4"]);
+    } finally {
+      add.mockRestore();
+      await new Promise((resolve) => proxied.close(resolve));
+    }
+  });
+
   it("answers 403 on /faucet when the faucet is off", async () => {
     expect((await post("/faucet", JSON.stringify({ account_id: "alice.testnet" }))).status).toBe(403);
   });

@@ -17,7 +17,7 @@ const APP_ONLY = new Set(["/faucet", "/deposit-quote"]);
 const MAX_REQUESTS_PER_MINUTE = 30;
 const MAX_FILL_READS_PER_MINUTE = 60;
 const FaucetRequest = z.object({ account_id: AccountId });
-const FAUCET_IPV6_GROUPS = 3;
+const SITE_IPV6_GROUPS = 3;
 
 const CORS = {
   "access-control-allow-origin": "*",
@@ -106,7 +106,7 @@ export function createRelayServer(relay: Relay, fills: Fills, hub: MmHub, collec
       case "POST /faucet":
         if (!faucet) throw new HttpError(403, "the faucet is off on this network");
         if (!isJson(request)) throw new HttpError(415, "send application/json");
-        return [200, { tx_hash: await faucet.drip((await parseBody(request, FaucetRequest)).account_id, clientKey(request, trustProxy, FAUCET_IPV6_GROUPS)) }];
+        return [200, { tx_hash: await faucet.drip((await parseBody(request, FaucetRequest)).account_id, clientKey(request, trustProxy, SITE_IPV6_GROUPS)) }];
       case "POST /deposit-quote":
         if (!isJson(request)) throw new HttpError(415, "send application/json");
         return [200, await oneClick.quote(await parseBody(request, oneClick.schema))];
@@ -117,7 +117,7 @@ export function createRelayServer(relay: Relay, fills: Fills, hub: MmHub, collec
         if (!AccountId.safeParse(param).success) throw new HttpError(400, "invalid account id");
         return [200, fills.byAccount(param)];
       case "POST /calls":
-        return [200, await calls.add(await parseBody(request, CallRequest))];
+        return [200, await calls.add(await parseBody(request, CallRequest), clientKey(request, trustProxy, SITE_IPV6_GROUPS))];
       case "GET /calls/:arg":
         if (!AccountId.safeParse(param).success) throw new HttpError(400, "invalid account id");
         return [200, calls.byAccount(param)];

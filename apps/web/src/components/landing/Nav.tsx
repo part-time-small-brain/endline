@@ -1,6 +1,7 @@
 import { useApp } from "../../app/context.ts";
 import { Link } from "../../app/router.tsx";
 import { Wordmark } from "../Glyphs.tsx";
+import { ThemeToggle } from "../ThemeToggle.tsx";
 import { jump } from "./jump.ts";
 
 const SECTIONS = [
@@ -30,12 +31,15 @@ export function Nav() {
           </a>
         </nav>
       </div>
-      <Link
-        href={paths.trade}
-        className="inline-flex h-11 items-center rounded-xl bg-ink px-4 text-sm font-semibold whitespace-nowrap text-on-ink transition-[transform,opacity] duration-150 ease-out hover:opacity-90 active:scale-[0.97]"
-      >
-        Open app
-      </Link>
+      <div className="flex items-center gap-2">
+        <ThemeToggle />
+        <Link
+          href={paths.trade}
+          className="inline-flex h-11 items-center rounded-xl bg-ink px-4 text-sm font-semibold whitespace-nowrap text-on-ink transition-[transform,opacity] duration-150 ease-out hover:opacity-90 active:scale-[0.97]"
+        >
+          Open app
+        </Link>
+      </div>
     </header>
   );
 }
