@@ -85,6 +85,7 @@ Writes close `write_cutoff_sec` before expiry. Exercise and redeem need a final 
 |---|---|---|
 | `exercise(token_id, amount)`, `redeem(...)`, `burn_pair(series_id, amount)` | Holder on the contract's own ledger | 1 yocto. Pays into the caller's intents balance |
 | `withdraw_claimable(owner_id, asset)` | Anyone | 1 yocto. Retries a failed payout, always to `owner_id` |
+| `storage_deposit(account_id?, registration_only?)` | Anyone | NEP-145 subset. The attached NEAR, minus its own record, becomes `account_id`'s storage credit (default: the caller). It pays for new balance rows when options leave intents to this ledger. Can't be withdrawn; `registration_only: true` is rejected |
 | `request_settlement(underlying, expiry)` | Anyone | Attach ≥ 0.01 NEAR, 300 TGas (less is refused). From expiry + 5 min until expiry + `oracle_window_sec` |
 | `propose_settlement(underlying, expiry, price)` | Oracle account | 1 yocto. Manual fallback. Needs a listed series at that expiry, only from expiry + `oracle_window_sec`, once per key |
 | `override_settlement(underlying, expiry, price)` | Owner | 1 yocto. Only before `final_at`, keeps `final_at` |
@@ -93,13 +94,17 @@ Writes close `write_cutoff_sec` before expiry. Exercise and redeem need a final 
 | `add_underlying`, `remove_oracle`, `set_paused` | Owner | 1 yocto |
 | `propose_owner(owner_id \| null)` | Owner | 1 yocto. Replaces any earlier proposal; `null` withdraws it |
 | `accept_owner()` | Proposed owner | 1 yocto. Ownership moves only now, so a typo can't lose it and a multisig or DAO proves it can call before it owns |
-| NEP-245 `mt_transfer`, `mt_batch_transfer`, `mt_transfer_call`, `mt_batch_transfer_call` | Holders | ≥ 1 yocto plus storage for new balance rows. Max 10 tokens per batch. No approvals. Plain transfers to `intents.near` or this contract are rejected: use `mt_transfer_call` / `mt_batch_transfer_call`. Into `intents.near` the `msg` must be empty or an account id (a plain deposit) |
+| NEP-245 `mt_transfer`, `mt_batch_transfer`, `mt_transfer_call`, `mt_batch_transfer_call` | Holders | ≥ 1 yocto plus storage for new balance rows. From `intents.near` (an intents `mt_withdraw`) the receiver's storage credit pays instead, and the call fails if it's short. Max 10 tokens per batch. No approvals. Plain transfers to `intents.near` or this contract are rejected: use `mt_transfer_call` / `mt_batch_transfer_call`. Into `intents.near` the `msg` must be empty or an account id (a plain deposit) |
 
 Pause blocks writes and new series only. Exits are never blocked.
 
+### Withdrawing options to this ledger
+
+An intents `mt_withdraw` of option tokens to an account with no balance row for them needs storage credit for that account. Without it a plain withdraw fails and intents refunds the tokens; a withdraw with `msg` is not refunded. Put `"storage_deposit": "10000000000000000000000"` (0.01 NEAR, paid from the signer's intents wNEAR) in the `mt_withdraw` intent, or call `storage_deposit` first. A new account with a long and a short row takes about 450 bytes (0.0045 NEAR) at the longest account id; later withdrawals into existing rows are free.
+
 ## Views
 
-`get_config` (includes `pending_owner_id`, `oracle_delay_sec`), `get_oracle_wasm` and `get_oracles` (in force now), `get_pending_oracle_changes`, `get_underlyings`, `get_series`, `list_series(from_index, limit ≤ 200)` (every series ever listed), `list_series_by_expiry(from_expiry, after_id, limit ≤ 200)` (series with `expiry ≥ from_expiry` in `(expiry, id)` order; for the next page pass the last one's `expiry` and `id` as `from_expiry` and `after_id`), `get_settlement(underlying, expiry)`, `get_claimable(account_id, asset)`, and NEP-245 `mt_balance_of`, `mt_batch_balance_of`, `mt_supply`, `mt_batch_supply`, `mt_token`.
+`get_config` (includes `pending_owner_id`, `oracle_delay_sec`), `get_oracle_wasm` and `get_oracles` (in force now), `get_pending_oracle_changes`, `get_underlyings`, `get_series`, `list_series(from_index, limit ≤ 200)` (every series ever listed), `list_series_by_expiry(from_expiry, after_id, limit ≤ 200)` (series with `expiry ≥ from_expiry` in `(expiry, id)` order; for the next page pass the last one's `expiry` and `id` as `from_expiry` and `after_id`), `get_settlement(underlying, expiry)`, `get_claimable(account_id, asset)`, NEP-145 `storage_balance_of(account_id)` (`total` and `available` are both the credit left), and NEP-245 `mt_balance_of`, `mt_batch_balance_of`, `mt_supply`, `mt_batch_supply`, `mt_token`.
 
 `mt_supply` includes retired tokens: options closed through intents stay in the contract's intents balance and are never burned. Open interest = supply minus the contract's own intents balance of that token.
 

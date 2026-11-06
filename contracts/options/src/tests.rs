@@ -148,6 +148,13 @@ fn settle(c: &mut Contract, price_usd: u128) -> u64 {
     MANUAL_AT + 3_600
 }
 
+fn withdraw_from_intents(c: &mut Contract, to: AccountId, token: &str, amount: u128) {
+    ctx(to.clone(), T0, DEPOSIT);
+    c.storage_deposit(None, None);
+    ctx(intents(), T0, 1);
+    c.mt_transfer(to, token.into(), U128(amount), None, None);
+}
+
 fn bal(c: &Contract, who: AccountId, token: &str) -> u128 {
     c.mt_balance_of(who, token.into()).0
 }
@@ -656,8 +663,7 @@ fn ledger_holder_exercises_directly() {
     let mut c = setup();
     let id = create(&mut c, 110_000, W, OptionKind::Call);
     write(&mut c, USDC_ASSET, W * USD, &id);
-    ctx(intents(), T0, 1);
-    c.mt_transfer(alice(), id.clone(), U128(BTC), None, None);
+    withdraw_from_intents(&mut c, alice(), &id, BTC);
 
     let now = settle(&mut c, 116_000);
     ctx(alice(), now, 1);
@@ -855,8 +861,7 @@ fn plain_transfer_to_intents_rejected() {
     let mut c = setup();
     let id = create(&mut c, 110_000, W, OptionKind::Call);
     write(&mut c, USDC_ASSET, W * USD, &id);
-    ctx(intents(), T0, 1);
-    c.mt_transfer(alice(), id.clone(), U128(BTC), None, None);
+    withdraw_from_intents(&mut c, alice(), &id, BTC);
     ctx(alice(), T0, 1);
     c.mt_transfer(intents(), id, U128(BTC), None, None);
 }
@@ -867,8 +872,7 @@ fn ledger_transfer_to_new_account_pays_storage() {
     let mut c = setup();
     let id = create(&mut c, 110_000, W, OptionKind::Call);
     write(&mut c, USDC_ASSET, W * USD, &id);
-    ctx(intents(), T0, 1);
-    c.mt_transfer(alice(), id.clone(), U128(BTC), None, None);
+    withdraw_from_intents(&mut c, alice(), &id, BTC);
     ctx(alice(), T0, 1);
     c.mt_transfer(acc("bob.near"), id, U128(1), None, None);
 }
@@ -878,8 +882,7 @@ fn ledger_transfer_with_storage_deposit_succeeds() {
     let mut c = setup();
     let id = create(&mut c, 110_000, W, OptionKind::Call);
     write(&mut c, USDC_ASSET, W * USD, &id);
-    ctx(intents(), T0, 1);
-    c.mt_transfer(alice(), id.clone(), U128(BTC), None, None);
+    withdraw_from_intents(&mut c, alice(), &id, BTC);
     ctx(alice(), T0, 10u128.pow(22));
     c.mt_transfer(acc("bob.near"), id.clone(), U128(1), None, None);
     assert_eq!(bal(&c, acc("bob.near"), &id), 1);
@@ -916,12 +919,73 @@ fn the_first_write_adds_no_storage_the_contract_pays_for() {
 }
 
 #[test]
+fn the_intents_row_survives_reaching_zero_so_the_next_write_adds_no_storage() {
+    let mut c = setup();
+    let id = create(&mut c, 110_000, W, OptionKind::Put);
+    write(&mut c, USDC_ASSET, W * USD, &id);
+    withdraw_from_intents(&mut c, alice(), &id, BTC);
+    ctx(intents(), T0, 0);
+    let before = near_sdk::env::storage_usage();
+    c.mt_on_transfer(
+        alice(),
+        vec![alice()],
+        vec![USDC_ASSET.into()],
+        vec![U128(W * USD)],
+        json!({"action": "write", "series_id": id}).to_string(),
+    );
+    c.balances.flush();
+    assert_eq!(near_sdk::env::storage_usage(), before);
+    assert_eq!(bal(&c, intents(), &id), BTC);
+}
+
+#[test]
+fn intents_withdrawals_to_new_rows_are_paid_from_the_receivers_storage_credit() {
+    let mut c = setup();
+    let id = create(&mut c, 110_000, W, OptionKind::Call);
+    write(&mut c, USDC_ASSET, W * USD, &id);
+    let bob = acc("bob.near");
+    assert!(c.storage_balance_of(bob.clone()).is_none());
+    ctx(alice(), T0, DEPOSIT);
+    let credit = c.storage_deposit(Some(bob.clone()), None).available.0;
+    assert!(credit > 0 && credit < DEPOSIT);
+    assert_eq!(c.storage_balance_of(bob.clone()).unwrap().total.0, credit);
+
+    let tokens = vec![id.clone(), short(&id)];
+    let send = |c: &mut Contract, to: &AccountId| {
+        ctx(intents(), T0, 1);
+        let before = near_sdk::env::storage_usage();
+        c.mt_batch_transfer(to.clone(), tokens.clone(), vec![U128(1), U128(1)], None, None);
+        (near_sdk::env::storage_usage() - before) as u128
+    };
+    let rows = send(&mut c, &bob);
+    let left = c.storage_balance_of(bob.clone()).unwrap().available.0;
+    assert!(rows > 0);
+    assert_eq!(
+        left,
+        credit - rows * near_sdk::env::storage_byte_cost().as_yoctonear()
+    );
+    send(&mut c, &bob);
+    assert_eq!(c.storage_balance_of(bob.clone()).unwrap().available.0, left);
+    assert_eq!(bal(&c, bob, &short(&id)), 2);
+
+    panics_with("carol.near needs", || {
+        send(&mut c, &acc("carol.near"));
+    });
+    ctx(acc("dave.near"), T0, 1);
+    panics_with("attach at least", || {
+        c.storage_deposit(None, None);
+    });
+    panics_with("registration_only is not supported", || {
+        c.storage_deposit(None, Some(true));
+    });
+}
+
+#[test]
 fn deposits_to_intents_take_only_a_plain_msg() {
     let mut c = setup();
     let id = create(&mut c, 110_000, W, OptionKind::Call);
     write(&mut c, USDC_ASSET, W * USD, &id);
-    ctx(intents(), T0, 1);
-    c.mt_transfer(alice(), id.clone(), U128(BTC), None, None);
+    withdraw_from_intents(&mut c, alice(), &id, BTC);
     ctx(alice(), T0, DEPOSIT);
     let execute =
         json!({"receiver_id": "alice.near", "execute_intents": [], "refund_if_fails": true}).to_string();
@@ -944,8 +1008,7 @@ fn resolve_refunds_what_the_receiver_leaves_unused_up_to_its_balance() {
     let mut c = setup();
     let id = create(&mut c, 110_000, W, OptionKind::Call);
     write(&mut c, USDC_ASSET, W * USD, &id);
-    ctx(intents(), T0, 1);
-    c.mt_transfer(acc("bob.near"), id.clone(), U128(1_000), None, None);
+    withdraw_from_intents(&mut c, acc("bob.near"), &id, 1_000);
     let mut resolve = |receiver: AccountId, result: PromiseResult, amount: u128| {
         callback_ctx(T0, result);
         c.mt_resolve_transfer(vec![alice()], receiver, vec![id.clone()], vec![U128(amount)])[0].0

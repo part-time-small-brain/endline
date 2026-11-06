@@ -187,7 +187,7 @@ impl Contract {
         let key = (token_id.to_string(), account_id.clone());
         let balance = self.balances.get(&key).copied().unwrap_or(0);
         require!(balance >= amount, "insufficient balance");
-        if balance == amount {
+        if balance == amount && *account_id != self.intents_id {
             self.balances.remove(&key);
         } else {
             self.balances.insert(key, balance - amount);
@@ -301,6 +301,7 @@ impl Contract {
         self.balances.flush();
         if sender_id == self.intents_id {
             assert_one_yocto();
+            self.charge_storage_credit(receiver_id, storage_before);
         } else {
             charge_storage(storage_before, ONE_YOCTO);
         }
