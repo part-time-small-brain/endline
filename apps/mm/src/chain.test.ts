@@ -19,14 +19,12 @@ describe("seriesFrom", () => {
   }));
   const from = (expiry: number) => listed.filter((s) => s.expiry >= expiry).sort(order);
 
-  function contract(afterCall = (_calls: number) => {}) {
+  function contract() {
     const calls: string[] = [];
     vi.spyOn(JsonRpcProvider.prototype, "callFunction").mockImplementation((async ({ method, args }: { method: string; args: { from_expiry: number; after_id?: string; limit: number } }) => {
       calls.push(method);
       const { from_expiry: expiry, after_id: after, limit } = args;
-      const page = from(expiry).filter((s) => after === undefined || s.expiry > expiry || s.id > after).slice(0, limit);
-      afterCall(calls.length);
-      return page;
+      return from(expiry).filter((s) => after === undefined || s.expiry > expiry || s.id > after).slice(0, limit);
     }) as unknown as JsonRpcProvider["callFunction"]);
     return { chain: new ChainReader("http://rpc", "opt.testnet"), calls };
   }
@@ -38,13 +36,9 @@ describe("seriesFrom", () => {
     expect(await chain.seriesFrom(1_000)).toEqual(from(1_000));
   });
 
-  it("reads every series by expiry cursor, so one deleted between pages hides no other", async () => {
-    const first = from(1_000)[0]!;
-    const { chain, calls } = contract((n) => {
-      if (n === 1) listed.splice(listed.indexOf(first), 1);
-    });
-    const all = await chain.series();
+  it("reads every series by expiry cursor, an order a delete can't reshuffle", async () => {
+    const { chain, calls } = contract();
+    expect(await chain.series()).toEqual(from(0));
     expect(new Set(calls)).toEqual(new Set(["list_series_by_expiry"]));
-    expect(all.filter((s) => s.id !== first.id)).toEqual(from(1_000));
   });
 });

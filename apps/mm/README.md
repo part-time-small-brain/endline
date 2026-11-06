@@ -118,7 +118,7 @@ Stale data refuses each quote on its own. SIGINT/SIGTERM closes the relay socket
 | Exercise | Once a series' price is final, exercise the MM's longs beyond its pairs (bought back from users) that pay something, up to 10 per intent |
 | Delete | The MM's own series that ended 7 to 37 days ago and that `deletable_series` says owe nothing: `delete_series`, up to 20 per call, refunding their storage to the MM. Older ones are no longer checked; anyone can still delete them |
 
-Burn, redeem and exercise cover series that expired up to 7 days ago, so the MM's own positions never keep a series from being deleted. A write the contract refuses after the intent executes (e.g. writes just closed) is refunded by intents and still logs its tx; the next pass sees the unchanged balance.
+Burn, redeem and exercise cover series that expired up to 7 days ago, so the MM's own positions don't keep a series from being deleted, short of rounding dust it can't exercise. A write the contract refuses after the intent executes (e.g. writes just closed) is refunded by intents and still logs its tx; the next pass sees the unchanged balance.
 
 ## Settlement monitor
 
