@@ -16,7 +16,7 @@ The relay runs the RFQ auction, settles trades with `intents.near::execute_inten
 | `POST /publish` | `{quote_id, signed}` → `StatusUpdate` (200 settled, 422 failed) |
 | `GET /status/:quote_id` | `StatusUpdate`. `expired` from `sign_by_ms`; forgotten after an hour (then 404) |
 | `GET /fills/:account_id` | `Fill[]` for that signer |
-| `POST /execute` | `{signed}` → `{tx_hash}`. Gasless collect. `tx_hash` is `""` when the send errored but the signer's nonce shows it ran |
+| `POST /execute` | `{signed}` → `{tx_hash}`. Gasless collect. `tx_hash` is the relayer's transaction that ran, also when the send errored |
 | `POST /transfer` | `{signed}` → `{tx_hash}`. Moves USDC between intents accounts for a $0.01 fee to the relayer instead of gas ([rules](#transfer)). `tx_hash` as for `/execute` |
 | `POST /claims` | `{signed}` → `{ok: true}`. Stores a pre-signed exercise for auto-collect |
 | `POST /calls` | `{series_id, signer, session}` → `Call`. A free call ([rules](#free-calls)) |
@@ -35,7 +35,7 @@ The relay runs the RFQ auction, settles trades with `intents.near::execute_inten
 | Quote | `POST /quote {series_id, side, size, signer: {standard, signer_id}, session}`. `side` is yours: `buy` or `sell` (to close). A buy must be at least the asset's `min_write` |
 | Auction | The relay asks every connected market maker for 300 to 1500 ms, closing early once all have answered. Best price wins (buy: lowest, sell: highest, ties: first answer) |
 | Sign | The `Quote` carries `premium`, `pay`, `receive`, `sign_by_ms` (market maker deadline − 3 s) and `payload`, exactly what your wallet signs |
-| Publish | `POST /publish {quote_id, signed}`, accepted only if byte-for-byte what the relay issued and unused. The relay simulates both halves, then calls `execute_intents([mm, user])`: both fill or neither does. If that call errors, the quote stays `settling` until the user's nonce is used (`settled`, maybe without `tx_hash`) or a final block passes the deadline with it unused (`failed`) |
+| Publish | `POST /publish {quote_id, signed}`, accepted only if byte-for-byte what the relay issued and unused. The relay simulates both halves, then calls `execute_intents([mm, user])`: both fill or neither does. If that call errors, the relay reads every transaction it signed for it at `final`: `settled` with the one that succeeded, `failed` once all of them failed or a final block passes the deadline with none succeeded. Until then the quote stays `settling` |
 
 ### Signing `Quote.payload`
 
@@ -54,7 +54,7 @@ Free calls move no money, but the caller needs at least $1 of `QUOTE_ASSET` in t
 
 ## Collect: `/execute` and `/claims`
 
-Both accept only an exercise exactly as the SDK's `exerciseOptions` builds and `toSign` encodes it: one `transfer` to the options contract with `msg` `{"action":"exercise"}`, `min_gas` 100 TGas, 1 to 10 long tokens of series in the `GET /series` listing, each at least `min_write`. Anything else is refused before any gas is spent. Each `(signer_id, nonce)` goes on-chain once, one payload per signer (exercise or transfer) is in flight at a time (an errored send stays in flight until its nonce is used or a final block passes its deadline), and every payload must still have 2 minutes left when the relay sends it, with its deadline written exactly as the SDK writes it.
+Both accept only an exercise exactly as the SDK's `exerciseOptions` builds and `toSign` encodes it: one `transfer` to the options contract with `msg` `{"action":"exercise"}`, `min_gas` 100 TGas, 1 to 10 long tokens of series in the `GET /series` listing, each at least `min_write`. Anything else is refused before any gas is spent. Each `(signer_id, nonce)` goes on-chain once, one payload per signer (exercise or transfer) is in flight at a time (an errored send stays in flight until one of the relayer's transactions for it succeeds, all fail, or a final block passes its deadline), and every payload must still have 2 minutes left when the relay sends it, with its deadline written exactly as the SDK writes it.
 
 | Route | Rules |
 |---|---|
@@ -81,7 +81,7 @@ Body: `{error}`.
 | `413` | Body over 64 KB |
 | `415` | Faucet request not `application/json` |
 | `422` | Refused by `simulate_intents` |
-| `500` | A collect or transfer errored and its nonce was still unused once a final block passed its deadline: it never ran. If the response never arrives (the relay holds it until then, up to the deadline), check the balance before signing again |
+| `500` | A collect or transfer errored and the relayer's transactions for it failed, or none had succeeded once a final block passed its deadline: it never ran. If the response never arrives (the relay holds it until then, up to the deadline), check the balance before signing again |
 | `429` | Rate limit (per IP, or 4 quotes per 25 s per signer), faucet already used in the last 24 h, or 10 free calls used this round |
 | `502` | Faucet transfer refunded (try again) or of unknown outcome (check your balance; it counts as sent) |
 | `503` | No market maker online, no valid quote, claim queue full, no price for a free call's series right now, or the free-call store full |
@@ -95,6 +95,6 @@ Not exposed on the hosted relay (`api.endline.trade`). To connect a market maker
 | Relay → MM | `{"method":"quote","params":QuoteEvent}`. `side` is the user's side. Answers after `deadline_ms` are dropped |
 | MM → relay | `{"method":"quote_response","params":{quote_id, premium, signed}}`. One answer per quote per connection |
 | MM → relay | `{"method":"marks","params":[{series_id, ask, bid?, vol}]}`. Its current price per series it holds and would quote, replacing its previous marks; dropped 10 s after receipt or when it disconnects |
-| Relay → MM | `{"method":"quote_status","params":StatusUpdate}` to the winner: `settled` (with `tx_hash`, unless the relay settled it by the user's nonce after an RPC error), `failed` with `reason`, or `expired` |
+| Relay → MM | `{"method":"quote_status","params":StatusUpdate}` to the winner: `settled` with `tx_hash`, `failed` with `reason`, or `expired` |
 
 An answer counts only if its `token_diff` is exactly the expected fee-exact market maker leg for that premium, its deadline is 20 to 60 s out with a versioned nonce, and `simulate_intents([mm])` leaves exactly the user's leg open.

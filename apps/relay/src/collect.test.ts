@@ -6,7 +6,7 @@ import { type Fill, type Intent, payload, readPayload, relayedTransfer, type Sig
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Claims } from "./claims.ts";
 import { Collector } from "./collect.ts";
-import { Rejected } from "./rpc.ts";
+import { Rejected, Unsettled } from "./rpc.ts";
 import { fakeChain, httpStatus, INTENTS, MIN_WRITE, nep413, OPTION, OPTIONS, SALT, SERIES, USDC } from "./test-fakes.ts";
 
 const SHORT = `${OPTION}-SHORT`;
@@ -264,25 +264,35 @@ describe("gasless sends whose execute call errored", () => {
   });
   afterEach(() => vi.useRealTimers());
 
-  it.each(sends)("answers %s that ran as sent, by the signer's nonce, so the user never signs it again", async (_, send, make) => {
+  it.each(sends)("answers %s whose relayer transaction ran as sent, with that transaction, so the user never signs it again", async (_, send, make) => {
     const { chain, collector, executed, settle } = setup();
     settle();
     const execute = chain.execute;
     vi.spyOn(chain, "execute").mockImplementationOnce(async (batch) => {
-      await execute(batch);
-      throw new Error("Internal server error");
+      throw new Unsettled([await execute(batch)], new Error("Internal server error"));
     });
-    const nonceRead = vi.spyOn(chain, "isNonceUsed");
-    const s = make();
-    expect(await send(collector, s)).toBe("");
-    expect(nonceRead).toHaveBeenCalledWith("alice.test", readPayload(s).nonce);
+    expect(await send(collector, make())).toBe("tx1");
     expect(executed).toHaveLength(1);
   });
 
-  it.each(sends)("fails %s only once a final block is past the deadline with the nonce unused, never on a read error, and holds the signer's lock until then", async (_, send, make) => {
+  it.each(sends)("fails %s whose relayer transaction failed, even though the signer burned the nonce with another payload", async (_, send, make) => {
     const { chain, collector, executed, settle } = setup();
     settle();
-    vi.spyOn(chain, "execute").mockRejectedValueOnce(new Error("Request timeout"));
+    const execute = chain.execute;
+    const s = make();
+    const burn = nep413({ ...readPayload(s), intents: [] });
+    vi.spyOn(chain, "execute").mockImplementationOnce(async (batch) => {
+      await execute([burn]);
+      return execute(batch);
+    });
+    await expect(send(collector, s)).rejects.toThrow("nonce already used");
+    expect(executed).toEqual([[burn]]);
+  });
+
+  it.each(sends)("fails %s of unknown outcome only once a final block is past the deadline with its transaction still unknown, never on a read error, and holds the signer's lock until then", async (_, send, make) => {
+    const { chain, collector, executed, settle } = setup();
+    settle();
+    vi.spyOn(chain, "execute").mockRejectedValueOnce(new Unsettled(["lost"], new Error("Request timeout")));
     const s = make();
     const deadline = Date.parse(readPayload(s).deadline);
     vi.spyOn(chain, "finalTimeMs").mockImplementation(async () => {

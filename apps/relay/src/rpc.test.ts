@@ -1,8 +1,10 @@
+import { createHash } from "node:crypto";
 import { CLAIM_WINDOW_SEC } from "@endline/sdk";
-import { Account, JsonRpcProvider, KeyPair } from "near-api-js";
+import { Account, baseEncode, JsonRpcProvider, KeyPair } from "near-api-js";
+import { InvalidNonceError, TransactionTimeoutError, UnknownTransactionError } from "near-api-js/rpc-errors";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { loadConfig } from "./config.ts";
-import { nearChain, Refunded } from "./rpc.ts";
+import { nearChain, Refunded, Unsettled } from "./rpc.ts";
 
 const config = loadConfig({
   NEAR_RPC_URL: "https://rpc.example",
@@ -40,6 +42,39 @@ describe("depositFt", () => {
       expect(error).toBeInstanceOf(Error);
       expect(error).not.toBeInstanceOf(Refunded);
     }
+  });
+});
+
+describe("execute", () => {
+  it("hands back every transaction it signed when a send errors, also one re-signed after a stale key nonce", async () => {
+    vi.spyOn(JsonRpcProvider.prototype, "viewAccessKey").mockResolvedValue({ nonce: 7n } as never);
+    vi.spyOn(JsonRpcProvider.prototype, "viewBlock").mockResolvedValue({ header: { hash: baseEncode(new Uint8Array(32)) } } as never);
+    const sent: string[] = [];
+    vi.spyOn(JsonRpcProvider.prototype, "sendTransactionUntil").mockImplementation(async (tx) => {
+      sent.push(baseEncode(createHash("sha256").update(tx.transaction.encode()).digest()));
+      if (sent.length === 1) throw new InvalidNonceError(7, 7, "", "");
+      throw new Error("Request timeout");
+    });
+    const error = await nearChain(config).execute([]).catch((e: unknown) => e);
+    expect(sent).toHaveLength(2);
+    expect(error).toBeInstanceOf(Unsettled);
+    expect(error).toMatchObject({ message: "Request timeout", txHashes: sent });
+  });
+});
+
+describe("txStatus", () => {
+  it("reads the relayer's transaction at final, and only a transaction the node never saw is unknown", async () => {
+    const view = vi.spyOn(JsonRpcProvider.prototype, "viewTransactionStatus");
+    const chain = nearChain(config);
+    view.mockResolvedValueOnce({ status: { SuccessValue: "" } } as never);
+    expect(await chain.txStatus("h")).toBe("succeeded");
+    expect(view).toHaveBeenCalledWith({ txHash: "h", accountId: "relayer.test", waitUntil: "FINAL" });
+    view.mockResolvedValueOnce({ status: { Failure: {} } } as never);
+    expect(await chain.txStatus("h")).toBe("failed");
+    view.mockRejectedValueOnce(new UnknownTransactionError("h"));
+    expect(await chain.txStatus("h")).toBe("unknown");
+    view.mockRejectedValueOnce(new TransactionTimeoutError());
+    await expect(chain.txStatus("h")).rejects.toBeInstanceOf(TransactionTimeoutError);
   });
 });
 

@@ -26,7 +26,7 @@ import { type Bid, legs } from "./bid.ts";
 import type { Config } from "./config.ts";
 import type { Fills } from "./fills.ts";
 import { rateLimit } from "./limit.ts";
-import { type Chain, ranByNonce } from "./rpc.ts";
+import { type Chain, ranTx } from "./rpc.ts";
 import { Sessions } from "./session.ts";
 
 export const SIGN_MARGIN_MS = 3_000;
@@ -207,8 +207,9 @@ export class Relay {
     try {
       return { quote_id: quoteId, status: "settled", tx_hash: await this.deps.chain.execute(batch) };
     } catch (error) {
-      console.error("execute_intents errored, settling by the user's nonce", quoteId, error);
-      return (await ranByNonce(this.deps.chain, user, quoteId)) ? { quote_id: quoteId, status: "settled" } : failed(quoteId, error);
+      console.error("execute_intents errored, settling by the relayer's transactions", quoteId, error);
+      const txHash = await ranTx(this.deps.chain, user, error, quoteId);
+      return txHash === undefined ? failed(quoteId, error) : { quote_id: quoteId, status: "settled", tx_hash: txHash };
     }
   }
 
