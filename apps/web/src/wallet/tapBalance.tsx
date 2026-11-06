@@ -62,7 +62,7 @@ export function TapProvider({ children }: { children: ReactNode }) {
 
   const signed = useCallback(async () => {
     if (!main) throw new Error("Connect a wallet first");
-    const seed = await signSeed(main, config.network);
+    const seed = await signSeed(main, { network: config.network, intentsId: config.intentsId, host: window.location.host });
     if (current.current !== main) throw new Error("Another wallet connected meanwhile");
     return { seed, tap: tapWallet(seed, main, config.intentsId) };
   }, [main, config]);
