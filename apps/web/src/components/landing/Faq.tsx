@@ -12,12 +12,12 @@ const QUESTIONS = [
 
 export function Faq() {
   return (
-    <section id="faq" className="bg-surface py-24 lg:py-32">
+    <section id="faq" className="border-t border-rule py-24 lg:py-32">
       <div className="mx-auto max-w-7xl px-4 lg:px-12">
         <SectionHead title="Questions" />
-        <dl className="grid gap-10 lg:grid-cols-2 lg:gap-x-16 lg:gap-y-12">
+        <dl className="grid gap-x-16 lg:grid-cols-2">
           {QUESTIONS.map(([question, answer], i) => (
-            <Reveal key={question} delay={(i % 2) * 0.08}>
+            <Reveal key={question} delay={(i % 2) * 0.08} className="border-t border-rule py-6">
               <dt className="font-display text-xl font-semibold">{question}</dt>
               <dd className="mt-2 text-ink-2">{answer}</dd>
             </Reveal>

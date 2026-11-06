@@ -8,6 +8,7 @@ import solana from "../../assets/chains/solana.svg";
 import { m, useReducedMotion } from "motion/react";
 import { formatPrice } from "../../lib/money.ts";
 import { SideGlyph } from "../Glyphs.tsx";
+import { LABEL } from "../label.ts";
 import { Reveal } from "./Reveal.tsx";
 import { SectionHead } from "./SectionHead.tsx";
 import { useSize } from "./useSize.ts";
@@ -108,19 +109,19 @@ export function Intents({ symbol, strike, quoteDecimals }: Props) {
                 ))}
               </ul>
               <div
-                className={`rounded-3xl bg-paper p-4 text-ink shadow-[0_24px_48px_rgb(0_0_0/0.2)] ${wide ? "absolute -translate-y-1/2" : ""}`}
+                className={`rounded-md border border-rule bg-surface p-4 text-ink ${wide ? "absolute -translate-y-1/2" : ""}`}
                 style={wide ? { left: hubX, top: hubY, width: HUB_W } : undefined}
               >
-                <p className="text-xs text-ink-2">One balance</p>
+                <p className={LABEL}>One balance</p>
                 <p className="font-display text-3xl font-semibold">$412.58</p>
-                <p className="text-xs text-ink-2">USDC</p>
+                <p className="font-mono text-xs text-ink-3">USDC</p>
               </div>
-              <div className={`rounded-2xl bg-up p-4 text-on-up ${wide ? "absolute right-0 -translate-y-1/2" : ""}`} style={wide ? { top: hubY, width: OUT_W } : undefined}>
+              <div className={`rounded-md border border-up bg-up-field p-4 text-up-ink ${wide ? "absolute right-0 -translate-y-1/2" : ""}`} style={wide ? { top: hubY, width: OUT_W } : undefined}>
                 <p className="flex items-center gap-2 font-display text-xl font-semibold">
                   <SideGlyph kind="call" size={20} />
                   {symbol} Up
                 </p>
-                <p className="mt-1 text-sm">above {formatPrice(strike, quoteDecimals)}</p>
+                <p className="mt-1 font-mono text-xs text-ink-2">above {formatPrice(strike, quoteDecimals)}</p>
               </div>
             </div>
           </Reveal>

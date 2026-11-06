@@ -1,5 +1,5 @@
 import type { Locator, Page } from "@playwright/test";
-import { connectDemo, dollars, expect, money, settle, sideways, test } from "./fixtures.ts";
+import { connectDemo, dollars, expect, money, openPopover, settle, sideways, test } from "./fixtures.ts";
 
 test("Lite is the default and Pro persists across reload", async ({ page }) => {
   await page.goto("/app");
@@ -39,17 +39,6 @@ test("Lite buys through the same confirm sheet", async ({ page }) => {
 });
 
 const CHIP_LABELS = ["End date", "Trade asset", "Trade direction", "Price to beat", "Trade amount"] as const;
-
-async function openPopover(page: Page, label: string) {
-  const expanded = page.getByRole("button", { expanded: true });
-  if (await expanded.count()) await page.keyboard.press("Escape");
-  const trigger = page.getByRole("button", { name: label, exact: true });
-  await trigger.click();
-  await expect(trigger).toHaveAttribute("aria-expanded", "true");
-  const panel = trigger.locator("..").locator(":scope > span");
-  await expect(panel).toBeVisible();
-  return panel;
-}
 
 async function ready(page: Page) {
   await page.goto("/app");
@@ -462,32 +451,6 @@ test("Lite baseline and six popovers fit the viewport and support Escape", async
     await expect(trigger).toHaveAttribute("aria-expanded", "false");
     await expect(trigger).toBeFocused();
   }
-});
-
-const look = (page: Page) => page.evaluate(() => [
-  document.documentElement.dataset.look ?? "none",
-  getComputedStyle(document.documentElement).backgroundColor,
-  document.querySelector('meta[name="theme-color"]')?.getAttribute("content"),
-]);
-const NEAR = ["near", "rgb(10, 10, 10)", "#0a0a0a"];
-
-test("every app screen wears the NEAR look in both themes, with no theme switch, and the landing keeps its own", async ({ page }) => {
-  const themeSwitch = page.getByRole("group", { name: "Theme", exact: true });
-  await page.goto("/app");
-  await expect(page.getByLabel("Trade sentence")).toBeVisible();
-  expect(await look(page)).toEqual(NEAR);
-  await expect(themeSwitch).toBeHidden();
-  for (const mode of ["Pro", "Tap", "Lite"]) {
-    await page.getByRole("button", { name: mode, exact: true }).click();
-    expect(await look(page), mode).toEqual(NEAR);
-    await expect(themeSwitch).toBeHidden();
-  }
-  await page.getByRole("link", { name: /Positions/ }).click();
-  await expect(page).toHaveURL(/\/positions$/);
-  expect(await look(page)).toEqual(NEAR);
-  await expect(themeSwitch).toBeHidden();
-  await page.goto("/");
-  await expect(page.locator("html")).not.toHaveAttribute("data-look", /./);
 });
 
 test("the price list runs high to low with now marked between the prices either side", async ({ page }) => {

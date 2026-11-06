@@ -17,7 +17,7 @@ import { formatUsd, toNumber } from "../lib/money.ts";
 import { goodCase } from "../lib/ticket.ts";
 import type { TradeMode } from "../lib/tradeMode.ts";
 import { useWallet } from "../wallet/context.tsx";
-import { Lite } from "./Lite.tsx";
+import { Lite } from "../components/trade/Lite.tsx";
 import { Tap } from "./Tap.tsx";
 
 interface Props {
@@ -58,7 +58,9 @@ export function Trade({ mode, nowSec, views, onConnect, onAddFunds, onQuote }: P
       {mode === "tap" ? (
         <Tap state={state} nowSec={nowSec} views={views} onConnect={onConnect} onAddFunds={onAddFunds} onQuote={onQuote} />
       ) : mode === "lite" ? (
-        <Lite state={state} nowSec={nowSec} action={action} />
+        <div className="mx-auto w-full max-w-2xl flex-1 px-4 pt-3 lg:px-6 lg:pt-6">
+          <Lite state={state} nowSec={nowSec} action={action} stickyAction />
+        </div>
       ) : (
         <div data-side={up ? "up" : "down"} className="grid min-h-0 flex-1 grid-cols-1 gap-4 px-4 lg:grid-cols-[minmax(0,1fr)_440px] lg:gap-6 lg:px-6 lg:pt-2 pb-32 lg:pb-6">
           <div className="flex min-h-0 min-w-0 flex-col gap-4">

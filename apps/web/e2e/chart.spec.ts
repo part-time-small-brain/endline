@@ -69,17 +69,10 @@ test("line lands on the price to beat when lazy modules arrive late", async ({ p
   expect(Math.abs(chart.line - mid(chart.handle))).toBeLessThan(1);
 });
 
-test("under the NEAR look the two sides fade away from the line in either theme", async ({ page }) => {
-  const opacities = (theme: string) =>
-    chartOf(page).evaluate((root, t) => {
-      document.documentElement.dataset.theme = t;
-      return [...root.querySelectorAll("svg linearGradient")].map((g) => [...g.querySelectorAll("stop")].map((s) => getComputedStyle(s).stopOpacity));
-    }, theme);
-  expect(await opacities("light")).toEqual([
-    ["0", "1"],
-    ["1", "0"],
-  ]);
-  expect(await opacities("dark")).toEqual([
+test("the two sides fade away from the line", async ({ page }) => {
+  const opacities = await chartOf(page).evaluate((root) =>
+    [...root.querySelectorAll("svg linearGradient")].map((g) => [...g.querySelectorAll("stop")].map((s) => getComputedStyle(s).stopOpacity)));
+  expect(opacities).toEqual([
     ["0", "1"],
     ["1", "0"],
   ]);

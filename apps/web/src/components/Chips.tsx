@@ -46,7 +46,7 @@ export function Chips<T extends string>({ label, options, value, onChange, colum
             disabled={option.disabled}
             onClick={() => onChange(option.value)}
             className={`min-h-11 min-w-0 rounded-xl px-3 py-2 text-left transition-[transform,background-color,box-shadow] duration-150 ease-out active:scale-[0.97] disabled:opacity-40 ${
-              selected ? "bg-paper shadow-[inset_0_0_0_2px_var(--ink)]" : "bg-well hover:bg-well-hover near:ring-1 near:ring-ink/20 near:ring-inset"
+              selected ? "bg-paper shadow-[inset_0_0_0_2px_var(--ink)]" : "bg-well ring-1 ring-ink/20 ring-inset hover:bg-well-hover"
             }`}
           >
             <span className="block truncate text-base font-semibold">{option.label}</span>

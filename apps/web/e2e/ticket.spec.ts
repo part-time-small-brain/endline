@@ -130,7 +130,7 @@ test("ticket shows the cap two steps past the line on the winning side, paying m
   }
 });
 
-test("the picked asset stands out from its group in both themes", async ({ page }) => {
+test("the picked asset stands out from its group", async ({ page }) => {
   const luminance = (rgb: string) => {
     const [r, g, b] = (rgb.match(/[\d.]+/g) ?? []).slice(0, 3).map((v) => {
       const c = Number(v) / 255;
@@ -141,12 +141,9 @@ test("the picked asset stands out from its group in both themes", async ({ page 
   await page.addStyleTag({ content: "*, *::before, *::after { transition: none !important; }" });
   const group = page.getByRole("radiogroup", { name: "Asset" }).first();
   const picked = group.getByRole("radio", { checked: true });
-  for (const theme of ["light", "dark"]) {
-    await page.evaluate((t) => document.documentElement.setAttribute("data-theme", t), theme);
-    const [chip, track] = await Promise.all([picked.evaluate((el) => getComputedStyle(el).backgroundColor), group.evaluate((el) => getComputedStyle(el).backgroundColor)]);
-    const [a, b] = [luminance(chip), luminance(track)];
-    expect((Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05), theme).toBeGreaterThan(1.2);
-  }
+  const [chip, track] = await Promise.all([picked.evaluate((el) => getComputedStyle(el).backgroundColor), group.evaluate((el) => getComputedStyle(el).backgroundColor)]);
+  const [a, b] = [luminance(chip), luminance(track)];
+  expect((Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05)).toBeGreaterThan(1.2);
 });
 
 test("utility classes win over base styles", async ({ page }) => {

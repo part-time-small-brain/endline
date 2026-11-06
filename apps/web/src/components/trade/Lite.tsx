@@ -1,25 +1,26 @@
 import { capPrice, maxPayout } from "@endline/sdk";
 import { CaretDown, Info } from "@phosphor-icons/react";
 import type { ReactNode } from "react";
-import type { useTicket } from "../app/useTicket.ts";
-import { Brackets } from "../components/Brackets.tsx";
-import { pickWithArrows } from "../components/Chips.tsx";
-import { Popover } from "../components/Popover.tsx";
-import { AmountPicker } from "../components/trade/AmountPicker.tsx";
-import { SideGlyph } from "../components/Glyphs.tsx";
-import { ASSET_ICONS } from "../components/trade/AssetPicker.tsx";
-import { assetName } from "../lib/labels.ts";
-import { formatChance, formatMultiple, formatPct, formatPrice, formatUsd, toNumber, toUnits } from "../lib/money.ts";
-import { payoutMultiple } from "../lib/ticket.ts";
-import { dayLabel, formatClock, formatUtc } from "../lib/time.ts";
+import type { useTicket } from "../../app/useTicket.ts";
+import { assetName } from "../../lib/labels.ts";
+import { formatChance, formatMultiple, formatPct, formatPrice, formatUsd, toNumber, toUnits } from "../../lib/money.ts";
+import { payoutMultiple } from "../../lib/ticket.ts";
+import { dayLabel, formatClock, formatUtc } from "../../lib/time.ts";
+import { Brackets } from "../Brackets.tsx";
+import { pickWithArrows } from "../Chips.tsx";
+import { SideGlyph } from "../Glyphs.tsx";
+import { LABEL } from "../label.ts";
+import { Popover } from "../Popover.tsx";
+import { AmountPicker } from "./AmountPicker.tsx";
+import { ASSET_ICONS } from "./AssetPicker.tsx";
 
 interface Props {
   state: ReturnType<typeof useTicket>;
   nowSec: number;
   action: ReactNode;
+  stickyAction?: boolean;
 }
 
-const label = "font-mono text-[0.625rem] font-medium tracking-[0.14em] text-ink-3 uppercase";
 const legend = "before:pointer-events-none before:absolute before:-top-[0.4375rem] before:left-2 before:bg-surface before:px-1 before:font-mono before:text-[0.625rem] before:leading-[0.875rem] before:font-medium before:tracking-[0.14em] before:uppercase";
 
 const Caret = () => <CaretDown size="0.44em" weight="bold" aria-hidden="true" className="shrink-0 opacity-50" />;
@@ -33,7 +34,7 @@ function Meter({ chance, lit, className }: { chance: number; lit: string; classN
   );
 }
 
-export function Lite({ state, nowSec, action }: Props) {
+export function Lite({ state, nowSec, action, stickyAction }: Props) {
   const {
     data, quoteDecimals, unit, symbol, symbols, kind, expiry, budget,
     setSymbol, setKind, setExpiry, setSeries, setBudget,
@@ -44,10 +45,11 @@ export function Lite({ state, nowSec, action }: Props) {
   const payout = valid ? maxPayout(current.terms, current.size) : undefined;
   const multiple = valid ? payoutMultiple(current) : undefined;
   const strike = series ? BigInt(series.strike) : undefined;
-  const chip = `relative inline-flex min-h-11 max-w-full items-center gap-[0.25em] rounded-md border px-[0.4em] py-[0.08em] align-middle leading-tight font-semibold transition-colors [@media(min-height:44rem)]:scroll-mb-40 ${legend}`;
+  const pinned = stickyAction ? "[@media(min-height:44rem)]:scroll-mb-40" : "";
+  const chip = `relative inline-flex min-h-11 max-w-full items-center gap-[0.25em] rounded-md border px-[0.4em] py-[0.08em] align-middle leading-tight font-semibold transition-colors ${pinned} ${legend}`;
   const slot = `${chip} border-ink/20 text-ink before:text-ink-3 hover:border-ink/45 hover:bg-well aria-expanded:border-ink`;
   const panel = "w-96 max-w-[calc(100vw-2rem)] rounded-md bg-surface p-2 font-sans text-sm font-normal leading-5 tracking-normal text-ink normal-case shadow-[0_24px_64px_rgb(0_0_0/0.6)]";
-  const heading = `mb-1 px-3 pt-2 pb-1 ${label}`;
+  const heading = `mb-1 px-3 pt-2 pb-1 ${LABEL}`;
   const row = "flex min-h-14 w-full items-center justify-between gap-3 rounded-md px-3 py-2 text-left transition-colors";
   const picked = (selected: boolean) => (selected ? "bg-side-field shadow-[inset_0_0_0_1px_var(--side)]" : "hover:bg-well");
   const move = (price: bigint) => spot !== undefined && spot > 0n ? formatPct(toNumber(price - spot, quoteDecimals) / toNumber(spot, quoteDecimals)) : "—";
@@ -90,7 +92,7 @@ export function Lite({ state, nowSec, action }: Props) {
   const Glyph = ASSET_ICONS[symbol];
 
   return (
-    <div data-side={up ? "up" : "down"} className="mx-auto w-full max-w-2xl flex-1 px-4 pt-3 lg:px-6 lg:pt-6">
+    <div data-side={up ? "up" : "down"}>
       <section aria-label="Trade ticket">
         <div className="relative rounded-md border border-rule bg-surface p-4 min-[375px]:px-[1.125rem] sm:p-6 lg:p-8">
           <Brackets color="border-side" />
@@ -125,7 +127,7 @@ export function Lite({ state, nowSec, action }: Props) {
                         <span className="block font-semibold">{dayLabel(end, nowSec)} · {formatClock(end)}</span>
                         <span className="block font-mono text-xs text-ink-3">{formatUtc(end)}</span>
                       </span>
-                      <span className="shrink-0 text-right font-mono text-sm">{closest ? formatChance(odds(closest)) : "—"}<span className={`block ${label}`}>est. chance</span></span>
+                      <span className="shrink-0 text-right font-mono text-sm">{closest ? formatChance(odds(closest)) : "—"}<span className={`block ${LABEL}`}>est. chance</span></span>
                     </button>
                   ))}
                   {dates.length === 0 && <p className="px-3 py-2 text-ink-2">{empty}</p>}
@@ -183,7 +185,7 @@ export function Lite({ state, nowSec, action }: Props) {
                         <span className="block text-xs text-ink-3">Ends {k === "call" ? "above" : "below"} the price to beat</span>
                       </span>
                     </span>
-                    <span className="shrink-0 text-right font-mono text-sm">{chance !== undefined ? formatChance(chance) : "—"}<span className={`block ${label}`}>est. chance</span></span>
+                    <span className="shrink-0 text-right font-mono text-sm">{chance !== undefined ? formatChance(chance) : "—"}<span className={`block ${LABEL}`}>est. chance</span></span>
                   </button>
                 ))}
               </div>
@@ -198,7 +200,7 @@ export function Lite({ state, nowSec, action }: Props) {
                 panelClassName={panel}
               >
                 <div className={heading}>Price to beat · {symbol} ends {direction}</div>
-                <div aria-hidden="true" className={`flex justify-between border-b border-rule px-3 pb-1.5 ${label}`}><span>Price · move</span><span>Est. chance</span></div>
+                <div aria-hidden="true" className={`flex justify-between border-b border-rule px-3 pb-1.5 ${LABEL}`}><span>Price · move</span><span>Est. chance</span></div>
                 <div role="radiogroup" aria-label="Prices to beat" onKeyDown={pickWithArrows} className="mt-1 flex flex-col gap-0.5">
                   {ladder.filter(onTop).map(rung)}
                   {spot !== undefined && ladder.length > 0 && nowLine}
@@ -229,18 +231,18 @@ export function Lite({ state, nowSec, action }: Props) {
 
           <dl className="mt-4 grid grid-cols-2 border-t border-rule">
             <div className="border-r border-b border-rule py-3 pr-3">
-              <dt className={label}>Payout</dt>
+              <dt className={LABEL}>Payout</dt>
               <dd className="mt-1.5 font-mono text-[1.375rem] leading-7 font-medium text-ink">{multiple !== undefined ? formatMultiple(multiple) : "—"}</dd>
             </div>
             <div className="border-b border-rule py-3 pl-3.5">
-              <dt className={`flex items-center gap-1 ${label}`}>
+              <dt className={`flex items-center gap-1 ${LABEL}`}>
                 Est. chance
                 <Popover
                   fit
                   label="About estimated chance"
                   description={`${chanceLabel} estimated chance`}
                   button={<Info size={14} aria-hidden="true" />}
-                  buttonClassName="-my-4 -mr-3 -ml-2.5 grid size-11 place-items-center [@media(min-height:44rem)]:scroll-mb-40 rounded-md text-ink-3 transition-colors hover:text-ink aria-expanded:text-ink"
+                  buttonClassName={`-my-4 -mr-3 -ml-2.5 grid size-11 place-items-center rounded-md text-ink-3 transition-colors hover:text-ink aria-expanded:text-ink ${pinned}`}
                   panelClassName={panel}
                 >
                   <span className="block p-1">
@@ -256,7 +258,7 @@ export function Lite({ state, nowSec, action }: Props) {
             </div>
             {series && current && (
               <div className="col-span-2 pt-3">
-                <dt className={label}>Full payout if</dt>{" "}
+                <dt className={LABEL}>Full payout if</dt>{" "}
                 <dd className="mt-1.5 text-ink-2">{symbol} ends {direction} <strong className="font-mono font-medium text-ink">{formatPrice(capPrice(current.terms), quoteDecimals)}</strong></dd>
               </div>
             )}
@@ -264,7 +266,7 @@ export function Lite({ state, nowSec, action }: Props) {
           {!(series && current) && <p role="status" className="mt-3 text-sm text-ink-2">{empty}</p>}
         </div>
 
-        <div className="bottom-0 z-10 -mx-4 mt-3 border-t border-rule bg-page/95 px-4 pt-3.5 pb-[max(1.25rem,env(safe-area-inset-bottom))] backdrop-blur-md sm:mx-0 sm:px-0 [@media(min-height:44rem)]:sticky">
+        <div className={`mt-3 border-t border-rule pt-3.5 ${stickyAction ? "bottom-0 z-10 -mx-4 bg-page/95 px-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] backdrop-blur-md sm:mx-0 sm:px-0 [@media(min-height:44rem)]:sticky" : ""}`}>
           <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 font-mono text-[0.6875rem] tracking-[0.08em] text-ink-3 uppercase">
             <span>
               Max loss <strong className="text-[0.8125rem] font-medium tracking-normal text-ink">{valid ? formatUsd(current.cost, quoteDecimals, "up").replace(/\.00$/, "") : "—"}</strong>

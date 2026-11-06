@@ -23,7 +23,6 @@ interface Props {
   payout: (price: number) => bigint;
   reference: (price: number) => bigint;
   onStrike: (index: number) => void;
-  onLine?: (y: number) => void;
 }
 
 const WIDE = { axis: 80, top: 24, bottom: 32, history: 0.46, future: 0.2, bars: 72, ticks: 7 };
@@ -48,7 +47,7 @@ function draggedBefore(): boolean {
 }
 
 export function HorizonChart(props: Props) {
-  const { symbol, kind, history, spot, vol, nowSec, expiry, strikes, strikeIndex, focus, breakeven, quoteDecimals, payout, reference, onStrike, onLine } = props;
+  const { symbol, kind, history, spot, vol, nowSec, expiry, strikes, strikeIndex, focus, breakeven, quoteDecimals, payout, reference, onStrike } = props;
   const box = useRef<HTMLDivElement>(null);
   const clip = useId();
   const [size, setSize] = useState({ width: 0, height: 0 });
@@ -91,8 +90,7 @@ export function HorizonChart(props: Props) {
     if (placed.current && !reduce) line.set(lineY);
     else line.jump(lineY);
     placed.current = width > 0;
-    if (width > 0) onLine?.(lineY);
-  }, [line, lineY, reduce, width, onLine]);
+  }, [line, lineY, reduce, width]);
 
   const nowMs = nowSec * 1000;
   const x = linear([nowMs - DAY_MS, nowMs], [0, xNow]);

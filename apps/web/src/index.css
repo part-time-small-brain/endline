@@ -1,82 +1,8 @@
 @import "tailwindcss";
-@import "@fontsource-variable/funnel-sans/wght.css";
-@import "@fontsource-variable/funnel-display/wght.css";
 @import "@fontsource-variable/geist-mono/wght.css";
 @import "@fontsource-variable/mona-sans/wght.css";
 
-@custom-variant near (&:where([data-look="near"] *));
-
 :root {
-  color-scheme: light;
-  --page: #dee3ea;
-  --surface: #f4f6f9;
-  --well: #dee3ea;
-  --well-hover: #d2d9e2;
-  --track: #d2d9e2;
-  --paper: #ffffff;
-  --ink: #0e1420;
-  --ink-2: #475163;
-  --ink-3: #5a6577;
-  --on-ink: #ffffff;
-  --rule: #c3cbd6;
-  --grid: rgb(14 20 32 / 0.07);
-  --cone: rgb(14 20 32 / 0.06);
-  --scrim: rgb(14 20 32 / 0.45);
-  --danger: #b3261e;
-
-  --up: #12b886;
-  --up-ink: #0b6e50;
-  --up-field: #bee7dd;
-  --up-soft: #dbefec;
-  --up-glow: var(--up-field);
-  --up-glow-soft: var(--up-soft);
-  --on-up: #0e1420;
-  --down: #f0506e;
-  --down-ink: #9e3549;
-  --down-field: #f3ced8;
-  --down-soft: #f4e4ea;
-  --down-glow: var(--down-field);
-  --down-glow-soft: var(--down-soft);
-  --on-down: #0e1420;
-  --glow-far: 1;
-}
-
-[data-theme="dark"] {
-  color-scheme: dark;
-  --page: #000000;
-  --surface: #0e0e10;
-  --well: #18181b;
-  --well-hover: #212125;
-  --track: #121214;
-  --paper: #27272b;
-  --ink: #f2f2f3;
-  --ink-2: #a1a1a7;
-  --ink-3: #8b8b92;
-  --on-ink: #000000;
-  --rule: #26262b;
-  --grid: rgb(255 255 255 / 0.05);
-  --cone: rgb(255 255 255 / 0.06);
-  --scrim: rgb(0 0 0 / 0.7);
-  --danger: #ff8a80;
-
-  --up: #12b886;
-  --up-ink: #20bc8d;
-  --up-field: #0e221e;
-  --up-soft: #0e1616;
-  --up-glow: #0f3e31;
-  --up-glow-soft: #0e1e1b;
-  --on-up: #0e1420;
-  --down: #f15e7a;
-  --down-ink: #f47e95;
-  --down-field: #29181d;
-  --down-soft: #191215;
-  --down-glow: #4e242e;
-  --down-glow-soft: #23151a;
-  --on-down: #0e1420;
-  --glow-far: 0;
-}
-
-[data-look="near"] {
   color-scheme: dark;
   --page: #0a0a0a;
   --surface: #121212;
@@ -109,22 +35,10 @@
   --down-glow: rgb(255 121 102 / 0.35);
   --down-glow-soft: rgb(255 121 102 / 0.12);
   --on-down: #0a0a0a;
-  --glow-far: 0;
   --radius-xl: 6px;
   --radius-2xl: 6px;
   --radius-3xl: 14px;
-  --font-sans: "Mona Sans Variable", ui-sans-serif, system-ui, sans-serif;
-  --font-display: var(--font-sans);
-}
-
-[data-look="near"] .font-sans,
-[data-look="near"] .font-display {
-  font-family: var(--font-sans);
-}
-
-[data-look="near"] body {
-  background-image: radial-gradient(rgb(242 241 233 / 0.06) 1px, transparent 1.5px);
-  background-size: 18px 18px;
+  --dot-gap: 18px;
 }
 
 :root,
@@ -165,22 +79,18 @@
   --color-up-ink: var(--up-ink);
   --color-up-field: var(--up-field);
   --color-up-soft: var(--up-soft);
-  --color-up-glow: var(--up-glow);
-  --color-up-glow-soft: var(--up-glow-soft);
   --color-on-up: var(--on-up);
   --color-down: var(--down);
   --color-down-ink: var(--down-ink);
   --color-down-field: var(--down-field);
   --color-down-soft: var(--down-soft);
-  --color-down-glow: var(--down-glow);
-  --color-down-glow-soft: var(--down-glow-soft);
   --color-on-down: var(--on-down);
   --color-side: var(--side);
   --color-side-ink: var(--side-ink);
   --color-side-field: var(--side-field);
   --color-on-side: var(--on-side);
-  --font-sans: "Funnel Sans Variable", ui-sans-serif, system-ui, sans-serif;
-  --font-display: "Funnel Display Variable", "Funnel Sans Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Mona Sans Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Mona Sans Variable", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "Geist Mono Variable", ui-monospace, monospace;
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
   --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
@@ -195,6 +105,11 @@
     font-variant-numeric: tabular-nums;
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
+  }
+
+  body {
+    background-image: radial-gradient(var(--grid) 1px, transparent 1.5px);
+    background-size: var(--dot-gap) var(--dot-gap);
   }
 
   h1,

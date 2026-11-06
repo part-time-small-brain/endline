@@ -1,5 +1,5 @@
 import { domAnimation, LazyMotion, MotionConfig } from "motion/react";
-import { useLayoutEffect, useState } from "react";
+import { useState } from "react";
 import { useApp } from "./app/context.ts";
 import { useData } from "./app/data.tsx";
 import { Link, navigate, usePathname } from "./app/router.tsx";
@@ -12,7 +12,6 @@ import { KeySetup } from "./components/KeySetup.tsx";
 import { Notice } from "./components/Notice.tsx";
 import { QuoteSheet, type QuoteSelection } from "./components/QuoteSheet.tsx";
 import { useNow } from "./hooks/useNow.ts";
-import { syncThemeColor } from "./hooks/useTheme.ts";
 import { useTradeMode } from "./hooks/useTradeMode.ts";
 import { type Route, routeOf } from "./lib/route.ts";
 import { Landing } from "./screens/Landing.tsx";
@@ -54,14 +53,6 @@ function Shell({ route, onConnect, onAddFunds, onQuote }: {
   const open = views?.filter((v) => v.status !== "paid" && v.status !== "expired").length ?? 0;
   const toCollect = views?.filter((v) => v.status === "collect").length ?? 0;
   const lite = route === "trade" && mode === "lite";
-  useLayoutEffect(() => {
-    document.documentElement.dataset.look = "near";
-    syncThemeColor();
-    return () => {
-      delete document.documentElement.dataset.look;
-      syncThemeColor();
-    };
-  }, []);
 
   return (
     <div className={`flex min-h-dvh flex-col ${route === "trade" ? "lg:h-dvh" : ""}`}>
