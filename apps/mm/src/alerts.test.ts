@@ -3,7 +3,7 @@ import { pendingAlerts, reserveAlert, settlementAlert, type Contract } from "./a
 import type { PendingChanges, ProposedSettlement } from "./chain.ts";
 
 const CONTRACT: Contract = {
-  optionsId: "opt3.near-options-dev.testnet",
+  optionsId: "opt4.near-options-dev.testnet",
   networkId: "testnet",
   ownerId: "owner.testnet",
   oracles: ["oracle.testnet"],
@@ -38,7 +38,7 @@ describe("settlementAlert", () => {
     const text = check(proposed("90000000000"), 80_705.19)?.text;
     expect(text).toContain("Deribit 80705.19 (1152 bps off)");
     expect(text).toContain(
-      `near contract call-function as-transaction opt3.near-options-dev.testnet override_settlement json-args '{"underlying":"BTC","expiry":${EXPIRY},"price":"<price>"}' prepaid-gas '30 Tgas' attached-deposit '1 yoctoNEAR' sign-as owner.testnet network-config testnet`,
+      `near contract call-function as-transaction opt4.near-options-dev.testnet override_settlement json-args '{"underlying":"BTC","expiry":${EXPIRY},"price":"<price>"}' prepaid-gas '30 Tgas' attached-deposit '1 yoctoNEAR' sign-as owner.testnet network-config testnet`,
     );
   });
 
