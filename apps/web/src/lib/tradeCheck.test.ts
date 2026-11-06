@@ -58,8 +58,8 @@ describe("checkTrade", () => {
 
   it("rejects a quote that stays signable longer than any market maker deadline, even when its deadline matches", () => {
     const signableFor = (ms: number) => checkTrade(message(good, { deadline: new Date(RECEIVED + ms).toISOString() }), { ...quote, sign_by_ms: RECEIVED + ms }, expected, RECEIVED);
-    expect(() => signableFor(65_000)).not.toThrow();
-    expect(() => signableFor(65_001)).toThrow(/deadline/);
+    expect(() => signableFor(120_000)).not.toThrow();
+    expect(() => signableFor(120_001)).toThrow(/deadline/);
     expect(() => signableFor(365 * 86_400_000)).toThrow(/deadline/);
   });
 

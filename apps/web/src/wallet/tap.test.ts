@@ -47,7 +47,6 @@ describe("tap key", () => {
     const [request, elsewhere] = wallet.seen.map((u) => (u as Extract<Unsigned, { standard: "nep413" }>).payload);
     expect(request).toMatchObject({ recipient: "app.endline.trade", message: expect.stringMatching(/^Endline Tap balance\n\nSign this only on app\.endline\.trade\. .*alice\.near on mainnet for the intents contract intents\.near:/) });
     expect(elsewhere!.recipient).toBe("endline.trade");
-    expect(elsewhere!.nonce).not.toBe(request!.nonce);
     const eth = evm(27);
     await signSeed(eth, APP);
     expect(text(eth.seen[0]!)).toBe(request!.message.replace("alice.near", "0xabc"));

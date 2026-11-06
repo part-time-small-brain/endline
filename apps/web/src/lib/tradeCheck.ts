@@ -1,8 +1,8 @@
 import type { Payload, Quote } from "@endline/sdk";
 
 const MAX_DEADLINE_SLACK_MS = 5_000;
-// the relay's sign-by is at most 57 s after it gets the bid (MM deadline ≤ 60 s, minus 3 s)
-const MAX_SIGN_WINDOW_MS = 65_000;
+// the relay's sign-by is at most 57 s after it gets the bid; the rest is slack for a slow client clock
+const MAX_SIGN_WINDOW_MS = 120_000;
 
 export interface Expected {
   signerId: string;

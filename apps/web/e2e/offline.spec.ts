@@ -633,7 +633,7 @@ test.describe("Tap", () => {
     expect(state.published).toEqual(["quote-2"]);
   });
 
-  test("a tap whose auto-collect the relay refuses says so instead of leaving it to look on", async ({ page }) => {
+  test("a tap whose auto-collect the relay refuses says auto-collect is off", async ({ page }) => {
     await withTapBalance(page);
     await page.evaluate(() => {
       const fetch = window.fetch.bind(window);

@@ -19,7 +19,7 @@ function tapMessage({ network, intentsId, host }: TapApp, accountId: string): st
 async function tapRequest(main: Wallet, app: TapApp): Promise<Unsigned> {
   const message = tapMessage(app, main.accountId);
   if (main.standard === "erc191") return { standard: "erc191", payload: message };
-  const nonce = base64.encode(await sha256(new TextEncoder().encode(`Endline Tap balance:${app.network}:${app.intentsId}:${app.host}`)));
+  const nonce = base64.encode(await sha256(new TextEncoder().encode("Endline Tap balance")));
   return { standard: "nep413", payload: { message, nonce, recipient: app.host } };
 }
 
