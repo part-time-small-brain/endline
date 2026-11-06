@@ -17,6 +17,13 @@ pub enum CloseAction {
     BurnPair,
 }
 
+#[derive(Default)]
+struct Debit {
+    collateral: u128,
+    long: u128,
+    short: u128,
+}
+
 #[derive(Serialize)]
 #[serde(crate = "near_sdk::serde")]
 struct Closed<'a> {
@@ -69,10 +76,13 @@ impl Contract {
         let unique: BTreeSet<&String> = token_ids.iter().collect();
         require!(unique.len() == token_ids.len(), "duplicate token");
 
-        let mut debits: BTreeMap<String, u128> = BTreeMap::new();
+        let mut debits: BTreeMap<String, Debit> = BTreeMap::new();
         let mut payout = 0u128;
-        let mut add = |series_id: &str, value: u128| {
-            *debits.entry(series_id.to_string()).or_default() += value;
+        let mut add = |series_id: &str, value: u128, long: u128, short: u128| {
+            let debit = debits.entry(series_id.to_string()).or_default();
+            debit.collateral += value;
+            debit.long += long;
+            debit.short += short;
             payout += value;
         };
 
@@ -85,7 +95,12 @@ impl Contract {
                 "burn_pair needs one long and one short of the same series with equal amounts"
             );
             let series = self.series_or_panic(series_id);
-            add(&series.id, series.terms().pair_refund(amounts[0]));
+            add(
+                &series.id,
+                series.terms().pair_refund(amounts[0]),
+                amounts[0],
+                amounts[0],
+            );
         } else {
             let wanted = if action == CloseAction::Exercise {
                 Side::Long
@@ -102,7 +117,12 @@ impl Contract {
                 let price = self
                     .final_price(&series.underlying, series.expiry)
                     .unwrap_or_else(|| env::panic_str(&format!("{series_id} not settled yet")));
-                add(&series.id, series.payout(side, *amount, price));
+                let (long, short) = if side == Side::Long {
+                    (*amount, 0)
+                } else {
+                    (0, *amount)
+                };
+                add(&series.id, series.payout(side, *amount, price), long, short);
             }
         }
 
@@ -112,10 +132,24 @@ impl Contract {
         for (series_id, debit) in &debits {
             let mut series = self.series_or_panic(series_id).clone();
             require!(
-                *debit <= series.collateral_locked.0,
+                debit.collateral <= series.collateral_locked.0,
                 "collateral invariant violated"
             );
-            series.collateral_locked = U128(series.collateral_locked.0 - debit);
+            series.collateral_locked = U128(series.collateral_locked.0 - debit.collateral);
+            series.long_open = U128(
+                series
+                    .long_open
+                    .0
+                    .checked_sub(debit.long)
+                    .expect("open invariant violated"),
+            );
+            series.short_open = U128(
+                series
+                    .short_open
+                    .0
+                    .checked_sub(debit.short)
+                    .expect("open invariant violated"),
+            );
             self.series.insert(series_id.clone(), series);
         }
         if payout > 0 {

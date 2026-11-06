@@ -35,4 +35,10 @@ describe("seriesFrom", () => {
     expect(calls).toEqual(Array(2).fill("list_series_by_expiry"));
     expect(await chain.seriesFrom(1_000)).toEqual(from(1_000));
   });
+
+  it("reads every series by expiry cursor, an order a delete can't reshuffle", async () => {
+    const { chain, calls } = contract();
+    expect(await chain.series()).toEqual(from(0));
+    expect(new Set(calls)).toEqual(new Set(["list_series_by_expiry"]));
+  });
 });

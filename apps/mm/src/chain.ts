@@ -16,6 +16,8 @@ const Simulation = z.object({ invariant_violated: z.unknown().optional() }).loos
 const SERIES_PAGE = 200;
 const SettlementTermsView = ConfigView.extend({ owner_id: z.string(), timing: z.object({ oracle_window_sec: z.number().int().min(0) }) });
 const SettlementView = Settlement.extend({ proposed_by: z.string() });
+const ChainSeries = Series.extend({ created_by: z.string().optional() });
+export type ChainSeries = z.infer<typeof ChainSeries>;
 const PendingOwnerView = z.object({ pending_owner_id: z.string().nullable() });
 const PendingOracleChangesView = z.object({
   oracles: z.array(z.tuple([z.string(), z.number().int()])),
@@ -102,24 +104,23 @@ export class ChainReader {
     return list.map(([symbol, u]) => ({ symbol, index: u.index, decimals: u.decimals, minWrite: u.min_write }));
   }
 
-  async series(): Promise<Series[]> {
-    const all: Series[] = [];
-    for (let from = 0; ; from += SERIES_PAGE) {
-      const page = z.array(Series).parse(await this.view(this.optionsId, "list_series", { from_index: from, limit: SERIES_PAGE }));
+  async series(): Promise<ChainSeries[]> {
+    return this.seriesFrom(0);
+  }
+
+  async seriesFrom(fromExpiry: number): Promise<ChainSeries[]> {
+    const all: ChainSeries[] = [];
+    for (;;) {
+      const last = all.at(-1);
+      const cursor = last ? { from_expiry: last.expiry, after_id: last.id } : { from_expiry: fromExpiry };
+      const page = z.array(ChainSeries).parse(await this.view(this.optionsId, "list_series_by_expiry", { ...cursor, limit: SERIES_PAGE }));
       all.push(...page);
       if (page.length < SERIES_PAGE) return all;
     }
   }
 
-  async seriesFrom(fromExpiry: number): Promise<Series[]> {
-    const all: Series[] = [];
-    for (;;) {
-      const last = all.at(-1);
-      const cursor = last ? { from_expiry: last.expiry, after_id: last.id } : { from_expiry: fromExpiry };
-      const page = z.array(Series).parse(await this.view(this.optionsId, "list_series_by_expiry", { ...cursor, limit: SERIES_PAGE }));
-      all.push(...page);
-      if (page.length < SERIES_PAGE) return all;
-    }
+  async deletableSeries(ids: string[]): Promise<string[]> {
+    return z.array(z.string()).parse(await this.view(this.optionsId, "deletable_series", { series_ids: ids }));
   }
 
   async settlementTerms(): Promise<SettlementTerms> {
@@ -189,6 +190,17 @@ export class Chain extends ChainReader {
       args: { underlying, strike: strike.toString(), width: width.toString(), expiry, kind },
       gas: teraToGas(30),
       deposit,
+    });
+    return outcome.transaction.hash;
+  }
+
+  async deleteSeries(ids: string[]): Promise<string> {
+    const outcome = await this.account.callFunctionRaw({
+      contractId: this.optionsId,
+      methodName: "delete_series",
+      args: { series_ids: ids },
+      gas: teraToGas(300),
+      deposit: 0n,
     });
     return outcome.transaction.hash;
   }

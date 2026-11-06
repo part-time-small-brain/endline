@@ -53,6 +53,10 @@ impl Terms {
             .saturating_sub(mul_div_ceil(amount, self.intrinsic(settlement), self.unit))
     }
 
+    pub fn max_short_payout(&self, amount: u128, settlement: u128) -> u128 {
+        mul_div_floor(amount, self.width - self.intrinsic(settlement), self.unit)
+    }
+
     fn intrinsic(&self, settlement: u128) -> u128 {
         match self.kind {
             OptionKind::Call => settlement.saturating_sub(self.strike),

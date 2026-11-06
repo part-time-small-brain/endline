@@ -1,5 +1,5 @@
 use near_sdk::json_types::U128;
-use near_sdk::near;
+use near_sdk::{near, AccountId, NearToken};
 
 use crate::math::Terms;
 
@@ -30,6 +30,10 @@ pub struct Series {
     pub expiry: u64,
     pub underlying_decimals: u8,
     pub collateral_locked: U128,
+    pub long_open: U128,
+    pub short_open: U128,
+    pub created_by: AccountId,
+    pub storage_paid: NearToken,
 }
 
 impl Series {

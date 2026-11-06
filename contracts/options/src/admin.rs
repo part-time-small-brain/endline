@@ -123,16 +123,12 @@ impl Contract {
             expiry,
             underlying_decimals: config.decimals,
             collateral_locked: U128(0),
+            long_open: U128(0),
+            short_open: U128(0),
+            created_by: env::predecessor_account_id(),
+            storage_paid: NearToken::from_yoctonear(0),
         };
 
-        events::options(
-            "series_created",
-            &SeriesCreated {
-                long_id: id.clone(),
-                short_id: series::short_id(&id),
-                series: &series,
-            },
-        );
         let storage_before = env::storage_usage();
         self.listed_expiries.insert((series.underlying.clone(), expiry));
         self.series_by_expiry.insert((expiry, id.clone()), ());
@@ -146,7 +142,17 @@ impl Contract {
         self.series_by_expiry.flush();
         self.supply.flush();
         self.balances.flush();
-        charge_storage(storage_before, NearToken::from_yoctonear(0));
+        let paid = charge_storage(storage_before, NearToken::from_yoctonear(0));
+        let series = self.series.get_mut(&id).expect("just inserted");
+        series.storage_paid = paid;
+        events::options(
+            "series_created",
+            &SeriesCreated {
+                long_id: id.clone(),
+                short_id: series::short_id(&id),
+                series,
+            },
+        );
         id
     }
 }

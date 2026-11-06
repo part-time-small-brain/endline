@@ -1,5 +1,6 @@
 mod admin;
 mod close;
+mod delete;
 mod events;
 mod math;
 mod mt;
@@ -157,7 +158,7 @@ fn storage_cost(storage_before: u64) -> NearToken {
     env::storage_byte_cost().saturating_mul(used as u128)
 }
 
-fn charge_storage(storage_before: u64, keep: NearToken) {
+fn charge_storage(storage_before: u64, keep: NearToken) -> NearToken {
     let cost = storage_cost(storage_before).saturating_add(keep);
     let attached = env::attached_deposit();
     require!(attached >= cost, format!("attach at least {cost} for storage"));
@@ -167,6 +168,7 @@ fn charge_storage(storage_before: u64, keep: NearToken) {
             .transfer(refund)
             .detach();
     }
+    cost
 }
 
 fn is_intents_asset(asset: &str) -> bool {
