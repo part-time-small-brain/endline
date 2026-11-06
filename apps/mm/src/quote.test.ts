@@ -44,7 +44,7 @@ describe("default limits on a near-money bet", () => {
 const LOOSE = { ...SETTINGS, maxTradeUsd: 1e9, maxSeriesUsd: 1e12, maxDeltaUsd: 1e9, maxVegaUsd: 1e9 };
 
 function quoter(desk: Desk, send: (r: QuoteResponse) => void, settings = SETTINGS) {
-  return new Quoter({ desk, settings, intentsId: "intents.test.near", accountId: MM, sign: nep413Signer(MM, key.toString()), send, onFill: () => {}, log: () => {} });
+  return new Quoter({ desk, settings, intentsId: "intents.test.near", accountId: MM, sign: nep413Signer(key.toString()), send, onFill: () => {}, log: () => {} });
 }
 
 beforeAll(() => vi.setSystemTime(NOW));

@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Auctions, MAX_WAIT_MS } from "./auction.ts";
 import { checkBid } from "./bid.ts";
 import { Fills } from "./fills.ts";
+import { Unsettled } from "./rpc.ts";
 import { HttpError, type MarketMakers, Relay, SIGN_MARGIN_MS } from "./relay.ts";
 import { fakeChain, httpStatus, INTENTS, MIN_WRITE, mmSigned, nep413, OPTION, OPTIONS, SALT, SERIES, session, USDC, WRITE_CUTOFF_SEC } from "./test-fakes.ts";
 
@@ -86,8 +87,8 @@ describe("relay", () => {
     const [mmLeg] = executed[0] ?? [];
     expect(Date.parse(readPayload(mmLeg!).deadline) - SIGN_MARGIN_MS).toBe(q.sign_by_ms);
     expect(statuses).toEqual([update]);
-    expect(await fills.byAccount(USER)).toMatchObject([{ quote_id: q.quote_id, premium: "15000000", tx_hash: "tx1" }]);
-    expect(await fills.byAccount("bob.test")).toEqual([]);
+    expect(fills.byAccount(USER)).toMatchObject([{ quote_id: q.quote_id, premium: "15000000", tx_hash: "tx1" }]);
+    expect(fills.byAccount("bob.test")).toEqual([]);
   });
 
   it("lists open series and those expired within the claim window, nothing older", async () => {
@@ -174,32 +175,48 @@ describe("relay", () => {
     expect(update).toMatchObject({ status: "failed", reason: "invalid signature" });
     expect(statuses).toEqual([update]);
     expect(executed).toHaveLength(0);
-    expect(await fills.byAccount(USER)).toEqual([]);
+    expect(fills.byAccount(USER)).toEqual([]);
     expect(await httpStatus(relay.publish({ quote_id: q.quote_id, signed: sign(q) }))).toBe(409);
   });
 
-  it("settles a trade whose execute call errored after it ran, by the user's nonce, and records the fill", async () => {
+  it("settles a trade whose send errored after one of the relayer's transactions ran, and records the fill with that transaction", async () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
     const { relay, quote, chain, executed, statuses, fills } = setup();
     const execute = chain.execute;
     vi.spyOn(chain, "execute").mockImplementationOnce(async (batch) => {
-      await execute(batch);
-      throw new Error("Internal server error");
+      const ran = await execute(batch);
+      const resent = await execute(batch).catch((error: Unsettled) => error.txHashes);
+      throw new Unsettled([ran, ...resent], new Error("Internal server error"));
     });
-    const nonceRead = vi.spyOn(chain, "isNonceUsed");
     const q = await quote();
     const update = await relay.publish({ quote_id: q.quote_id, signed: sign(q) });
-    expect(update).toEqual({ quote_id: q.quote_id, status: "settled" });
-    expect(nonceRead).toHaveBeenCalledWith(USER, readPayload(q.payload).nonce);
+    expect(update).toEqual({ quote_id: q.quote_id, status: "settled", tx_hash: "tx1" });
     expect(executed).toHaveLength(1);
     expect(statuses).toEqual([update]);
-    expect(await fills.byAccount(USER)).toEqual([expect.objectContaining({ quote_id: q.quote_id, tx_hash: "" })]);
+    expect(fills.byAccount(USER)).toEqual([expect.objectContaining({ quote_id: q.quote_id, tx_hash: "tx1" })]);
   });
 
-  it("fails an errored execute only once a final block is past the deadline with the nonce unused, never on a read error", async () => {
+  it("fails a trade whose own transaction failed, even though the user burned the nonce with another payload", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const { relay, quote, chain, executed, statuses, fills } = setup();
+    const execute = chain.execute;
+    const q = await quote();
+    const burn = nep413({ ...readPayload(q.payload), intents: [] });
+    vi.spyOn(chain, "execute").mockImplementationOnce(async (batch) => {
+      await execute([burn]);
+      return execute(batch);
+    });
+    const update = await relay.publish({ quote_id: q.quote_id, signed: sign(q) });
+    expect(update).toMatchObject({ quote_id: q.quote_id, status: "failed", reason: "nonce already used" });
+    expect(executed).toEqual([[burn]]);
+    expect(statuses).toEqual([update]);
+    expect(fills.byAccount(USER)).toEqual([]);
+  });
+
+  it("fails a send of unknown outcome only once a final block is past the deadline with its transaction still unknown, never on a read error", async () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
     const { relay, quote, chain, statuses, fills } = setup();
-    vi.spyOn(chain, "execute").mockRejectedValueOnce(new Error("Request timeout"));
+    vi.spyOn(chain, "execute").mockRejectedValueOnce(new Unsettled(["lost"], new Error("Request timeout")));
     const q = await quote();
     const deadline = Date.parse(readPayload(q.payload).deadline);
     vi.spyOn(chain, "finalTimeMs").mockImplementation(async () => {
@@ -215,7 +232,7 @@ describe("relay", () => {
     await vi.advanceTimersByTimeAsync(6_000);
     expect(update).toMatchObject({ quote_id: q.quote_id, status: "failed", reason: "Request timeout" });
     expect(statuses).toEqual([update]);
-    expect(await fills.byAccount(USER)).toEqual([]);
+    expect(fills.byAccount(USER)).toEqual([]);
   });
 
   it("refuses unknown quote ids and unknown series", async () => {

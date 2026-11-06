@@ -47,7 +47,7 @@ scripts/deploy-testnet.sh <your-account>.testnet
 
 Testnet scripts sign with the near CLI legacy keychain (`~/.near-credentials`). `oracle-smoke.sh` also needs a Pinata JWT: [Oracle WASM](apps/docs/content/docs/developers/oracle.mdx#pinning-a-new-wasm). Running relay + MM + web: [Running locally](apps/docs/content/docs/developers/running-locally.mdx#full-stack-on-testnet).
 
-Toolchain: Rust 1.95 with `wasm32-unknown-unknown` and `wasm32-wasip2`, `cargo-near` 0.22, `near` (near-cli-rs), `outlayer` (outlayer-cli), `wasmtime`, Node 24, pnpm.
+Toolchain: Rust 1.95 with `wasm32-unknown-unknown` and `wasm32-wasip2`, `cargo-near` 0.22, `near` (near-cli-rs), `outlayer` (outlayer-cli), `wasmtime`, Node 24, pnpm, Docker (mainnet reproducible build).
 
 ## Code rules
 

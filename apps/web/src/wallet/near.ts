@@ -6,11 +6,14 @@ import type { Wallet } from "./wallet.ts";
 
 let connector: NearConnector | undefined;
 
+// script-src in public/_headers allows this nonce: near-connect's wallet iframes inherit the page's CSP
+const WALLET_SCRIPT_NONCE = "C3e81UrLlcvSI878Vp11WNpx";
+
 // upstream's JSON has drifted from the package's WalletManifest type
 const pinned = manifest as unknown as { wallets: WalletManifest[]; version: string };
 
 function getConnector(network: "mainnet" | "testnet"): NearConnector {
-  connector ??= new NearConnector({ network, features: { signMessage: true }, manifest: pinned });
+  connector ??= new NearConnector({ network, features: { signMessage: true }, manifest: pinned, cspNonce: WALLET_SCRIPT_NONCE });
   return connector;
 }
 

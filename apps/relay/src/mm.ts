@@ -34,8 +34,8 @@ export class MmHub implements MarketMakers {
   }
 
   upgrade(request: IncomingMessage, socket: Duplex, head: Buffer): void {
-    const key = new URL(request.url ?? "", "http://relay").searchParams.get("key");
-    if (key === null || !this.knows(key)) {
+    const key = request.headers.authorization?.match(/^Bearer (.+)$/)?.[1];
+    if (key === undefined || !this.knows(key)) {
       socket.end("HTTP/1.1 401 Unauthorized\r\nConnection: close\r\nContent-Length: 0\r\n\r\n");
       return;
     }

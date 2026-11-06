@@ -13,7 +13,7 @@ import type { ProposerConfig } from "./config.ts";
 const TICK_MS = 60_000;
 const RUN_TIMEOUT_MS = 90_000;
 const FETCH_TIMEOUT_MS = 30_000;
-const MAX_DEV_BPS = 50;
+const MAX_DEV_BPS = 20;
 const MAX_AGE_SEC = 86_400;
 const OracleWasm = z.object({ url: z.url(), sha256: z.string().regex(/^[0-9a-f]{64}$/) });
 type OracleWasm = z.infer<typeof OracleWasm>;

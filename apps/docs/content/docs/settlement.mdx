@@ -12,9 +12,9 @@ Each exchange's 1-minute closing prices are averaged over the 30 minutes before 
 | Coinbase, Kraken, Bitstamp, Bitfinex | USD |
 | Binance, OKX, Bybit | USDT, converted at a 30-minute USDT/USD average from Coinbase and Kraken |
 
-- An exchange counts only with at least 25 of its 30 one-minute prices, and at least 3 exchanges must count, so one bad exchange can't move the median.
+- An exchange counts only with at least 25 of its 30 one-minute prices, and at least 3 exchanges must count on 08:00 UTC markets (which have the Deribit check below), 4 on other expiries, so one bad exchange can't move the median.
 - If the two USDT/USD rates are missing, more than 0.2% (20 bps) apart, or outside 0.97 to 1.03, the USDT exchanges drop out.
-- On 08:00 UTC markets, no price is set if Deribit's delivery price is more than 0.5% (50 bps) from the median, or if Deribit doesn't answer (we retry every 10 minutes). Deribit alone never sets the price.
+- On 08:00 UTC markets, no price is set if Deribit's delivery price is more than 0.2% (20 bps) from the median, or if Deribit doesn't answer (we retry every 10 minutes). Deribit alone never sets the price.
 - Selling back and new options stop 30 minutes before the end, when the averaging window opens.
 
 Exact rules: [Oracle WASM](./developers/oracle.mdx).
@@ -46,7 +46,7 @@ A proposed price becomes final when its dispute window ends. Until then our moni
 
 | Problem | What happens |
 |---|---|
-| Fewer than 3 exchanges, median and Deribit 0.5% apart, or no Deribit price on an 08:00 market | No automatic price. The oracle account proposes one by hand once the manual window opens |
+| Fewer than 3 exchanges (4 on a market not ending at 08:00 UTC), median and Deribit more than 0.2% apart, or no Deribit price on an 08:00 market | No automatic price. The oracle account proposes one by hand once the manual window opens |
 | OutLayer down or timing out | Our settler retries every 10 min, and anyone can. If none succeeds within 6 h, manual proposal |
 | Wrong price proposed | The owner overrides it inside the dispute window |
 

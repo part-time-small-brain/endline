@@ -9,7 +9,6 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@defuse-protocol/intents-sdk": "^0.92.0",
     "@endline/sdk": "workspace:*",
     "@nktkas/hyperliquid": "^0.33.3",
     "near-api-js": "^7.3.1",

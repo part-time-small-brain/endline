@@ -27,7 +27,7 @@ url, sha, index, expiry = sys.argv[1], sys.argv[2], sys.argv[3], int(sys.argv[4]
 print(json.dumps({
     "source": {"WasmUrl": {"url": url, "hash": sha, "build_target": "wasm32-wasip2"}},
     "resource_limits": {"max_instructions": 10_000_000_000, "max_memory_mb": 128, "max_execution_seconds": 60},
-    "input_data": json.dumps({"index": index, "expiry": expiry, "quote_decimals": 6, "max_dev_bps": 50}),
+    "input_data": json.dumps({"index": index, "expiry": expiry, "quote_decimals": 6, "max_dev_bps": 20}),
     "response_format": "Json",
 }))
 PY

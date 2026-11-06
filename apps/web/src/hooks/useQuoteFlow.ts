@@ -43,6 +43,7 @@ export function useQuoteFlow({ wallet, seriesId, optionAsset, side, size }: Args
       if (error instanceof RelayError && error.status === 401) forgetSession(wallet, config.intentsId);
       throw error;
     });
+    const receivedAt = Date.now();
     const legs = checkTrade(readPayload(quote.payload), quote, {
       signerId: wallet.accountId,
       intentsId: config.intentsId,
@@ -50,8 +51,8 @@ export function useQuoteFlow({ wallet, seriesId, optionAsset, side, size }: Args
       quoteAsset: config.quoteAsset,
       side,
       size: size.toString(),
-    });
-    return { ...quote, legs, receivedAt: Date.now() };
+    }, receivedAt);
+    return { ...quote, legs, receivedAt };
   }, [services, config, wallet, seriesId, optionAsset, side, size]);
 
   const request = useCallback(() => {

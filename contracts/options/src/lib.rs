@@ -9,6 +9,7 @@ mod payout;
 mod receiver;
 mod series;
 mod settlement;
+mod storage;
 mod views;
 mod write;
 
@@ -36,6 +37,8 @@ enum StorageKey {
     PendingSettlements,
     ListedExpiries,
     SeriesByExpiry,
+    StorageCredits,
+    Undelivered,
 }
 
 #[near(serializers = [borsh, json])]
@@ -84,6 +87,8 @@ pub struct Contract {
     pending_settlements: LookupMap<(String, u64), u64>,
     listed_expiries: LookupSet<(String, u64)>,
     series_by_expiry: TreeMap<(u64, String), ()>,
+    storage_credits: LookupMap<AccountId, u128>,
+    undelivered: LookupMap<(AccountId, String), u128>,
 }
 
 #[near]
@@ -136,6 +141,8 @@ impl Contract {
             pending_settlements: LookupMap::new(StorageKey::PendingSettlements),
             listed_expiries: LookupSet::new(StorageKey::ListedExpiries),
             series_by_expiry: TreeMap::new(StorageKey::SeriesByExpiry),
+            storage_credits: LookupMap::new(StorageKey::StorageCredits),
+            undelivered: LookupMap::new(StorageKey::Undelivered),
         }
     }
 }
@@ -146,11 +153,13 @@ const MIN_ORACLE_DELAY_SEC: u64 = 60;
 const MAX_ORACLE_DELAY_SEC: u64 = 7 * 86_400;
 const ONE_YOCTO: NearToken = NearToken::from_yoctonear(1);
 
-fn charge_storage(storage_before: u64, keep: NearToken) -> NearToken {
+fn storage_cost(storage_before: u64) -> NearToken {
     let used = env::storage_usage().saturating_sub(storage_before);
-    let cost = env::storage_byte_cost()
-        .saturating_mul(used as u128)
-        .saturating_add(keep);
+    env::storage_byte_cost().saturating_mul(used as u128)
+}
+
+fn charge_storage(storage_before: u64, keep: NearToken) -> NearToken {
+    let cost = storage_cost(storage_before).saturating_add(keep);
     let attached = env::attached_deposit();
     require!(attached >= cost, format!("attach at least {cost} for storage"));
     let refund = attached.saturating_sub(cost);

@@ -49,7 +49,7 @@ The shared environment is `near-options-dev.testnet`; ids are in `deploy/testnet
 
 ```bash
 export NEAR_RPC_URL=https://rpc.testnet.fastnear.com INTENTS_ID=intents.near-options-dev.testnet \
-  OPTIONS_ID=opt3.near-options-dev.testnet QUOTE_ASSET=nep141:usdc.near-options-dev.testnet
+  OPTIONS_ID=opt4.near-options-dev.testnet QUOTE_ASSET=nep141:usdc.near-options-dev.testnet
 
 NETWORK_ID=testnet DATA_DIR=data RELAYER_ACCOUNT_ID=<relayer>.testnet RELAYER_PRIVATE_KEY=ed25519:… \
   MM_API_KEYS=<key of 16+ chars> APP_ORIGINS=http://localhost:5173 pnpm --filter @endline/relay start
@@ -74,7 +74,7 @@ pnpm --filter @endline/mm start positions           # market maker balances, gre
 
 ## Docker
 
-`deploy/` has the Dockerfile and compose file for the hosted testnet stack: `web` (Caddy serving the relay's public routes), `relay`, `mm`, `lister`, `monitor`, `proposer` and a Cloudflare tunnel. The landing, the app and these docs are static sites on Cloudflare Pages. Each container reads only its own variables from `deploy/.env` (template: `deploy/env.example`).
+`deploy/` has the Dockerfile and compose file for the hosted testnet stack: `web` (Caddy serving the relay's public routes), `relay`, `mm`, `lister`, `monitor`, `proposer` and a Cloudflare tunnel. The landing, the app and these docs are static sites on Cloudflare Pages. Each container reads only its own variables from `deploy/.env` (template: `deploy/env.example`). The `proposer` needs its own `ORACLE_ACCOUNT_ID` and `ORACLE_PRIVATE_KEY` and won't start without them. Caddy takes the client IP from `CF-Connecting-IP` only on requests from the tunnel container (`10.86.86.86`) and ignores it from anyone else.
 
 ```bash
 docker compose -f deploy/compose.yaml --env-file deploy/.env build

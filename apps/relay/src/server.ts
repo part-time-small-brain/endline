@@ -15,6 +15,7 @@ const MAX_BODY_BYTES = 64 * 1024;
 const LIMITED = new Set(["POST /quote", "POST /execute", "POST /transfer", "POST /claims", "POST /calls", "POST /faucet", "POST /deposit-quote"]);
 const APP_ONLY = new Set(["/faucet", "/deposit-quote"]);
 const MAX_REQUESTS_PER_MINUTE = 30;
+const MAX_FILL_READS_PER_MINUTE = 600;
 const FaucetRequest = z.object({ account_id: AccountId });
 const SITE_IPV6_GROUPS = 3;
 
@@ -72,6 +73,7 @@ function send(response: ServerResponse, status: number, body: unknown, cors: obj
 
 export function createRelayServer(relay: Relay, fills: Fills, hub: MmHub, collector: Collector, oneClick: OneClick, calls: Calls, faucet?: Faucet, trustProxy = false, appOrigins: ReadonlySet<string> = new Set()): Server {
   const allow = rateLimit(MAX_REQUESTS_PER_MINUTE, 60_000);
+  const allowFillRead = rateLimit(MAX_FILL_READS_PER_MINUTE, 60_000);
   const route = async (request: IncomingMessage): Promise<[number, unknown]> => {
     const path = pathOf(request);
     if (path === undefined) throw new HttpError(400, "bad url");
@@ -111,8 +113,9 @@ export function createRelayServer(relay: Relay, fills: Fills, hub: MmHub, collec
       case "GET /status/:arg":
         return [200, relay.status(param)];
       case "GET /fills/:arg":
+        if (!allowFillRead(clientKey(request, trustProxy))) throw new HttpError(429, "too many requests");
         if (!AccountId.safeParse(param).success) throw new HttpError(400, "invalid account id");
-        return [200, await fills.byAccount(param)];
+        return [200, fills.byAccount(param)];
       case "POST /calls":
         return [200, await calls.add(await parseBody(request, CallRequest), clientKey(request, trustProxy, SITE_IPV6_GROUPS))];
       case "GET /calls/:arg":

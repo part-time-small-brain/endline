@@ -38,7 +38,7 @@ decimals() {
 
 [[ $url == https://* && $url != *[\'\"\ ]* ]] || fail "ORACLE_WASM_URL must be https:// without quotes or spaces"
 [[ $sha =~ ^[0-9a-f]{64}$ ]] || fail "ORACLE_WASM_SHA256 must be 64 lowercase hex chars"
-git -C "$repo" diff --quiet HEAD -- contracts/options || fail "contracts/options has uncommitted changes"
+[ -z "$(git -C "$repo" status --porcelain -- contracts/options Cargo.toml Cargo.lock)" ] || fail "contracts/options, Cargo.toml or Cargo.lock has uncommitted changes"
 [ -e "$HOME/.near-credentials/mainnet/$root.json" ] || [ -d "$HOME/.near-credentials/mainnet/$root" ] || fail "import $root into the legacy keychain (~/.near-credentials/mainnet)"
 [ "$(curl -sfL "$url" | shasum -a 256 | cut -d' ' -f1)" = "$sha" ] || fail "$url does not serve sha256 $sha"
 balance="$(near_balance "$root")"
@@ -46,14 +46,14 @@ balance="$(near_balance "$root")"
 [ "$(near_balance "$opt")" -eq -1 ] || fail "$opt already exists: the contract is not upgradeable, pick a new account"
 [ "$(near_balance "$oracle")" -ge 0 ] || fail "$oracle does not exist"
 [ "$(decimals "$usdc")" = 6 ] || fail "$usdc is not 6 decimals"
-(cd "$repo/contracts/options" && cargo near build non-reproducible-wasm >&2)
+(cd "$repo/contracts/options" && cargo near build reproducible-wasm >&2)
 echo "preflight ok. Contract $(git -C "$repo" rev-parse --short HEAD), wasm sha256 $(shasum -a 256 "$wasm" | cut -d' ' -f1)" >&2
 
 net="network-config mainnet"
 send="$net sign-with-legacy-keychain send"
 call="near contract call-function as-transaction"
 view="near contract call-function as-read-only"
-echo "# 0. Relayer and MM accounts, each with its own full-access key (their private keys are RELAYER_PRIVATE_KEY and MM_PRIVATE_KEY)"
+echo "# 0. Relayer and MM accounts, each with its own full-access key (the settler's RELAYER_PRIVATE_KEY, since request_settlement attaches NEAR, and MM_PRIVATE_KEY)"
 for account in "$relayer" "$mm"; do
   if [ "$(near_balance "$account")" -eq -1 ]; then
     echo "near account create-account fund-myself $account '3 NEAR' autogenerate-new-keypair save-to-legacy-keychain sign-as $root $send"
@@ -61,6 +61,8 @@ for account in "$relayer" "$mm"; do
     echo "# $account exists: needs ~3 NEAR and its key in ~/.near-credentials/mainnet/$account.json"
   fi
 done
+echo "# The relay only sends execute_intents: its RELAYER_PRIVATE_KEY is this function-call key, never the full-access one"
+echo "near account add-key $relayer grant-function-call-access --allowance unlimited --contract-account-id intents.near --function-names execute_intents autogenerate-new-keypair save-to-legacy-keychain $send"
 cat <<EOF
 
 # 1. Contract account. Its 8 NEAR (code storage, 2 NEAR reserve, series storage) can't be withdrawn once step 3 deletes its keys

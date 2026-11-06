@@ -15,7 +15,7 @@ description: What protects your money, and what you still have to trust.
 | Full collateral | Every payout is locked before the option exists. No liquidations, no market maker default |
 | Funds stay in `intents.near` | We never hold your USDC, options or payouts |
 | Atomic trades | You pay and get the option in one step, or nothing happens |
-| You see what you sign | The app shows a card matching the exact trade your wallet signs, and rejects a quote that doesn't match |
+| You see what you sign | The app shows a card matching the exact trade your wallet signs, and rejects a quote that doesn't match or stays signable for more than 2 minutes |
 | 7-exchange final price | One exchange can't move it ([Settlement](./settlement.mdx)) |
 
 ## What the owner can and can't do
@@ -41,7 +41,7 @@ The owner controls the oracle accounts and the pinned oracle program, so it coul
 | Single market maker | Only ours quotes today. If it's offline you can't buy or sell back. Positions and payouts are unaffected |
 | NEAR Intents | Everything sits in `intents.near`, so its security is part of ours |
 | Capped payout | You get at most size × the width, however far past the cap the price ends |
-| Tap balance | Taps sign with a key your browser derives from one wallet signature. Anyone who gets that key, from that signature or from script on the page while it's open, can move your whole Tap balance. Never your main balance. Keep in it only what you're tapping with |
+| Tap balance | Taps sign with a key your browser derives from one wallet signature. Its text names Endline, the site and the intents contract: sign it only on app.endline.trade. Anyone who gets that key, from that signature or from script on the page while it's open, can move your whole Tap balance. Never your main balance. Keep in it only what you're tapping with |
 | Public positions | Option balances on NEAR Intents are public. Funds in near.com Confidential Mode must move to the main balance before trading |
 
 Full threat model: [Security model](./developers/security.mdx).

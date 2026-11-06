@@ -1,5 +1,6 @@
 import { Amount, CLAIM_WINDOW_SEC, Config as ContractConfig, readPayload, Series, Settlement, type SignedPayload } from "@endline/sdk";
-import { Account, getTransactionLastResult, JsonRpcProvider, type KeyPairString } from "near-api-js";
+import { Account, actions, baseEncode, getTransactionLastResult, JsonRpcProvider, KeyPair, type KeyPairString, KeyPairSigner, type Transaction } from "near-api-js";
+import { UnknownTransactionError } from "near-api-js/rpc-errors";
 import { z } from "zod";
 import type { Config } from "./config.ts";
 
@@ -7,14 +8,34 @@ const CACHE_MS = 60_000;
 const EXECUTE_GAS = 300_000_000_000_000n;
 const FT_TRANSFER_CALL_GAS = 100_000_000_000_000n;
 const PAGE = 200;
-const NONCE_POLL_MS = 3_000;
-const NONCE_FINAL_MS = 5_000;
+const OUTCOME_POLL_MS = 3_000;
+const PAST_DEADLINE_MS = 5_000;
 
 const Simulation = z.object({ invariant_violated: z.unknown().optional() });
 type Simulation = z.infer<typeof Simulation>;
 
 export class Rejected extends Error {}
 export class Refunded extends Error {}
+export class Unsettled extends Error {
+  constructor(
+    readonly txHashes: string[],
+    cause: unknown,
+  ) {
+    super(cause instanceof Error ? cause.message : String(cause), { cause });
+  }
+}
+
+type TxStatus = "succeeded" | "failed" | "unknown";
+
+class HashingSigner extends KeyPairSigner {
+  readonly txHashes: string[] = [];
+
+  override async signTransaction(transaction: Transaction) {
+    const signed = await super.signTransaction(transaction);
+    this.txHashes.push(baseEncode(signed.txHash));
+    return signed;
+  }
+}
 
 export interface Chain {
   fee(): Promise<bigint>;
@@ -26,25 +47,29 @@ export interface Chain {
   balanceOf(accountId: string, asset: string): Promise<bigint>;
   simulate(signed: SignedPayload[]): Promise<Simulation>;
   execute(signed: SignedPayload[]): Promise<string>;
-  isNonceUsed(accountId: string, nonce: string): Promise<boolean>;
+  txStatus(txHash: string): Promise<TxStatus>;
   finalTimeMs(): Promise<number>;
 }
 
-// an execute error can come back for a batch that ran; only a final block past the deadline with the nonce unused means it never will
-export async function ranByNonce(chain: Chain, signed: SignedPayload, label: string): Promise<boolean> {
-  const { signer_id, nonce, deadline } = readPayload(signed);
-  const final = Date.parse(deadline) + NONCE_FINAL_MS;
+// an execute error can come back after one of the relayer's transactions ran; one still unknown once a final block passes the deadline never will
+export async function ranTx(chain: Chain, signed: SignedPayload, error: unknown, label: string): Promise<string | undefined> {
+  const txHashes = error instanceof Unsettled ? error.txHashes : [];
+  const final = Date.parse(readPayload(signed).deadline) + PAST_DEADLINE_MS;
   let logged = false;
   for (;;) {
     try {
       const past = (await chain.finalTimeMs()) > final;
-      if (await chain.isNonceUsed(signer_id, nonce)) return true;
-      if (past) return false;
+      const statuses = await Promise.allSettled(txHashes.map((txHash) => chain.txStatus(txHash)));
+      const ran = txHashes.find((_, i) => statuses[i]?.status === "fulfilled" && statuses[i].value === "succeeded");
+      if (ran !== undefined) return ran;
+      const unread = statuses.find((status) => status.status === "rejected");
+      if (unread) throw unread.reason;
+      if (past || statuses.every((status) => status.status === "fulfilled" && status.value === "failed")) return undefined;
     } catch (readError) {
-      if (!logged) console.error("can't read the user's nonce yet, still settling", label, readError);
+      if (!logged) console.error("can't read the relayer's transactions yet, still settling", label, readError);
       logged = true;
     }
-    await new Promise((resolve) => setTimeout(resolve, NONCE_POLL_MS));
+    await new Promise((resolve) => setTimeout(resolve, OUTCOME_POLL_MS));
   }
 }
 
@@ -75,6 +100,7 @@ interface NearChain extends Chain {
 
 export function nearChain(config: Config): NearChain {
   const provider = new JsonRpcProvider({ url: config.NEAR_RPC_URL });
+  const key = KeyPair.fromString(config.RELAYER_PRIVATE_KEY as KeyPairString);
   const relayer = new Account(config.RELAYER_ACCOUNT_ID, provider, config.RELAYER_PRIVATE_KEY as KeyPairString);
   const view = (contractId: string, method: string, args: Record<string, unknown> = {}) =>
     provider.callFunction({ contractId, method, args });
@@ -135,16 +161,22 @@ export function nearChain(config: Config): NearChain {
       return Simulation.parse(result);
     },
     execute: async (signed) => {
-      const outcome = await relayer.callFunctionRaw({
-        contractId: config.INTENTS_ID,
-        methodName: "execute_intents",
-        args: { signed },
-        gas: EXECUTE_GAS,
-        deposit: 0n,
-      });
-      return outcome.transaction_outcome.id;
+      const signer = new HashingSigner(key);
+      try {
+        const outcome = await relayer.signAndSendTransaction({ receiverId: config.INTENTS_ID, actions: [actions.functionCall("execute_intents", { signed }, EXECUTE_GAS, 0n)], signer });
+        return outcome.transaction_outcome.id;
+      } catch (error) {
+        throw new Unsettled(signer.txHashes, error);
+      }
     },
-    isNonceUsed: async (accountId, nonce) => z.boolean().parse(await provider.callFunction({ contractId: config.INTENTS_ID, method: "is_nonce_used", args: { account_id: accountId, nonce }, blockQuery: { finality: "final" } })),
+    txStatus: async (txHash) => {
+      const outcome = await provider.viewTransactionStatus({ txHash, accountId: config.RELAYER_ACCOUNT_ID, waitUntil: "NONE" }).catch((error: unknown) => {
+        if (error instanceof UnknownTransactionError) return undefined;
+        throw error;
+      });
+      if (outcome?.final_execution_status !== "FINAL" || typeof outcome.status !== "object") return "unknown";
+      return "Failure" in outcome.status ? "failed" : "succeeded";
+    },
     finalTimeMs: async () => Number(BigInt((await provider.viewBlock({ finality: "final" })).header.timestamp_nanosec) / 1_000_000n),
   };
 }
