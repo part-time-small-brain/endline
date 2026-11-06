@@ -1,17 +1,13 @@
-import { createIntentSignerNEP413 } from "@defuse-protocol/intents-sdk";
-import { type Payload, SignedPayload } from "@endline/sdk";
+import { nep413Hash, type Payload, SignedPayload, toSign, type Unsigned } from "@endline/sdk";
 import { baseEncode, KeyPair, type KeyPairString } from "near-api-js";
 
 export type SignPayload = (payload: Payload) => Promise<SignedPayload>;
 
-export function nep413Signer(accountId: string, privateKey: KeyPairString): SignPayload {
+export function nep413Signer(privateKey: KeyPairString): SignPayload {
   const key = KeyPair.fromString(privateKey);
-  const signer = createIntentSignerNEP413({
-    accountId,
-    signMessage: (_payload, hash) => {
-      const { signature, publicKey } = key.sign(hash);
-      return { publicKey: publicKey.toString(), signature: `ed25519:${baseEncode(signature)}` };
-    },
-  });
-  return async (payload) => SignedPayload.parse(await signer.signIntent(payload));
+  return async (payload) => {
+    const unsigned = toSign("nep413", payload) as Extract<Unsigned, { standard: "nep413" }>;
+    const { signature, publicKey } = key.sign(nep413Hash(unsigned.payload));
+    return SignedPayload.parse({ ...unsigned, public_key: publicKey.toString(), signature: `ed25519:${baseEncode(signature)}` });
+  };
 }

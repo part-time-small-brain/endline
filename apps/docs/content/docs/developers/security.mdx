@@ -68,7 +68,7 @@ description: The rules every change keeps, what each actor can do, and the gaps 
 | Not upgradeable | Fixes ship as a new deployment; old series stay redeemable |
 | Vendor-hosted wallet scripts | Wallets that serve their own script (Intear, NEAR Mobile, Trezu, EVM-on-NEAR) can change it, as in any dapp. near-connect also caches scripts in the browser, and its popup lets a user add a debug wallet |
 | Unsigned 1Click fields | 1Click doesn't sign `appFees` (nor a few other request fields), so a compromised relay could add a fee under the 3% cap, shown in the amount that arrives |
-| Non-reproducible wasm | The build uses `cargo near build non-reproducible-wasm`; matching the deployed bytecode hash is not guaranteed |
+| Testnet wasm not reproducible | Testnet deploys use `cargo near build non-reproducible-wasm`. The mainnet plan builds with `reproducible-wasm` in the pinned `sourcescan/cargo-near` image, so anyone with the source can rebuild it and match the deployed code hash. The repository is private until the mainnet deploy |
 | Contract account keys | Every full-access key on the contract account must be deleted after deploy |
 
 ## Monitoring

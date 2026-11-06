@@ -23,7 +23,7 @@ describe("settlementAlert", () => {
     expect(check(proposed("10000000000"), 10_020)).toBeUndefined();
   });
 
-  it("alerts one quote unit past 20 bps, well inside the oracle's 50 bps veto, and 20 bps below the reference", () => {
+  it("alerts one quote unit past 20 bps, the oracle's own Deribit veto, and 20 bps below the reference", () => {
     expect(check(proposed("10020000001"), 10_000)?.key).toBe(`settle BTC ${EXPIRY}`);
     expect(check(proposed("9980000000"), 10_000)?.key).toBe(`settle BTC ${EXPIRY}`);
   });

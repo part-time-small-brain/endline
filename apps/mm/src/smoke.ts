@@ -16,7 +16,7 @@ async function post(path: string, body: unknown): Promise<unknown> {
   return json;
 }
 
-const sign = nep413Signer(accountId, privateKey);
+const sign = nep413Signer(privateKey);
 
 async function currentSalt(rpcUrl: string, intentsId: string): Promise<string> {
   const params = { request_type: "call_function", finality: "final", account_id: intentsId, method_name: "current_salt", args_base64: "e30=" };
