@@ -594,14 +594,14 @@ test.describe("Tap", () => {
     await expect(cell).toHaveAccessibleName(/· pays up to 4\.8×/);
     expect(state.published).toEqual([]);
     await page.clock.resume();
-    await page.route("https://www.deribit.com/**", (route) => route.fulfill({ json: route.request().url().includes("chart") ? { result: [] } : { result: { index_price: 81_200 } } }));
+    await page.route("https://www.deribit.com/**", (route) => (route.request().url().includes("chart") ? route.fallback() : route.fulfill({ json: { result: { index_price: 81_200 } } })));
     await page.clock.fastForward(5_000);
     await expect(cell).toHaveAccessibleName(/· winning now · you hold this$/);
     state.premium = 25;
     await cell.click();
     await expect(page.getByRole("status").filter({ hasText: "Bought BTC Up $81,000 for $25.00." })).toBeVisible();
     await page.clock.pauseAt((await page.evaluate(() => Date.now())) + 100);
-    await expect(cell).toHaveAttribute("class", /shadow-\[0_0_28px_currentColor\]!/);
+    await expect.poll(() => cell.evaluate((el) => el.getAnimations().filter((a) => a instanceof CSSTransition).length)).toBe(0);
     await expect(cell).toHaveCSS("background-color", "rgb(11, 38, 28)");
     expect(state.published).toEqual(["quote-2"]);
   });
