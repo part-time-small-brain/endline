@@ -1,6 +1,6 @@
 import { Check } from "@phosphor-icons/react";
 import type { ReactNode } from "react";
-import type { PositionView } from "../app/usePositions.ts";
+import { pnlOf, type PositionView, valueOf } from "../app/usePositions.ts";
 import { useCollect } from "../hooks/useCollect.ts";
 import { capLabel, seriesTitle } from "../lib/labels.ts";
 import { formatPct, formatUsd, toNumber } from "../lib/money.ts";
@@ -30,8 +30,8 @@ export function PositionCard({ view, quoteDecimals, nowSec, onSellBack }: Props)
   const { series } = view;
   const collect = useCollect();
   const usd = (value: bigint) => formatUsd(value, quoteDecimals);
-  const value = view.valueNow ?? (view.status === "active" || view.status === "settling" || view.status === "closed" ? undefined : view.payout);
-  const pnl = value !== undefined && view.paid > 0n ? value + view.received - view.paid : undefined;
+  const value = valueOf(view);
+  const pnl = pnlOf(view);
   const ended = series.expiry <= nowSec;
   const pill = PILLS[view.status];
   const sellable = view.status === "active" && series.quotable;

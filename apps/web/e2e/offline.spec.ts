@@ -1,4 +1,4 @@
-import { toSign, type QuoteRequest, type StatusUpdate } from "@endline/sdk";
+import { type Mark, toSign, type QuoteRequest, type StatusUpdate } from "@endline/sdk";
 import type { Page, Route } from "@playwright/test";
 import { expect, handleOf, money, term, test } from "./fixtures.ts";
 
@@ -575,6 +575,13 @@ test.describe("Tap", () => {
 
   test("a tap signs only while the firm quote still pays the multiple on the cell, and a refused one shows the new multiple at once", async ({ page }) => {
     const state = await withTapBalance(page);
+    await page.route("**/rpc", async (route) => {
+      const params = route.request().postDataJSON().params;
+      if (params.method_name !== "mt_batch_balance_of") return route.fallback();
+      const ids: string[] = JSON.parse(Buffer.from(params.args_base64, "base64").toString()).token_ids;
+      await route.fulfill({ json: { jsonrpc: "2.0", id: "web", result: { result: [...Buffer.from(JSON.stringify(ids.map((id) => (id.endsWith("-P") ? "0" : String(250 * USD)))))] } } });
+    });
+    await page.clock.fastForward(10_000);
     let ask = 400;
     await page.route("**/marks", (route) => route.fulfill({ json: [{ series_id: "BTC-5NOV26-81000_83000-C", ask: String(ask * USD), bid: String(380 * USD), vol: 0.4 }] }));
     const cell = page.getByRole("table").getByRole("button", { name: /^Up · BTC ends above \$81,000 · Tomorrow/ });
@@ -587,9 +594,15 @@ test.describe("Tap", () => {
     await expect(cell).toHaveAccessibleName(/· pays up to 4\.8×/);
     expect(state.published).toEqual([]);
     await page.clock.resume();
+    await page.route("https://www.deribit.com/**", (route) => (route.request().url().includes("chart") ? route.fallback() : route.fulfill({ json: { result: { index_price: 81_200 } } })));
+    await page.clock.fastForward(5_000);
+    await expect(cell).toHaveAccessibleName(/· winning now · you hold this$/);
     state.premium = 25;
     await cell.click();
     await expect(page.getByRole("status").filter({ hasText: "Bought BTC Up $81,000 for $25.00." })).toBeVisible();
+    await page.clock.pauseAt((await page.evaluate(() => Date.now())) + 100);
+    await expect.poll(() => cell.evaluate((el) => el.getAnimations().filter((a) => a instanceof CSSTransition).length)).toBe(0);
+    await expect(cell).toHaveCSS("background-color", "rgb(11, 38, 28)");
     expect(state.published).toEqual(["quote-2"]);
   });
 
@@ -617,6 +630,55 @@ test.describe("Tap", () => {
     await page.route("**/series", (route) => route.fulfill({ json: { quote_asset: "nep141:usdc.demo.testnet", quote_decimals: 6, series: closed } }));
     await page.clock.fastForward(15_000);
     await expect(mine.getByRole("button", { name: /^Sell \$/ })).toHaveCount(0);
+  });
+
+  test("a held cell shows what it's worth and its P&L, and glows and flashes each time spot crosses its price to beat", async ({ page }) => {
+    let index = 80_650;
+    let marks: Mark[] = [{ series_id: "BTC-5NOV26-81000_83000-C", ask: String(400 * USD), bid: String(380 * USD), vol: 0.4 }];
+    const token = "nep245:opt.demo.testnet:BTC-5NOV26-81000_83000-C";
+    await page.addInitScript(() => {
+      (window as unknown as { ethereum: object }).ethereum = {
+        async request({ method }: { method: string }) {
+          if (method === "eth_requestAccounts") return ["0x1111111111111111111111111111111111111111"];
+          throw new Error(method);
+        },
+      };
+    });
+    await page.route("**/fills/*", (route) =>
+      route.fulfill({ json: [{ quote_id: "q", series_id: "BTC-5NOV26-81000_83000-C", side: "buy", account_id: "0x1111111111111111111111111111111111111111", size: "2000000", premium: String(5 * USD), tx_hash: "tx", at_ms: NOW_MS - 3_600_000 }] }),
+    );
+    await live(page, () => marks, () => index);
+    await page.route("**/rpc", (route) => {
+      const params = route.request().postDataJSON().params;
+      const args = JSON.parse(Buffer.from(params.args_base64, "base64").toString());
+      const value = params.method_name === "mt_batch_balance_of" ? args.token_ids.map((id: string) => (id === token ? "2000000" : "0")) : view[params.method_name];
+      route.fulfill({ json: { jsonrpc: "2.0", id: "web", ...(value === undefined ? { error: { message: "unknown" } } : { result: { result: [...Buffer.from(JSON.stringify(value))] } }) } });
+    });
+    await page.getByRole("button", { name: "Connect", exact: true }).click();
+    await page.getByRole("button", { name: /Ethereum wallet/ }).click();
+    const cell = page.getByRole("table").getByRole("button", { name: /^Up · BTC ends above \$81,000 · Tomorrow/ });
+    const flashes = () => cell.evaluate((el) => el.getAnimations({ subtree: true }).filter((a) => (a as CSSAnimation).animationName === "fade").length);
+    await expect(cell).toHaveAccessibleName(/· pays up to 5\.0× · worth \$7\.60 · up \$2\.60 · you hold this$/);
+    await expect(cell).toHaveText("$7.60+52%5.0×");
+    expect(await flashes()).toBe(0);
+    index = 81_200;
+    await page.clock.fastForward(5_000);
+    await expect.poll(flashes, { intervals: [50] }).toBe(1);
+    await expect(cell).toHaveAccessibleName(/· up \$2\.60 · winning now · you hold this$/);
+    await expect.poll(flashes).toBe(0);
+    index = 80_650;
+    await page.clock.fastForward(5_000);
+    await expect.poll(flashes, { intervals: [50] }).toBe(1);
+    await expect(cell).toHaveAccessibleName(/· up \$2\.60 · you hold this$/);
+    marks = [{ series_id: "BTC-5NOV26-81000_83000-C", ask: String(400 * USD), vol: 0.4 }];
+    await page.clock.fastForward(5_000);
+    await expect(cell).toHaveText("$0.00-100%5.0×");
+    await expect(cell.getByText("-100%")).toHaveCSS("font-size", "16px");
+    marks = [];
+    await page.clock.fastForward(5_000);
+    const unpriced = page.getByRole("table").getByRole("button", { name: /^Up · BTC ends above \$81,000 · Tomorrow .* · no price right now · you hold this$/ });
+    await expect(unpriced).toBeDisabled();
+    await expect(unpriced).toHaveCSS("opacity", "1");
   });
 
   test("drops every cell once the relay's marks fail", async ({ page }) => {

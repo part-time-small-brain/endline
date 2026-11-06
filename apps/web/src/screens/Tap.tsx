@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { useTicket } from "../app/useTicket.ts";
-import type { PositionView } from "../app/usePositions.ts";
+import { type Holding, holding, type PositionView } from "../app/usePositions.ts";
 import type { QuoteSelection } from "../components/QuoteSheet.tsx";
 import { Brackets } from "../components/Brackets.tsx";
 import { Button } from "../components/Button.tsx";
@@ -50,7 +50,6 @@ export function Tap({ state, nowSec, views, onConnect, onAddFunds, onQuote }: Pr
     if (tapWallet) onQuote({ wallet: tapWallet, series, side: "sell", size });
   };
   const active = views?.filter((v) => v.status === "active" && v.series.underlying === symbol) ?? [];
-  const valueOf = (id: string) => active.filter((v) => v.series.id === id).reduce<bigint | undefined>((sum, v) => (v.valueNow === undefined ? sum : (sum ?? 0n) + v.valueNow), undefined);
   const mine = active.filter((v) => v.tap);
   const held = new Set(active.map((v) => v.series.id));
   const listed = [...priced.filter((s) => s.underlying === symbol && !held.has(s.id)), ...active.map((v) => v.series)];
@@ -58,10 +57,12 @@ export function Tap({ state, nowSec, views, onConnect, onAddFunds, onQuote }: Pr
   const rows = grid?.strikes.length ?? 0;
   const formatMoney = (value: bigint | undefined) => (value === undefined ? undefined : formatUsd(value, quoteDecimals));
   const move = (strike: bigint) => (spotNumber ? formatPct(toNumber(strike, quoteDecimals) / spotNumber - 1) : "");
-  const label = (cell: GridCell, strike: bigint, expiry: number) => {
+  const label = (cell: GridCell, strike: bigint, expiry: number, own: Holding | undefined) => {
     const up = cell.series.kind === "call";
     const pays = cell.multiple === undefined ? "no price right now" : `pays up to ${formatMultiple(cell.multiple)}`;
-    return `${up ? "Up" : "Down"} · ${symbol} ends ${up ? "above" : "below"} ${formatPrice(strike, quoteDecimals)} · ${dayLabel(expiry, nowSec)} ${formatClock(expiry)} · ${pays}${cell.held ? " · you hold this" : ""}`;
+    const worth = own?.value === undefined ? "" : ` · worth ${formatUsd(own.value, quoteDecimals)}`;
+    const pnl = own?.pnl === undefined ? "" : own.pnl > 0n ? ` · up ${formatUsd(own.pnl, quoteDecimals)}` : own.pnl < 0n ? ` · down ${formatUsd(-own.pnl, quoteDecimals)}` : " · even";
+    return `${up ? "Up" : "Down"} · ${symbol} ends ${up ? "above" : "below"} ${formatPrice(strike, quoteDecimals)} · ${dayLabel(expiry, nowSec)} ${formatClock(expiry)} · ${pays}${worth}${pnl}${cell.winning ? " · winning now" : ""}${cell.held ? " · you hold this" : ""}`;
   };
 
   return (
@@ -113,12 +114,14 @@ export function Tap({ state, nowSec, views, onConnect, onAddFunds, onQuote }: Pr
                     )}
                     {grid.cells[r]?.map((cell, c) => {
                       const expiry = grid.expiries[c] ?? 0;
+                      const own = cell?.held ? holding(active, cell.series.id) : undefined;
                       return (
                         <td key={cell?.series.id ?? expiry} className="h-[var(--row)] p-0.5">
                           <Cell
                             cell={cell}
-                            label={cell ? label(cell, strike, expiry) : ""}
-                            value={cell?.held ? formatMoney(valueOf(cell.series.id)) : undefined}
+                            label={cell ? label(cell, strike, expiry, own) : ""}
+                            value={formatMoney(own?.value)}
+                            change={own?.change}
                             state={cell && taps.states[cell.series.id]}
                             onTap={onTap}
                           />
