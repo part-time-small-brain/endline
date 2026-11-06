@@ -1,9 +1,9 @@
-import { expect, test } from "./fixtures.ts";
+import { expect, RPC, test } from "./fixtures.ts";
 
 const APP = "http://127.0.0.1:5313";
 
 test("the landing opens the app on its own origin, where Trade is the root", async ({ page }) => {
-  await page.route("**/rpc", (route) => route.fulfill({ json: { jsonrpc: "2.0", id: "web", error: { message: "offline" } } }));
+  await page.route(RPC, (route) => route.fulfill({ json: { jsonrpc: "2.0", id: "web", error: { message: "offline" } } }));
   await page.goto("/");
   const open = page.getByRole("link", { name: "Open app" }).first();
   await expect(open).toHaveAttribute("href", `${APP}/`);

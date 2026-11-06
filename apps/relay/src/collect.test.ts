@@ -43,7 +43,7 @@ function setup(fills = boughtPlenty) {
   const fake = fakeChain();
   const dir = mkdtempSync(join(tmpdir(), "relay-"));
   const claims = new Claims(dir);
-  const collector = new Collector(fake.chain, { INTENTS_ID: INTENTS, OPTIONS_ID: OPTIONS, QUOTE_ASSET: USDC, RELAYER_ACCOUNT_ID: RELAYER }, claims, fills);
+  const collector = new Collector(fake.chain, { intents_id: INTENTS, options_id: OPTIONS, quote_asset: USDC, RELAYER_ACCOUNT_ID: RELAYER }, claims, fills);
   const settle = (price = "120000000000") => fake.settlements.set(`${SERIES.underlying}:${SERIES.expiry}`, { price, final_at: FINAL_AT });
   return { ...fake, dir, claims, collector, settle };
 }

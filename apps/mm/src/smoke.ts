@@ -1,4 +1,5 @@
 import { exerciseOptions, payload, Quote, readPayload, sessionPayload, StatusUpdate } from "@endline/sdk";
+import { readDeployment } from "@endline/sdk/deployment";
 import type { KeyPairString } from "near-api-js";
 import { nep413Signer } from "./signer.ts";
 
@@ -6,7 +7,7 @@ const [relayUrl, seriesId, action, size] = process.argv.slice(2);
 const accountId = process.env.USER_ACCOUNT_ID;
 const privateKey = process.env.USER_PRIVATE_KEY as KeyPairString | undefined;
 if (!relayUrl || !seriesId || !["buy", "sell", "collect", "claim"].includes(action ?? "") || !size || !accountId || !privateKey) {
-  throw new Error("usage: USER_ACCOUNT_ID=… USER_PRIVATE_KEY=… INTENTS_ID=… OPTIONS_ID=… tsx src/smoke.ts <relay-url> <series-id> buy|sell|collect|claim <size>");
+  throw new Error("usage: USER_ACCOUNT_ID=… USER_PRIVATE_KEY=… NETWORK_ID=… tsx src/smoke.ts <relay-url> <series-id> buy|sell|collect|claim <size>");
 }
 
 async function post(path: string, body: unknown): Promise<unknown> {
@@ -25,14 +26,14 @@ async function currentSalt(rpcUrl: string, intentsId: string): Promise<string> {
   return JSON.parse(Buffer.from(result.result).toString());
 }
 
-const { INTENTS_ID: intentsId, OPTIONS_ID: optionsId, NEAR_RPC_URL: rpcUrl } = process.env;
-if (!intentsId || !rpcUrl) throw new Error("smoke needs INTENTS_ID and NEAR_RPC_URL");
+const network = process.env.NETWORK_ID;
+if (network !== "mainnet" && network !== "testnet") throw new Error("smoke needs NETWORK_ID=mainnet or testnet");
+const { rpc_url: rpcUrl, intents_id: intentsId, options_id: optionsId } = readDeployment(network);
 const salt = Uint8Array.from(Buffer.from(await currentSalt(rpcUrl, intentsId), "hex"));
 const random = crypto.getRandomValues(new Uint8Array(15));
 const deadlineMs = Date.now() + 300_000;
 
 if (action === "collect" || action === "claim") {
-  if (!optionsId) throw new Error(`${action} needs OPTIONS_ID`);
   const tokens = { [`nep245:${optionsId}:${seriesId}`]: BigInt(size) };
   const deadline = action === "claim" ? Date.now() + 7 * 86_400_000 : deadlineMs;
   const signed = await sign(payload(intentsId, accountId, deadline, salt, random, [exerciseOptions(optionsId, tokens)]));

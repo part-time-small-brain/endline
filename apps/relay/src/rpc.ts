@@ -99,7 +99,7 @@ interface NearChain extends Chain {
 }
 
 export function nearChain(config: Config): NearChain {
-  const provider = new JsonRpcProvider({ url: config.NEAR_RPC_URL });
+  const provider = new JsonRpcProvider({ url: config.rpc_url });
   const key = KeyPair.fromString(config.RELAYER_PRIVATE_KEY as KeyPairString);
   const relayer = new Account(config.RELAYER_ACCOUNT_ID, provider, config.RELAYER_PRIVATE_KEY as KeyPairString);
   const view = (contractId: string, method: string, args: Record<string, unknown> = {}) =>
@@ -111,14 +111,14 @@ export function nearChain(config: Config): NearChain {
     for (;;) {
       const last = all.at(-1);
       const cursor = last ? { from_expiry: last.expiry, after_id: last.id } : { from_expiry: fromExpiry };
-      const page = z.array(Series).parse(await view(config.OPTIONS_ID, "list_series_by_expiry", { ...cursor, limit: PAGE }));
+      const page = z.array(Series).parse(await view(config.options_id, "list_series_by_expiry", { ...cursor, limit: PAGE }));
       all.push(...page);
       if (page.length < PAGE) return all;
     }
   };
 
   const minWrites = cached(async () => {
-    const list = z.array(z.tuple([z.string(), z.object({ min_write: Amount })])).parse(await view(config.OPTIONS_ID, "get_underlyings"));
+    const list = z.array(z.tuple([z.string(), z.object({ min_write: Amount })])).parse(await view(config.options_id, "get_underlyings"));
     return new Map(list.map(([symbol, { min_write }]) => [symbol, BigInt(min_write)]));
   });
 
@@ -128,7 +128,7 @@ export function nearChain(config: Config): NearChain {
       const outcome = await relayer.callFunctionRaw({
         contractId: token,
         methodName: "ft_transfer_call",
-        args: { receiver_id: config.INTENTS_ID, amount: amount.toString(), msg: accountId },
+        args: { receiver_id: config.intents_id, amount: amount.toString(), msg: accountId },
         gas: FT_TRANSFER_CALL_GAS,
         deposit: 1n,
       });
@@ -138,22 +138,22 @@ export function nearChain(config: Config): NearChain {
       if (used !== amount.toString()) throw new Error(`unexpected ft_transfer_call result for ${accountId}: ${JSON.stringify(outcome.status)}`);
       return outcome.transaction_outcome.id;
     },
-    fee: cached(async () => BigInt(z.number().int().parse(await view(config.INTENTS_ID, "fee")))),
+    fee: cached(async () => BigInt(z.number().int().parse(await view(config.intents_id, "fee")))),
     currentSalt: cached(async () => {
-      const hex = z.string().regex(/^[0-9a-f]{8}$/).parse(await view(config.INTENTS_ID, "current_salt"));
+      const hex = z.string().regex(/^[0-9a-f]{8}$/).parse(await view(config.intents_id, "current_salt"));
       return Uint8Array.from(Buffer.from(hex, "hex"));
     }),
     listSeries: cached(listSeries),
-    contractConfig: cached(async () => ContractConfig.parse(await view(config.OPTIONS_ID, "get_config"))),
-    settlement: async (underlying, expiry) => Settlement.nullable().parse(await view(config.OPTIONS_ID, "get_settlement", { underlying, expiry })),
+    contractConfig: cached(async () => ContractConfig.parse(await view(config.options_id, "get_config"))),
+    settlement: async (underlying, expiry) => Settlement.nullable().parse(await view(config.options_id, "get_settlement", { underlying, expiry })),
     minWrite: async (underlying) => {
       const min = (await minWrites()).get(underlying);
       if (min === undefined) throw new Error(`unknown underlying ${underlying}`);
       return min;
     },
-    balanceOf: async (accountId, asset) => BigInt(z.string().regex(/^[0-9]+$/).parse(await view(config.INTENTS_ID, "mt_balance_of", { account_id: accountId, token_id: asset }))),
+    balanceOf: async (accountId, asset) => BigInt(z.string().regex(/^[0-9]+$/).parse(await view(config.intents_id, "mt_balance_of", { account_id: accountId, token_id: asset }))),
     simulate: async (signed) => {
-      const result = await view(config.INTENTS_ID, "simulate_intents", { signed }).catch((error: unknown) => {
+      const result = await view(config.intents_id, "simulate_intents", { signed }).catch((error: unknown) => {
         // near-api-js reports the verifier refusing a payload as a view-call GuestPanic
         if (error instanceof Error && error.message.includes("GuestPanic")) throw new Rejected(error.message);
         throw error;
@@ -163,7 +163,7 @@ export function nearChain(config: Config): NearChain {
     execute: async (signed) => {
       const signer = new HashingSigner(key);
       try {
-        const outcome = await relayer.signAndSendTransaction({ receiverId: config.INTENTS_ID, actions: [actions.functionCall("execute_intents", { signed }, EXECUTE_GAS, 0n)], signer });
+        const outcome = await relayer.signAndSendTransaction({ receiverId: config.intents_id, actions: [actions.functionCall("execute_intents", { signed }, EXECUTE_GAS, 0n)], signer });
         return outcome.transaction_outcome.id;
       } catch (error) {
         throw new Unsettled(signer.txHashes, error);

@@ -24,7 +24,7 @@ interface Exercise extends Sent {
   tokens: Record<string, bigint>;
 }
 
-type Settings = Pick<Config, "INTENTS_ID" | "OPTIONS_ID" | "QUOTE_ASSET" | "RELAYER_ACCOUNT_ID">;
+type Settings = Pick<Config, "intents_id" | "options_id" | "quote_asset" | "RELAYER_ACCOUNT_ID">;
 
 interface Leg {
   asset: string;
@@ -41,11 +41,11 @@ function readSigned(signed: SignedPayload, intentsId: string): { sent: Sent; int
 
 function readExercise(signed: SignedPayload, config: Settings): Exercise | undefined {
   try {
-    const read = readSigned(signed, config.INTENTS_ID);
+    const read = readSigned(signed, config.intents_id);
     const [intent, ...extra] = read?.intents ?? [];
     if (!read || intent?.intent !== "transfer" || extra.length > 0) return undefined;
     const tokens = Object.fromEntries(Object.entries(intent.tokens).map(([asset, amount]) => [asset, BigInt(amount)]));
-    return isDeepStrictEqual(intent, exerciseOptions(config.OPTIONS_ID, tokens)) ? { ...read.sent, tokens } : undefined;
+    return isDeepStrictEqual(intent, exerciseOptions(config.options_id, tokens)) ? { ...read.sent, tokens } : undefined;
   } catch {
     return undefined;
   }
@@ -53,11 +53,11 @@ function readExercise(signed: SignedPayload, config: Settings): Exercise | undef
 
 function readTransfer(signed: SignedPayload, config: Settings, fee: bigint): Sent | undefined {
   try {
-    const read = readSigned(signed, config.INTENTS_ID);
+    const read = readSigned(signed, config.intents_id);
     const [move] = read?.intents ?? [];
     if (!read || move?.intent !== "transfer") return undefined;
-    const amount = BigInt(move.tokens[config.QUOTE_ASSET] ?? 0);
-    const expected = relayedTransfer(move.receiver_id, config.RELAYER_ACCOUNT_ID, config.QUOTE_ASSET, amount, fee);
+    const amount = BigInt(move.tokens[config.quote_asset] ?? 0);
+    const expected = relayedTransfer(move.receiver_id, config.RELAYER_ACCOUNT_ID, config.quote_asset, amount, fee);
     return isDeepStrictEqual(read.intents, expected) ? read.sent : undefined;
   } catch {
     return undefined;
@@ -163,7 +163,7 @@ export class Collector {
 
   private async legs({ tokens }: Exercise): Promise<Leg[]> {
     const listed = new Map((await this.chain.listSeries()).map((s) => [s.id, s]));
-    const prefix = `nep245:${this.config.OPTIONS_ID}:`;
+    const prefix = `nep245:${this.config.options_id}:`;
     const legs: Leg[] = [];
     for (const [asset, amount] of Object.entries(tokens)) {
       const { seriesId, side } = parseTokenId(asset.slice(prefix.length));

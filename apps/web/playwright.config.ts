@@ -30,25 +30,10 @@ export default defineConfig({
   webServer: [
     server(PORT, { VITE_MOCK: "1" }),
     server(TESTNET_PORT, { VITE_MOCK: "1", VITE_NETWORK: "testnet" }),
-    server(OFFLINE_PORT, {
-      VITE_RELAY_URL: `http://localhost:${OFFLINE_PORT}`,
-      VITE_NETWORK: "testnet",
-      VITE_RPC_URL: `http://localhost:${OFFLINE_PORT}/rpc`,
-      VITE_INTENTS_ID: "intents.demo.testnet",
-      VITE_OPTIONS_ID: "opt.demo.testnet",
-      VITE_QUOTE_ASSET: "nep141:usdc.demo.testnet",
-    }),
+    server(OFFLINE_PORT, { VITE_RELAY_URL: `http://localhost:${OFFLINE_PORT}`, VITE_NETWORK: "testnet" }),
     {
       command: `vite --port ${SPLIT_PORT} --strictPort --host 127.0.0.1`,
-      env: {
-        VITE_APP_URL: SPLIT_APP,
-        VITE_RELAY_URL: SPLIT_APP,
-        VITE_NETWORK: "testnet",
-        VITE_RPC_URL: `${SPLIT_APP}/rpc`,
-        VITE_INTENTS_ID: "intents.demo.testnet",
-        VITE_OPTIONS_ID: "opt.demo.testnet",
-        VITE_QUOTE_ASSET: "nep141:usdc.demo.testnet",
-      },
+      env: { VITE_APP_URL: SPLIT_APP, VITE_RELAY_URL: SPLIT_APP, VITE_NETWORK: "testnet" },
       url: `${SPLIT_APP}/`,
       reuseExistingServer: true,
     },

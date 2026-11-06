@@ -32,6 +32,14 @@ export const Config = z.object({
 });
 export type Config = z.infer<typeof Config>;
 
+export const Deployment = z.object({
+  rpc_url: z.url(),
+  intents_id: AccountId,
+  options_id: AccountId,
+  quote_asset: z.string().startsWith("nep141:"),
+});
+export type Deployment = z.infer<typeof Deployment>;
+
 export const Settlement = z.object({ price: Amount, final_at: z.number().int() });
 export type Settlement = z.infer<typeof Settlement>;
 

@@ -22,16 +22,13 @@ afterEach(() => {
 describe("faucet", () => {
   it("refuses to start on mainnet", () => {
     const env = {
-      NEAR_RPC_URL: "https://rpc.example",
-      OPTIONS_ID: "opt.test",
-      QUOTE_ASSET: "nep141:usdc.test",
       RELAYER_ACCOUNT_ID: "relayer.test",
       RELAYER_PRIVATE_KEY: "ed25519:abc",
       MM_API_KEYS: "0123456789abcdef",
       DATA_DIR: "data",
     };
     expect(() => loadConfig({ ...env, NETWORK_ID: "mainnet", FAUCET: "true" })).toThrow("the faucet runs only on testnet");
-    expect(loadConfig({ ...env, NETWORK_ID: "mainnet", FAUCET: "false" }).FAUCET).toBe(false);
+    expect(() => loadConfig({ ...env, NETWORK_ID: "mainnet", FAUCET: "false" })).toThrow("no deploy/mainnet.json");
     expect(loadConfig({ ...env, NETWORK_ID: "testnet", FAUCET: "true" }).FAUCET).toBe(true);
     expect(loadConfig({ ...env, NETWORK_ID: "testnet" }).FAUCET).toBe(false);
   });

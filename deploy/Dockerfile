@@ -16,6 +16,7 @@ COPY apps apps
 RUN chmod -R a+rX /app && pnpm install --frozen-lockfile --filter '!@endline/docs' --filter '!@endline/web'
 
 FROM deps AS app
+COPY deploy/*.json deploy/
 RUN mkdir /data && chown node:node /data
 # else pnpm reinstalls into root-owned node_modules before every start
 ENV pnpm_config_verify_deps_before_run=false
