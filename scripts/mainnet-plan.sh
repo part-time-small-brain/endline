@@ -53,7 +53,7 @@ net="network-config mainnet"
 send="$net sign-with-legacy-keychain send"
 call="near contract call-function as-transaction"
 view="near contract call-function as-read-only"
-echo "# 0. Relayer and MM accounts, each with its own full-access key (their private keys are RELAYER_PRIVATE_KEY and MM_PRIVATE_KEY)"
+echo "# 0. Relayer and MM accounts, each with its own full-access key (the settler's RELAYER_PRIVATE_KEY, since request_settlement attaches NEAR, and MM_PRIVATE_KEY)"
 for account in "$relayer" "$mm"; do
   if [ "$(near_balance "$account")" -eq -1 ]; then
     echo "near account create-account fund-myself $account '3 NEAR' autogenerate-new-keypair save-to-legacy-keychain sign-as $root $send"
@@ -61,6 +61,8 @@ for account in "$relayer" "$mm"; do
     echo "# $account exists: needs ~3 NEAR and its key in ~/.near-credentials/mainnet/$account.json"
   fi
 done
+echo "# The relay only sends execute_intents: its RELAYER_PRIVATE_KEY is this function-call key, never the full-access one"
+echo "near account add-key $relayer grant-function-call-access --allowance unlimited --contract-account-id intents.near --function-names execute_intents autogenerate-new-keypair save-to-legacy-keychain $send"
 cat <<EOF
 
 # 1. Contract account. Its 8 NEAR (code storage, 2 NEAR reserve, series storage) can't be withdrawn once step 3 deletes its keys
