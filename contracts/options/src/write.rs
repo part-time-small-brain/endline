@@ -56,6 +56,8 @@ impl Contract {
                 .checked_add(used)
                 .expect("collateral overflow"),
         );
+        series.long_open = U128(series.long_open.0.checked_add(amount).expect("open overflow"));
+        series.short_open = U128(series.short_open.0.checked_add(amount).expect("open overflow"));
         self.series.insert(series_id.to_string(), series);
 
         self.deliver_options(

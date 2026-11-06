@@ -1577,3 +1577,203 @@ fn a_full_page_of_open_series_does_not_scan_expired_ones() {
     let gas = near_sdk::env::used_gas().as_gas();
     assert!(gas < 80_000_000_000_000, "{gas}");
 }
+
+const DELETE_AT: u64 = EXPIRY + 7 * DAY;
+
+fn transfers() -> Vec<(AccountId, u128)> {
+    get_created_receipts()
+        .into_iter()
+        .flat_map(|r| {
+            let receiver = r.receiver_id.clone();
+            r.actions.into_iter().filter_map(move |a| match a {
+                MockAction::Transfer { deposit, .. } => Some((receiver.clone(), deposit.as_yoctonear())),
+                _ => None,
+            })
+        })
+        .collect()
+}
+
+fn events_named(name: &str) -> Vec<Value> {
+    get_logs()
+        .iter()
+        .filter_map(|l| l.strip_prefix("EVENT_JSON:"))
+        .map(|l| serde_json::from_str::<Value>(l).unwrap())
+        .filter(|e| e["event"] == name)
+        .collect()
+}
+
+fn deletable(c: &Contract, id: &str) -> bool {
+    c.deletable_series(vec![id.into()]) == vec![id.to_string()]
+}
+
+#[test]
+fn a_paid_out_series_is_deleted_a_week_after_its_end_and_refunds_its_creator() {
+    let mut c = setup();
+    let id = create(&mut c, 110_000, W, OptionKind::Call);
+    let paid = c.get_series(id.clone()).unwrap().storage_paid.as_yoctonear();
+    assert!(paid > 0);
+    write(&mut c, USDC_ASSET, W * USD, &id);
+    let now = settle(&mut c, 116_000);
+    via_intents(
+        &mut c,
+        now,
+        &[wrapped(&id)],
+        &[BTC],
+        json!({"action": "exercise"}),
+    );
+    via_intents(
+        &mut c,
+        now,
+        &[wrapped(&short(&id))],
+        &[BTC],
+        json!({"action": "redeem"}),
+    );
+
+    ctx(acc("bob.near"), DELETE_AT - 1, 0);
+    assert!(!deletable(&c, &id));
+    panics_with("can't be deleted yet", || c.delete_series(vec![id.clone()]));
+
+    ctx(acc("bob.near"), DELETE_AT, 0);
+    assert!(deletable(&c, &id));
+    let before = near_sdk::env::storage_usage();
+    c.delete_series(vec![id.clone()]);
+    let freed = (before - near_sdk::env::storage_usage()) as u128;
+    let refund = near_sdk::env::storage_byte_cost().as_yoctonear() * freed;
+    assert!(refund > 0 && refund <= paid);
+    assert_eq!(transfers(), vec![(alice(), refund)]);
+    let deleted = &events_named("series_deleted")[0]["data"];
+    assert_eq!(
+        (&deleted["series_id"], &deleted["created_by"]),
+        (&json!(id), &json!("alice.near"))
+    );
+    assert!(c.get_series(id.clone()).is_none());
+    assert!(c.mt_supply(id.clone()).is_none());
+    assert!(c.list_series_by_expiry(0, None, None).is_empty());
+    panics_with("unknown series", || c.delete_series(vec![id.clone()]));
+    ctx(alice(), DELETE_AT, 10u128.pow(24));
+    panics_with("expiry in the past", || {
+        c.create_series(
+            "BTC".into(),
+            U128(110_000 * USD),
+            U128(W * USD),
+            EXPIRY,
+            OptionKind::Call,
+        );
+    });
+}
+
+#[test]
+fn a_series_that_still_owes_a_long_or_a_short_is_never_deleted() {
+    let mut c = setup();
+    let itm = create(&mut c, 110_000, W, OptionKind::Call);
+    let otm = create(&mut c, 120_000, W, OptionKind::Call);
+    write(&mut c, USDC_ASSET, W * USD, &itm);
+    write(&mut c, USDC_ASSET, W * USD, &otm);
+    ctx(acc("bob.near"), DELETE_AT, 0);
+    assert!(c.deletable_series(vec![itm.clone(), otm.clone()]).is_empty());
+
+    let now = settle(&mut c, 116_000);
+    via_intents(
+        &mut c,
+        now,
+        &[wrapped(&short(&itm))],
+        &[BTC],
+        json!({"action": "redeem"}),
+    );
+    ctx(acc("bob.near"), DELETE_AT + 30 * DAY, 0);
+    assert!(!deletable(&c, &itm), "an unexercised winning long is still owed");
+    assert!(
+        !deletable(&c, &otm),
+        "an unredeemed short is owed its collateral back"
+    );
+
+    via_intents(
+        &mut c,
+        DELETE_AT,
+        &[wrapped(&short(&otm))],
+        &[BTC],
+        json!({"action": "redeem"}),
+    );
+    via_intents(
+        &mut c,
+        DELETE_AT,
+        &[wrapped(&itm)],
+        &[BTC / 2],
+        json!({"action": "exercise"}),
+    );
+    ctx(acc("bob.near"), DELETE_AT, 0);
+    assert_eq!(
+        c.deletable_series(vec![itm.clone(), otm.clone()]),
+        vec![otm.clone()]
+    );
+    panics_with(&format!("{itm} can't be deleted yet"), || {
+        c.delete_series(vec![otm.clone(), itm.clone()])
+    });
+}
+
+#[test]
+fn open_counts_follow_every_close_path() {
+    let mut c = setup();
+    let id = create(&mut c, 110_000, W, OptionKind::Call);
+    write(&mut c, USDC_ASSET, W * USD, &id);
+    let open = |c: &Contract| {
+        let s = c.get_series(id.clone()).unwrap();
+        (s.long_open.0, s.short_open.0)
+    };
+    assert_eq!(open(&c), (BTC, BTC));
+    via_intents(
+        &mut c,
+        T0,
+        &[wrapped(&id), wrapped(&short(&id))],
+        &[BTC / 4, BTC / 4],
+        json!({"action": "burn_pair"}),
+    );
+    assert_eq!(open(&c), (BTC * 3 / 4, BTC * 3 / 4));
+    ctx(intents(), T0, 1);
+    c.mt_transfer(alice(), id.clone(), U128(BTC / 4), None, None);
+    let now = settle(&mut c, 116_000);
+    ctx(alice(), now, 1);
+    c.exercise(id.clone(), U128(BTC / 4));
+    assert_eq!(open(&c), (BTC / 2, BTC * 3 / 4));
+    via_intents(
+        &mut c,
+        now,
+        &[wrapped(&short(&id))],
+        &[BTC / 2],
+        json!({"action": "redeem"}),
+    );
+    assert_eq!(open(&c), (BTC / 2, BTC / 4));
+}
+
+#[test]
+fn an_unwritten_series_is_deleted_without_a_price_even_while_paused_and_refunds_are_summed_per_creator() {
+    let mut c = setup();
+    let a = create(&mut c, 110_000, W, OptionKind::Call);
+    let b = create(&mut c, 111_000, W, OptionKind::Call);
+    ctx(owner(), DELETE_AT, 1);
+    c.set_paused(true);
+    ctx(acc("bob.near"), DELETE_AT, 0);
+    c.delete_series(vec![a, b]);
+    let sent = transfers();
+    assert_eq!(sent.len(), 1);
+    assert_eq!(sent[0].0, alice());
+    assert_eq!(events_named("series_deleted").len(), 2);
+    panics_with("delete 1 to 20 series at a time", || c.delete_series(vec![]));
+    panics_with("delete 1 to 20 series at a time", || {
+        c.delete_series(vec!["x".into(); 21])
+    });
+}
+
+#[test]
+fn a_refund_that_bounces_is_reported_and_stays_in_the_contract() {
+    let mut c = setup();
+    callback_ctx(DELETE_AT, PromiseResult::Successful(vec![]));
+    c.on_storage_refund(alice(), NearToken::from_yoctonear(7));
+    assert!(events_named("storage_refund_failed").is_empty());
+    callback_ctx(DELETE_AT, PromiseResult::Failed);
+    c.on_storage_refund(alice(), NearToken::from_yoctonear(7));
+    assert_eq!(
+        events_named("storage_refund_failed")[0]["data"],
+        json!({"account_id": "alice.near", "amount": "7"})
+    );
+}

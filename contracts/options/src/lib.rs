@@ -1,5 +1,6 @@
 mod admin;
 mod close;
+mod delete;
 mod events;
 mod math;
 mod mt;
@@ -145,7 +146,7 @@ const MIN_ORACLE_DELAY_SEC: u64 = 60;
 const MAX_ORACLE_DELAY_SEC: u64 = 7 * 86_400;
 const ONE_YOCTO: NearToken = NearToken::from_yoctonear(1);
 
-fn charge_storage(storage_before: u64, keep: NearToken) {
+fn charge_storage(storage_before: u64, keep: NearToken) -> NearToken {
     let used = env::storage_usage().saturating_sub(storage_before);
     let cost = env::storage_byte_cost()
         .saturating_mul(used as u128)
@@ -158,6 +159,7 @@ fn charge_storage(storage_before: u64, keep: NearToken) {
             .transfer(refund)
             .detach();
     }
+    cost
 }
 
 fn is_intents_asset(asset: &str) -> bool {

@@ -82,7 +82,7 @@ impl Contract {
     }
 }
 
-fn promise_failed() -> bool {
+pub(crate) fn promise_failed() -> bool {
     matches!(env::promise_result_checked(0, 0), Err(PromiseError::Failed))
 }
 
