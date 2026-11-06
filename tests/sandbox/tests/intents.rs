@@ -872,3 +872,48 @@ async fn options_leave_intents_for_a_new_ledger_account_only_with_its_storage_pa
     );
     Ok(())
 }
+
+#[tokio::test]
+async fn payout_to_an_account_new_to_intents_arrives_and_nothing_goes_claimable() -> anyhow::Result<()> {
+    let env = setup().await?;
+    let (bob, tokens) = write_and_add_bob(&env).await?;
+    let usdc = asset(&env.usdc);
+    env.storage_deposit(&bob, bob.id(), STORAGE_DEPOSIT).await?;
+    env.alice
+        .call(env.intents.id(), "mt_withdraw")
+        .args_json(json!({"token": env.opt.id(), "receiver_id": bob.id(), "token_ids": tokens, "amounts": vec![CONTRACT.to_string(); 2]}))
+        .deposit(ONE_YOCTO)
+        .gas(MAX_GAS)
+        .transact()
+        .await?
+        .into_result()?;
+    assert_eq!(env.intents_balance(bob.id(), &usdc).await?, 0);
+
+    let close = bob
+        .call(env.opt.id(), "burn_pair")
+        .args_json(json!({"series_id": env.series, "amount": CONTRACT.to_string()}))
+        .deposit(ONE_YOCTO)
+        .gas(MAX_GAS)
+        .transact()
+        .await?;
+    assert!(close.is_success(), "{:?}", close.failures());
+    let payout = close
+        .receipt_outcomes()
+        .iter()
+        .find(|r| r.executor_id == *env.intents.id())
+        .unwrap()
+        .gas_burnt;
+    assert!(
+        payout.as_gas() * 2 <= Gas::from_tgas(20).as_gas(),
+        "intents mt_transfer to a new account burnt {payout}"
+    );
+    assert_eq!(env.intents_balance(bob.id(), &usdc).await?, WIDTH);
+    let claimable: String = env
+        .opt
+        .view("get_claimable")
+        .args_json(json!({"account_id": bob.id(), "asset": usdc}))
+        .await?
+        .json()?;
+    assert_eq!(claimable, "0");
+    Ok(())
+}
