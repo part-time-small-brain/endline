@@ -1,6 +1,6 @@
 import { m } from "motion/react";
 import { useEffect, useRef, useState } from "react";
-import type { TapState } from "../../hooks/useTaps.ts";
+import type { CallState } from "../../hooks/useCalls.ts";
 import type { GridCell } from "../../lib/grid.ts";
 import { formatMultiple } from "../../lib/money.ts";
 import { SideGlyph } from "../Glyphs.tsx";
@@ -28,7 +28,7 @@ interface Props {
   called: boolean;
   pays: string | undefined;
   blocked: boolean;
-  state: TapState | undefined;
+  state: CallState | undefined;
   onTap: (cell: GridCell) => void;
 }
 

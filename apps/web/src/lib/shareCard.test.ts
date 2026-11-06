@@ -29,8 +29,7 @@ describe("bestWin", () => {
     });
   });
 
-  it("adds up the main and Tap balances of one series, and shows what was sold back", () => {
-    expect(bestWin([stake(UNIT / 100n, 3n * USD), stake(UNIT / 100n, 3n * USD)], 81_400n * USD, 6)).toMatchObject({ result: "Won $8.00", detail: "Paid $6.00 · 1.3×" });
+  it("shows what was sold back, and counts it in the multiple", () => {
     expect(bestWin([stake(UNIT / 100n, 10n * USD, 9n * USD)], 81_400n * USD, 6)).toMatchObject({ result: "Won $4.00", detail: "Paid $10.00 · sold $9.00 back · 1.3×" });
   });
 
@@ -38,7 +37,6 @@ describe("bestWin", () => {
     expect(bestWin([stake(UNIT / 100n, 10n * USD)], 81_400n * USD, 6)).toBeUndefined();
     expect(bestWin([stake(UNIT, 10n * USD, 20n * USD)], 80_000n * USD, 6)).toBeUndefined();
     expect(bestWin([stake(UNIT, 0n)], 83_000n * USD, 6)).toBeUndefined();
-    expect(bestWin([stake(UNIT, 0n), stake(UNIT / 100n, 1n * USD)], 83_000n * USD, 6)).toBeUndefined();
     const both = [stake(UNIT / 100n, 1n * USD), stake(UNIT / 50n, 1n * USD, 0n, put)];
     expect(bestWin(both, 81_400n * USD, 6)?.title).toBe("BTC Up $81,000");
     expect(bestWin(both, 80_000n * USD, 6)?.title).toBe("BTC Down $81,000");

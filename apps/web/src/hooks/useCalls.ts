@@ -8,9 +8,10 @@ import { formatMultiple } from "../lib/money.ts";
 import { useWallet } from "../wallet/context.tsx";
 import { cachedSession, forgetSession, SESSION_PROMPT, signSession } from "../wallet/session.ts";
 import type { Wallet } from "../wallet/wallet.ts";
-import type { TapState } from "./useTaps.ts";
 
 const SHOWN_MS = 3_000;
+
+export type CallState = { status: "busy" } | { status: "done" } | { status: "failed" };
 
 function messageOf(error: unknown, wallet: Wallet): string {
   if (error instanceof RelayError && error.status === 401) return wallet.kind === "near" ? "Your wallet couldn't sign in. Enable it first if you haven't, the one-time step before your first buy, then tap again." : "Your wallet couldn't sign in. Tap again to sign in again.";
@@ -22,7 +23,7 @@ export function useCalls() {
   const { config, services } = useApp();
   const { wallet } = useWallet();
   const { quoteDecimals, reloadCalls } = useData();
-  const [states, setStates] = useState<Record<string, TapState>>({});
+  const [states, setStates] = useState<Record<string, CallState>>({});
   const [notice, setNotice] = useState<{ text: string; failed: boolean }>();
   const busy = useRef(new Set<string>());
   const owner = useRef(wallet);
@@ -39,7 +40,7 @@ export function useCalls() {
       if (!wallet || busy.current.has(id)) return;
       busy.current.add(id);
       setStates((current) => ({ ...current, [id]: { status: "busy" } }));
-      const finish = (state: TapState, text: string) => {
+      const finish = (state: CallState, text: string) => {
         if (owner.current !== wallet) return;
         busy.current.delete(id);
         setStates((current) => ({ ...current, [id]: state }));

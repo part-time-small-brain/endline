@@ -24,7 +24,7 @@ const fills = new Fills(mkdtempSync(join(tmpdir(), "relay-")));
 const auctions = new Auctions((event, mmId, response, receivedAt) => checkBid(chain, INTENTS, event, mmId, response, receivedAt));
 const hub = new MmHub([KEY], (mmId, response) => auctions.respond(mmId, response));
 const relay = new Relay({ config: { intents_id: INTENTS, options_id: OPTIONS, quote_asset: USDC }, chain, fills, auctions, mms: hub });
-const collector = new Collector(chain, { intents_id: INTENTS, options_id: OPTIONS, quote_asset: USDC, RELAYER_ACCOUNT_ID: "relayer.test" }, new Claims(mkdtempSync(join(tmpdir(), "relay-"))), fills);
+const collector = new Collector(chain, { intents_id: INTENTS, options_id: OPTIONS }, new Claims(mkdtempSync(join(tmpdir(), "relay-"))), fills);
 const oneClick = new OneClick(DEPOSIT.destinationAsset, "jwt");
 const calls = new Calls(chain, relay.sessions, () => hub.marks.best(Date.now()), mkdtempSync(join(tmpdir(), "relay-")));
 const server = createRelayServer(relay, fills, hub, collector, oneClick, calls);
@@ -76,10 +76,10 @@ describe("http", () => {
     ["malformed JSON", "/quote", "{", 400],
     ["a request that fails the schema", "/quote", JSON.stringify({ series_id: SERIES.id, side: "buy", size: "-1" }), 400],
     ["an execute with a malformed signed payload", "/execute", JSON.stringify({ signed: { standard: "nep413" } }), 400],
-    ["a transfer of nothing", "/transfer", JSON.stringify({ signed: session("alice.test") }), 400],
     ["a claim that is not a close", "/claims", JSON.stringify({ signed: { standard: "erc191", payload: "{}", signature: "secp256k1:x" } }), 400],
     ["an oversized body", "/publish", JSON.stringify({ pad: "x".repeat(70_000) }), 413],
     ["an unknown route", "/quote/extra", "{}", 404],
+    ["a transfer, which the relay no longer sends", "/transfer", JSON.stringify({ signed: session("alice.test") }), 404],
   ])("rejects %s", async (_, path, body, status) => {
     const response = await post(path, body);
     expect(response.status).toBe(status);
@@ -91,16 +91,15 @@ describe("http", () => {
     expect((await fetch(`http://${base}/health`)).status).toBe(200);
   });
 
-  it("rate limits quote, execute, transfer and claims per IP in a fixed window", async () => {
+  it("rate limits quote, execute and claims per IP in a fixed window", async () => {
     const limited = createRelayServer(relay, fills, hub, collector, oneClick, calls);
     await new Promise<void>((resolve) => limited.listen(0, "127.0.0.1", resolve));
     const url = `http://127.0.0.1:${(limited.address() as AddressInfo).port}`;
     const statusOf = async (path: string) => (await fetch(`${url}${path}`, { method: "POST", body: "{" })).status;
     try {
-      const paths = ["/quote", "/execute", "/transfer", "/claims"];
+      const paths = ["/quote", "/execute", "/claims"];
       for (let i = 0; i < 30; i++) expect(await statusOf(paths[i % paths.length]!)).toBe(400);
       expect(await statusOf("/quote")).toBe(429);
-      expect(await statusOf("/transfer")).toBe(429);
       expect(await statusOf("/calls")).toBe(429);
       expect(await statusOf("/faucet")).toBe(429);
       expect(await statusOf("/deposit-quote")).toBe(429);
@@ -284,7 +283,7 @@ describe("market maker socket", () => {
       mm.send("not json");
       mm.send(JSON.stringify({ method: "quote_response", params: { quote_id: event.quote_id, premium: "15000000", signed: mmSigned(event, 15_000_000n) } }));
     });
-    expect(await (await fetch(`http://${base}/health`)).json()).toEqual({ ok: true, market_makers: 1, relayer_id: "relayer.test" });
+    expect(await (await fetch(`http://${base}/health`)).json()).toEqual({ ok: true, market_makers: 1 });
 
     const signer = { standard: "nep413", signer_id: "alice.test" };
     const quoteResponse = await post("/quote", JSON.stringify({ series_id: SERIES.id, side: "buy", size: "1000000", signer, session: session("alice.test") }));

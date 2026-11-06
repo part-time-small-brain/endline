@@ -17,8 +17,6 @@ const data = (marks: Record<string, { series_id: string; ask: string; bid?: stri
   listing: { quote_asset: "usdc", quote_decimals: 6, series: [series] },
   balances: { "opt:BTC-X": 25_000_000n },
   fills: [],
-  tapBalances: undefined,
-  tapFills: undefined,
   settlements: {},
   marks,
   timing: { write_cutoff_sec: 1_800 },
@@ -47,23 +45,6 @@ describe("positions", () => {
     expect(positions(settled, finalAt + 60)?.[0]).toMatchObject({ status: "collect", payout: 500_000_000n });
   });
 
-  it("sorts both balances together, so a Tap payout ready to collect comes before a main bet that ended at $0", () => {
-    const finalAt = series.expiry + 3_600;
-    const put = { ...series, id: "BTC-P", kind: "put" as const, option_asset: "opt:BTC-P" };
-    const both = {
-      ...data(undefined),
-      listing: { quote_asset: "usdc", quote_decimals: 6, series: [series, put] },
-      balances: { "opt:BTC-P": 25_000_000n },
-      tapBalances: { "opt:BTC-X": 25_000_000n },
-      tapFills: [],
-      settlements: { [`BTC:${series.expiry}`]: { price: 83_000_000_000n, finalAt } },
-    };
-    expect(positions(both, finalAt + 60)?.map((v) => [v.series.id, v.status, v.tap])).toEqual([
-      ["BTC-X", "collect", true],
-      ["BTC-P", "expired", false],
-    ]);
-  });
-
   it("marks zero payouts expired and collected positions paid at finalAt without waiting", () => {
     const finalAt = series.expiry + 3_600;
     const settled = {
@@ -80,13 +61,13 @@ describe("positions", () => {
     expect(positions(paid, finalAt)?.[0]).toMatchObject({ status: "paid", payout: 500_000_000n });
   });
 
-  it("sums what a cell is worth across both balances, and shows P&L only when every bet in it has a price and a cost", () => {
+  it("values a held cell at the bid, counts what was sold back in its P&L, and shows P&L only with a price and a cost", () => {
     const marks = { "BTC-X": { series_id: "BTC-X", ask: "400000000", bid: "380000000", vol: 0.4 } };
     const fill = (side: "buy" | "sell", size: string, premium: string) => ({ quote_id: side, series_id: series.id, side, account_id: "user.near", size, premium, tx_hash: "tx", at_ms: NOW * 1_000 });
-    const both = (fills: ReturnType<typeof fill>[], tapFills: ReturnType<typeof fill>[], withMarks: Parameters<typeof data>[0] = marks) => holding(positions({ ...data(withMarks), fills, tapBalances: { "opt:BTC-X": 2_000_000n }, tapFills }, NOW) ?? [], series.id);
-    expect(both([fill("buy", "25000000", "80000000")], [])).toEqual({ value: 102_600_000n, pnl: undefined, change: undefined });
-    expect(both([fill("buy", "30000000", "90000000"), fill("sell", "5000000", "19000000")], [fill("buy", "2000000", "5000000")])).toEqual({ value: 102_600_000n, pnl: 26_600_000n, change: 0.28 });
-    expect(both([fill("buy", "25000000", "80000000")], [fill("buy", "2000000", "5000000")], {})).toEqual({ value: undefined, pnl: undefined, change: undefined });
+    const cell = (fills: ReturnType<typeof fill>[], withMarks: Parameters<typeof data>[0] = marks) => holding(positions({ ...data(withMarks), fills }, NOW) ?? [], series.id);
+    expect(cell([])).toEqual({ value: 95_000_000n, pnl: undefined, change: undefined });
+    expect(cell([fill("buy", "30000000", "80000000"), fill("sell", "5000000", "20000000")])).toEqual({ value: 95_000_000n, pnl: 35_000_000n, change: 0.4375 });
+    expect(cell([fill("buy", "25000000", "80000000")], {})).toEqual({ value: undefined, pnl: undefined, change: undefined });
     expect(holding([], series.id)).toEqual({ value: undefined, pnl: undefined, change: undefined });
   });
 

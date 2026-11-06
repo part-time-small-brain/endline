@@ -11,8 +11,8 @@ export const Intent = z.discriminatedUnion("intent", [
     intent: z.literal("transfer"),
     receiver_id: z.string(),
     tokens: z.record(z.string(), z.string()),
-    msg: z.string().exactOptional(),
-    min_gas: z.string().exactOptional(),
+    msg: z.string(),
+    min_gas: z.string(),
   }),
 ]);
 export type Intent = z.infer<typeof Intent>;
@@ -43,14 +43,6 @@ export function writeOptions(optionsContract: string, collateralAsset: string, c
     msg: JSON.stringify({ action: "write", series_id: seriesId }),
     min_gas: MIN_GAS,
   };
-}
-
-export function relayedTransfer(receiverId: string, relayerId: string, asset: string, amount: bigint, fee: bigint): Intent[] {
-  if (amount <= 0n) throw new Error("amount must be positive");
-  return [
-    { intent: "transfer", receiver_id: receiverId, tokens: amounts({ [asset]: amount }) },
-    { intent: "transfer", receiver_id: relayerId, tokens: amounts({ [asset]: fee }) },
-  ];
 }
 
 export function exerciseOptions(optionsContract: string, tokens: Diff): Intent {

@@ -45,10 +45,7 @@ export function PositionCard({ view, quoteDecimals, nowSec, onSellBack }: Props)
     <article className="rounded-md border border-rule bg-surface p-5">
       <header className="flex items-start justify-between gap-3">
         <div>
-          <h3 className="flex items-center gap-2 text-lg font-semibold">
-            {seriesTitle(series, quoteDecimals)}
-            {view.tap && <span className="rounded-md bg-well px-1.5 py-0.5 text-xs font-semibold text-ink-2">Tap</span>}
-          </h3>
+          <h3 className="text-lg font-semibold">{seriesTitle(series, quoteDecimals)}</h3>
           <p className="text-xs text-ink-2">{capLabel(series, quoteDecimals)}</p>
           <p className="text-sm text-ink-2">
             {ended ? "Ended" : "Ends"} {formatEnds(series.expiry)} <span className="text-ink-3">· {formatUtc(series.expiry)}</span>

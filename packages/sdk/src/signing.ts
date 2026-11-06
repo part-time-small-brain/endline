@@ -1,6 +1,5 @@
-import { ed25519 } from "@noble/curves/ed25519.js";
 import { sha256 } from "@noble/hashes/sha2.js";
-import { base58 as bs58, base64, hex } from "@scure/base";
+import { base64 } from "@scure/base";
 import { z } from "zod";
 import { Payload } from "./intents.ts";
 
@@ -56,18 +55,4 @@ function borshString(text: string): Uint8Array {
 
 export function nep413Hash({ message, nonce, recipient }: { message: string; nonce: string; recipient: string }): Uint8Array {
   return sha256(Uint8Array.from([...u32(NEP413_TAG), ...borshString(message), ...base64.decode(nonce), ...borshString(recipient), 0]));
-}
-
-export function implicitSigner(seed: Uint8Array) {
-  if (seed.length !== 32) throw new Error("an ed25519 seed is 32 bytes");
-  const key = ed25519.getPublicKey(seed);
-  const publicKey = `ed25519:${bs58.encode(key)}`;
-  return {
-    accountId: hex.encode(key),
-    publicKey,
-    sign(unsigned: Unsigned): Extract<SignedPayload, { standard: "nep413" }> {
-      if (unsigned.standard !== "nep413") throw new Error("an implicit key signs nep413 only");
-      return { ...unsigned, public_key: publicKey, signature: `ed25519:${bs58.encode(ed25519.sign(nep413Hash(unsigned.payload), seed))}` };
-    },
-  };
 }

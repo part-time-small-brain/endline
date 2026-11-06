@@ -9,8 +9,6 @@ export interface Relay {
   status(quoteId: string): Promise<StatusUpdate>;
   fills(accountId: string): Promise<Fill[]>;
   execute(signed: SignedPayload): Promise<string>;
-  transfer(signed: SignedPayload): Promise<string>;
-  relayerId(): Promise<string>;
   claim(signed: SignedPayload): Promise<void>;
   faucet(accountId: string): Promise<string>;
   call(request: CallRequest): Promise<Call>;
@@ -68,7 +66,6 @@ export function refusedOr<T>(request: Promise<T>, unconfirmed: string): Promise<
 
 const Executed = z.object({ tx_hash: z.string() });
 const Claimed = z.object({ ok: z.literal(true) });
-const Health = z.object({ relayer_id: z.string() });
 
 async function call<T>(url: string, schema: z.ZodType<T>, body?: unknown, signal: AbortSignal | null = null): Promise<T> {
   const init = body === undefined ? { signal } : { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body), signal };
@@ -90,8 +87,6 @@ export function httpRelay(baseUrl: string): Relay {
     status: (quoteId) => call(url(`/status/${encodeURIComponent(quoteId)}`), StatusUpdate),
     fills: (accountId) => call(url(`/fills/${encodeURIComponent(accountId)}`), Fill.array()),
     execute: async (signed) => (await call(url("/execute"), Executed, { signed })).tx_hash,
-    transfer: async (signed) => (await call(url("/transfer"), Executed, { signed })).tx_hash,
-    relayerId: async () => (await call(url("/health"), Health)).relayer_id,
     claim: async (signed) => {
       await call(url("/claims"), Claimed, { signed });
     },
