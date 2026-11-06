@@ -714,16 +714,74 @@ fn only_failed_payout_becomes_claimable() {
     });
 }
 
+fn delivered(c: &mut Contract, id: &str, result: PromiseResult) -> (u128, u128) {
+    callback_ctx(T0, result);
+    c.on_options_delivered(alice(), vec![id.into(), short(id)], vec![U128(BTC), U128(BTC)]);
+    (
+        c.get_undelivered(alice(), id.into()).0,
+        c.get_undelivered(alice(), short(id)).0,
+    )
+}
+
 #[test]
-fn rejected_delivery_returns_options_to_owner_on_ledger() {
+fn failed_delivery_stays_on_intents_and_is_recorded_for_retry() {
     let mut c = setup();
     let id = create(&mut c, 110_000, W, OptionKind::Call);
     write(&mut c, USDC_ASSET, W * USD, &id);
-    callback_ctx(T0, PromiseResult::Failed);
-    c.on_options_delivered(alice(), vec![id.clone(), short(&id)], vec![U128(BTC), U128(BTC)]);
-    assert_eq!(bal(&c, intents(), &id), 0);
-    assert_eq!(bal(&c, alice(), &id), BTC);
-    assert_eq!(bal(&c, alice(), &short(&id)), BTC);
+    assert_eq!(delivered(&mut c, &id, PromiseResult::Failed), (BTC, BTC));
+    assert_eq!(bal(&c, intents(), &id), BTC);
+    assert_eq!(bal(&c, alice(), &id), 0);
+    let event: Value = serde_json::from_str(get_logs()[0].strip_prefix("EVENT_JSON:").unwrap()).unwrap();
+    assert_eq!(event["event"], "delivery_failed");
+    assert_eq!(
+        event["data"],
+        json!({"owner_id": "alice.near", "token_ids": [id, short(&id)], "amounts": [BTC.to_string(), BTC.to_string()]})
+    );
+}
+
+#[test]
+fn delivery_records_what_intents_leaves_unused_up_to_the_amount_sent() {
+    let mut c = setup();
+    let id = create(&mut c, 110_000, W, OptionKind::Call);
+    write(&mut c, USDC_ASSET, W * USD, &id);
+    let unused = format!("[\"40\",\"{}\"]", 2 * BTC).into_bytes();
+    assert_eq!(
+        delivered(&mut c, &id, PromiseResult::Successful(unused)),
+        (40, BTC)
+    );
+    assert_eq!(bal(&c, intents(), &id), BTC);
+}
+
+#[test]
+fn anyone_can_retry_a_failed_delivery_and_a_failed_retry_is_recorded_again() {
+    let mut c = setup();
+    let id = create(&mut c, 110_000, W, OptionKind::Call);
+    write(&mut c, USDC_ASSET, W * USD, &id);
+    delivered(&mut c, &id, PromiseResult::Failed);
+
+    ctx(acc("bob.near"), T0, 1);
+    c.retry_delivery(alice(), vec![id.clone(), short(&id)]);
+    let deposits = calls("mt_on_transfer");
+    assert_eq!(deposits.len(), 1);
+    assert_eq!(deposits[0].0, intents());
+    assert_eq!(deposits[0].1["sender_id"], "opt.near");
+    assert_eq!(deposits[0].1["msg"], "alice.near");
+    assert_eq!(deposits[0].1["token_ids"], json!([id, short(&id)]));
+    assert_eq!(
+        deposits[0].1["amounts"],
+        json!([BTC.to_string(), BTC.to_string()])
+    );
+    assert_eq!(calls("on_options_delivered")[0].1["owner_id"], "alice.near");
+    panics_with("nothing undelivered for", || {
+        c.retry_delivery(alice(), vec![id.clone()])
+    });
+
+    assert_eq!(
+        delivered(&mut c, &id, PromiseResult::Successful(b"[\"0\",\"0\"]".to_vec())),
+        (0, 0)
+    );
+    assert_eq!(delivered(&mut c, &id, PromiseResult::Failed), (BTC, BTC));
+    assert_eq!(bal(&c, intents(), &id), BTC);
 }
 
 #[test]
@@ -787,12 +845,16 @@ fn override_after_final_rejected() {
 }
 
 #[test]
-fn successful_delivery_never_refunds_even_with_odd_result() {
+fn successful_delivery_never_records_anything_with_an_odd_result() {
     let mut c = setup();
     let id = create(&mut c, 110_000, W, OptionKind::Call);
     write(&mut c, USDC_ASSET, W * USD, &id);
-    callback_ctx(T0, PromiseResult::Successful(b"\"not a vec\"".to_vec()));
-    c.on_options_delivered(alice(), vec![id.clone(), short(&id)], vec![U128(BTC), U128(BTC)]);
+    for odd in [&b"\"not a vec\""[..], b"[\"5\"]", b"[\"0\",\"0\"]"] {
+        assert_eq!(
+            delivered(&mut c, &id, PromiseResult::Successful(odd.to_vec())),
+            (0, 0)
+        );
+    }
     assert_eq!(bal(&c, alice(), &id), 0);
     assert_eq!(bal(&c, intents(), &id), BTC);
 }

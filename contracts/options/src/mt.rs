@@ -148,7 +148,7 @@ impl Contract {
     }
 }
 
-fn unused_amounts(amounts: &[U128], to_intents: bool) -> Vec<u128> {
+pub(crate) fn unused_amounts(amounts: &[U128], to_intents: bool) -> Vec<u128> {
     let full = amounts.iter().map(|a| a.0).collect();
     let answer = match env::promise_result_checked(0, 4096) {
         Err(PromiseError::Failed) => return full,

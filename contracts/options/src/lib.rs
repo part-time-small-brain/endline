@@ -37,6 +37,7 @@ enum StorageKey {
     ListedExpiries,
     SeriesByExpiry,
     StorageCredits,
+    Undelivered,
 }
 
 #[near(serializers = [borsh, json])]
@@ -86,6 +87,7 @@ pub struct Contract {
     listed_expiries: LookupSet<(String, u64)>,
     series_by_expiry: TreeMap<(u64, String), ()>,
     storage_credits: LookupMap<AccountId, u128>,
+    undelivered: LookupMap<(AccountId, String), u128>,
 }
 
 #[near]
@@ -139,6 +141,7 @@ impl Contract {
             listed_expiries: LookupSet::new(StorageKey::ListedExpiries),
             series_by_expiry: TreeMap::new(StorageKey::SeriesByExpiry),
             storage_credits: LookupMap::new(StorageKey::StorageCredits),
+            undelivered: LookupMap::new(StorageKey::Undelivered),
         }
     }
 }

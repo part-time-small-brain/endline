@@ -93,4 +93,13 @@ impl Contract {
     pub fn get_claimable(&self, account_id: AccountId, asset: String) -> U128 {
         U128(self.claimable.get(&(account_id, asset)).copied().unwrap_or(0))
     }
+
+    pub fn get_undelivered(&self, account_id: AccountId, token_id: String) -> U128 {
+        U128(
+            self.undelivered
+                .get(&(account_id, token_id))
+                .copied()
+                .unwrap_or(0),
+        )
+    }
 }

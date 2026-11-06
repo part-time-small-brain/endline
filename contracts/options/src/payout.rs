@@ -1,9 +1,9 @@
 use near_sdk::json_types::U128;
 use near_sdk::serde::Serialize;
-use near_sdk::{assert_one_yocto, env, ext_contract, near, AccountId, Gas, PromiseError};
+use near_sdk::{assert_one_yocto, env, ext_contract, near, require, AccountId, Gas, PromiseError};
 
 use crate::events;
-use crate::mt::ext_mt_receiver;
+use crate::mt::{ext_mt_receiver, unused_amounts, MAX_BATCH};
 use crate::{Contract, ContractExt, ONE_YOCTO};
 
 const GAS_INTENTS_TRANSFER: Gas = Gas::from_tgas(20);
@@ -29,6 +29,14 @@ struct PayoutFailed<'a> {
     owner_id: &'a AccountId,
     asset: &'a str,
     amount: U128,
+}
+
+#[derive(Serialize)]
+#[serde(crate = "near_sdk::serde")]
+struct DeliveryFailed<'a> {
+    owner_id: &'a AccountId,
+    token_ids: Vec<String>,
+    amounts: Vec<U128>,
 }
 
 #[near]
@@ -61,23 +69,47 @@ impl Contract {
         }
     }
 
+    #[payable]
+    pub fn retry_delivery(&mut self, owner_id: AccountId, token_ids: Vec<String>) {
+        assert_one_yocto();
+        require!(
+            !token_ids.is_empty() && token_ids.len() <= MAX_BATCH,
+            "batch size"
+        );
+        let amounts = token_ids
+            .iter()
+            .map(|token_id| {
+                self.undelivered
+                    .remove(&(owner_id.clone(), token_id.clone()))
+                    .map(U128)
+                    .unwrap_or_else(|| env::panic_str(&format!("nothing undelivered for {token_id}")))
+            })
+            .collect();
+        self.notify_intents(&owner_id, token_ids, amounts);
+    }
+
     #[private]
     pub fn on_options_delivered(&mut self, owner_id: AccountId, token_ids: Vec<String>, amounts: Vec<U128>) {
-        if !promise_failed() {
-            return;
-        }
-        let intents_id = self.intents_id.clone();
-        for (token_id, amount) in token_ids.iter().zip(&amounts) {
-            let back = amount.0.min(self.balance_of(&intents_id, token_id));
-            if back > 0 {
-                self.internal_transfer(
-                    &intents_id,
-                    &owner_id,
-                    token_id,
-                    back,
-                    Some("intents deposit failed"),
-                );
+        let unused = unused_amounts(&amounts, true);
+        let mut failed = DeliveryFailed {
+            owner_id: &owner_id,
+            token_ids: vec![],
+            amounts: vec![],
+        };
+        for ((token_id, amount), unused) in token_ids.into_iter().zip(&amounts).zip(unused) {
+            let missed = unused.min(amount.0);
+            if missed == 0 {
+                continue;
             }
+            let key = (owner_id.clone(), token_id.clone());
+            let current = self.undelivered.get(&key).copied().unwrap_or(0);
+            self.undelivered
+                .insert(key, current.checked_add(missed).expect("undelivered overflow"));
+            failed.token_ids.push(token_id);
+            failed.amounts.push(U128(missed));
+        }
+        if !failed.token_ids.is_empty() {
+            events::options("delivery_failed", &failed);
         }
     }
 }
@@ -118,8 +150,12 @@ impl Contract {
         for (token_id, amount) in token_ids.iter().zip(&amounts) {
             self.internal_transfer(&me, &intents_id, token_id, *amount, Some("deposit to intents"));
         }
-        let amounts: Vec<U128> = amounts.into_iter().map(U128).collect();
-        ext_mt_receiver::ext(intents_id)
+        self.notify_intents(owner_id, token_ids, amounts.into_iter().map(U128).collect());
+    }
+
+    fn notify_intents(&self, owner_id: &AccountId, token_ids: Vec<String>, amounts: Vec<U128>) {
+        let me = env::current_account_id();
+        ext_mt_receiver::ext(self.intents_id.clone())
             .with_static_gas(GAS_INTENTS_DEPOSIT)
             .mt_on_transfer(
                 me.clone(),

@@ -37,6 +37,7 @@ description: The rules every change keeps, what each actor can do, and the gaps 
 | Missing price | Market stays pending. No fallback payout formula. `burn_pair` always works |
 | Settlement-window games | Writes and quotes stop at the TWAP window start |
 | Storage paid by the contract | New ledger rows from intents withdrawals are paid from the receiver's `storage_deposit` credit, other ledger transfers by the sender. The contract's intents row stays at zero, so writes never re-create it |
+| Failed option delivery | Options stay in the contract's intents row and are recorded per owner; anyone can resend them with `retry_delivery`, so intents-only owners (EVM, passkey) never need to call the contract |
 | Double exercise | Ledger closes burn before paying; intents closes park tokens in the contract's intents balance |
 | Tampered deposit quote | The relay passes on a 1Click deposit quote, and the app shows it, only if 1Click's signature over the request the app sent and the quote verifies. The app also refuses quotes losing more than 3% or carrying a memo, and shows what arrives |
 | Relay or MM skewing the ticket's prices | The ticket's cost, size, chance and values come from the relay's `GET /marks`, so a lying relay or MM sets what it shows. Funds stay safe: the firm quote comes from the auction and the pre-sign card shows the exact `token_diff` the wallet signs |
@@ -54,7 +55,7 @@ description: The rules every change keeps, what each actor can do, and the gaps 
 | Gap | Detail |
 |---|---|
 | No audit | The contract, relay and app haven't had an external audit |
-| Contract NEAR reserve | If the contract's NEAR falls below its storage needs, failed payouts can't be recorded as claimable and new settlements can't be stored. The monitor alerts below 2 NEAR over storage |
+| Contract NEAR reserve | If the contract's NEAR falls below its storage needs, failed payouts and deliveries can't be recorded and new settlements can't be stored. The monitor alerts below 2 NEAR over storage |
 | `/deposit-quote` is an open on-ramp under our 1Click key | It has no session, so a bot can quote deposits into any intents account. Fees can't be redirected and a 60/min cap protects the key, but heavy use can block deposit quotes for everyone for up to a minute |
 | Quote spam is bounded | Someone holding enough premium can keep a series' inventory reserved without trading |
 | Sessions aren't bound to this app | A session is an empty intents payload, accepted by any service using the same scheme |

@@ -85,6 +85,7 @@ Writes close `write_cutoff_sec` before expiry. Exercise and redeem need a final 
 |---|---|---|
 | `exercise(token_id, amount)`, `redeem(...)`, `burn_pair(series_id, amount)` | Holder on the contract's own ledger | 1 yocto. Pays into the caller's intents balance |
 | `withdraw_claimable(owner_id, asset)` | Anyone | 1 yocto. Retries a failed payout, always to `owner_id` |
+| `retry_delivery(owner_id, token_ids)` | Anyone | 1 yocto, max 10 tokens. Resends options whose deposit into `owner_id`'s intents balance failed or came back unused (`get_undelivered`). Until then they sit in the contract's intents ledger row |
 | `storage_deposit(account_id?, registration_only?)` | Anyone | NEP-145 subset. The attached NEAR, minus its own record, becomes `account_id`'s storage credit (default: the caller). It pays for new balance rows when options leave intents to this ledger. Can't be withdrawn; `registration_only: true` is rejected |
 | `request_settlement(underlying, expiry)` | Anyone | Attach ≥ 0.01 NEAR, 300 TGas (less is refused). From expiry + 5 min until expiry + `oracle_window_sec` |
 | `propose_settlement(underlying, expiry, price)` | Oracle account | 1 yocto. Manual fallback. Needs a listed series at that expiry, only from expiry + `oracle_window_sec`, once per key |
@@ -104,14 +105,14 @@ An intents `mt_withdraw` of option tokens to an account with no balance row for 
 
 ## Views
 
-`get_config` (includes `pending_owner_id`, `oracle_delay_sec`), `get_oracle_wasm` and `get_oracles` (in force now), `get_pending_oracle_changes`, `get_underlyings`, `get_series`, `list_series(from_index, limit ≤ 200)` (every series ever listed), `list_series_by_expiry(from_expiry, after_id, limit ≤ 200)` (series with `expiry ≥ from_expiry` in `(expiry, id)` order; for the next page pass the last one's `expiry` and `id` as `from_expiry` and `after_id`), `get_settlement(underlying, expiry)`, `get_claimable(account_id, asset)`, NEP-145 `storage_balance_of(account_id)` (`total` and `available` are both the credit left), and NEP-245 `mt_balance_of`, `mt_batch_balance_of`, `mt_supply`, `mt_batch_supply`, `mt_token`.
+`get_config` (includes `pending_owner_id`, `oracle_delay_sec`), `get_oracle_wasm` and `get_oracles` (in force now), `get_pending_oracle_changes`, `get_underlyings`, `get_series`, `list_series(from_index, limit ≤ 200)` (every series ever listed), `list_series_by_expiry(from_expiry, after_id, limit ≤ 200)` (series with `expiry ≥ from_expiry` in `(expiry, id)` order; for the next page pass the last one's `expiry` and `id` as `from_expiry` and `after_id`), `get_settlement(underlying, expiry)`, `get_claimable(account_id, asset)`, `get_undelivered(account_id, token_id)`, NEP-145 `storage_balance_of(account_id)` (`total` and `available` are both the credit left), and NEP-245 `mt_balance_of`, `mt_batch_balance_of`, `mt_supply`, `mt_batch_supply`, `mt_token`.
 
 `mt_supply` includes retired tokens: options closed through intents stay in the contract's intents balance and are never burned. Open interest = supply minus the contract's own intents balance of that token.
 
 ## Events
 
 - NEP-245 `mt_mint`, `mt_burn`, `mt_transfer` (`standard: "nep245"`, `version: "1.0.0"`).
-- `endline` `1.0.0`: `series_created`, `write`, `exercise`, `redeem` and `burn_pair` (each with its USDC `payout`), `settlement_proposed`, `settlement_overridden`, `payout_failed` (`owner_id`, `asset`, `amount`: now claimable).
+- `endline` `1.0.0`: `series_created`, `write`, `exercise`, `redeem` and `burn_pair` (each with its USDC `payout`), `settlement_proposed`, `settlement_overridden`, `payout_failed` (`owner_id`, `asset`, `amount`: now claimable), `delivery_failed` (`owner_id`, `token_ids`, `amounts`: now in `get_undelivered`, resend with `retry_delivery`).
 
 ## Testnet underlyings
 
