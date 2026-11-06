@@ -40,7 +40,7 @@ Without a wallet: `pnpm install && VITE_MOCK=1 pnpm --filter @endline/web dev`, 
 
 | | Testnet |
 |---|---|
-| Options contract | `opt4.near-options-dev.testnet` |
+| Options contract | `opt5.near-options-dev.testnet` |
 | Intents (copy of the mainnet wasm) | `intents.near-options-dev.testnet` |
 | USDC (mock, 6 decimals) | `usdc.near-options-dev.testnet` |
 | Oracle WASM | pinned by sha256 on the contract (`get_oracle_wasm`); the testnet proposer runs it as the manual oracle `oracle.near-options-dev.testnet` |

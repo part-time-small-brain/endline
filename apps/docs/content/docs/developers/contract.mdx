@@ -7,7 +7,7 @@ NEP-245 multi-token contract with per-series collateral accounting. Rust, near-s
 
 | Network | Account |
 |---|---|
-| Testnet | `opt4.near-options-dev.testnet` (intents: `intents.near-options-dev.testnet`) |
+| Testnet | `opt5.near-options-dev.testnet` (intents: `intents.near-options-dev.testnet`) |
 | Mainnet | Not deployed |
 
 ## Init
@@ -45,7 +45,7 @@ Every series is capped: a call (Up) pays `S−K` and a put (Down) pays `K−S`, 
 |---|---|---|
 | Long (the option) | series id | `BTC-27NOV26-110000_112000-C` |
 | Short (writer's claim on leftover collateral) | series id + `-SHORT` | `BTC-27NOV26-110000_112000-C-SHORT` |
-| Inside intents | `nep245:<contract>:<token id>` | `nep245:opt4.near-options-dev.testnet:BTC-27NOV26-110000_112000-C` |
+| Inside intents | `nep245:<contract>:<token id>` | `nep245:opt5.near-options-dev.testnet:BTC-27NOV26-110000_112000-C` |
 
 Option token decimals are the underlying's `decimals` from `add_underlying`. One whole token is one contract on one whole underlying.
 
@@ -77,7 +77,7 @@ Users reach the contract only through a signed intents `transfer` with `msg`, wh
 Writes close `write_cutoff_sec` before expiry. Exercise and redeem need a final price.
 
 ```json
-{"intent":"transfer","receiver_id":"opt4.near-options-dev.testnet","tokens":{"nep141:usdc.near-options-dev.testnet":"2000000000"},
+{"intent":"transfer","receiver_id":"opt5.near-options-dev.testnet","tokens":{"nep141:usdc.near-options-dev.testnet":"2000000000"},
  "msg":"{\"action\":\"write\",\"series_id\":\"BTC-27NOV26-110000_112000-C\"}","min_gas":"100000000000000"}
 ```
 
