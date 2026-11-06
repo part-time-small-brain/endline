@@ -51,22 +51,24 @@ async function tick(chain: Chain, config: Config): Promise<void> {
   const nowSec = Math.floor(Date.now() / 1000);
   const wanted = terms.paused ? [] : targets(terms, markets, nowSec, config.settings.maxSeriesUsd);
   const ids = new Set(listed.map((s) => s.id));
-  for (const t of wanted.filter((t) => !ids.has(t.id))) {
-    if (await attempt(`create ${t.id}`, () => chain.createSeries(t.underlying, t.strike, t.width, t.expiry, t.kind, CREATE_DEPOSIT))) ids.add(t.id);
-  }
-
-  const open = wanted.filter((t) => ids.has(t.id));
   const recent = watched(listed, nowSec);
   const long = (id: string) => intentsAssetId(config.optionsId, id);
   const short = (id: string) => intentsAssetId(config.optionsId, shortTokenId(id));
-  const tokenIds = [...new Set([...open.map((t) => t.id), ...recent.map((s) => s.id)])];
+  const tokenIds = [...new Set([...wanted.map((t) => t.id), ...recent.map((s) => s.id)])];
   const assets = [terms.quoteAsset, ...tokenIds.flatMap((id) => [long(id), short(id)])];
   const balances = new Map<string, bigint>();
   for (let i = 0; i < assets.length; i += BALANCE_PAGE) for (const [a, v] of await chain.balances(assets.slice(i, i + BALANCE_PAGE))) balances.set(a, v);
   const held = (asset: string) => balances.get(asset) ?? 0n;
 
-  const longs = new Map(open.map((t) => [t.id, held(long(t.id))]));
-  for (const w of planWrites(open, markets, terms, longs, balances)) {
+  const longs = new Map(wanted.map((t) => [t.id, held(long(t.id))]));
+  const writes = new Map(planWrites(wanted, markets, terms, longs, balances).map((w) => [w.id, w]));
+  for (const t of [...wanted.filter((t) => writes.has(t.id)), ...wanted.filter((t) => !writes.has(t.id))]) {
+    if (!ids.has(t.id)) {
+      if (!(await attempt(`create ${t.id}`, () => chain.createSeries(t.underlying, t.strike, t.width, t.expiry, t.kind, CREATE_DEPOSIT)))) continue;
+      ids.add(t.id);
+    }
+    const w = writes.get(t.id);
+    if (!w) continue;
     await attempt(`write ${w.id} with ${w.collateral} ${terms.quoteAsset}`, () =>
       chain.submit(writeOptions(config.optionsId, terms.quoteAsset, w.collateral, w.id), Date.now() + WRITE_TTL_MS),
     );
@@ -109,5 +111,5 @@ async function tick(chain: Chain, config: Config): Promise<void> {
     const batch = done.slice(i, i + DELETE_BATCH);
     await attempt(`delete ${batch.join(", ")}`, () => chain.deleteSeries(batch));
   }
-  console.log(`list: ${wanted.length} targets, ${open.length} listed${terms.paused ? ", contract paused" : ""}`);
+  console.log(`list: ${wanted.length} targets, ${wanted.filter((t) => ids.has(t.id)).length} listed${terms.paused ? ", contract paused" : ""}`);
 }

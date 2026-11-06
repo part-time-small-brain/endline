@@ -2,16 +2,26 @@ import { CLAIM_WINDOW_SEC, closeOptions, exerciseOptions, intentsAssetId, type S
 import { expect, it, vi } from "vitest";
 import type { Config } from "./config.ts";
 import { listCommand } from "./list.ts";
+import type { Target } from "./listing.ts";
 
 const EXPIRY = 1_800_000_000;
 const SHORT = intentsAssetId("opt.testnet", "BTC-P-SHORT");
-const chain = vi.hoisted(() => ({ series: [] as (Series & { created_by?: string })[], submitted: [] as unknown[], deletable: [] as string[], deleted: [] as string[][], held: {} as Record<string, bigint>, price: "1", viewDown: false }));
+const chain = vi.hoisted(() => ({ series: [] as (Series & { created_by?: string })[], submitted: [] as unknown[], deletable: [] as string[], deleted: [] as string[][], held: {} as Record<string, bigint>, price: "1", viewDown: false, paused: true, wanted: undefined as Target[] | undefined, actions: [] as string[] }));
 
 vi.mock("node:timers/promises", () => ({ setTimeout: async () => {} }));
+vi.mock("./deribit.ts", () => ({ indexPrice: async () => 76_000 }));
+vi.mock("./listing.ts", async (load) => {
+  const real = await load<typeof import("./listing.ts")>();
+  return { ...real, targets: (...args: Parameters<typeof real.targets>) => chain.wanted ?? real.targets(...args) };
+});
 vi.mock("./chain.ts", () => ({
   Chain: class {
-    listingTerms = async () => ({ paused: true, quoteAsset: "nep141:usdc", quoteDecimals: 6, writeCutoffSec: 1_800 });
-    underlyings = async () => [];
+    listingTerms = async () => ({ paused: chain.paused, quoteAsset: "nep141:usdc", quoteDecimals: 6, writeCutoffSec: 1_800 });
+    underlyings = async () => (chain.paused ? [] : [{ symbol: "BTC", index: "btc_usd", decimals: 8, minWrite: 1n }]);
+    createSeries = async (_underlying: string, strike: bigint) => {
+      chain.actions.push(`create ${strike}`);
+      return "tx";
+    };
     seriesFrom = async (fromExpiry: number) => chain.series.filter((s) => s.expiry >= fromExpiry);
     balances = async (assets: string[]) => new Map(assets.map((a) => [a, chain.held[a] ?? 0n]));
     settlement = async () => ({ price: chain.price, final_at: EXPIRY + 3_600 });
@@ -24,6 +34,7 @@ vi.mock("./chain.ts", () => ({
       return "tx";
     };
     submit = async (intent: unknown) => {
+      chain.actions.push("write");
       chain.submitted.push(intent);
       return "tx";
     };
@@ -90,4 +101,21 @@ it("finishes the pass and logs it when the contract can't say what's deletable",
   chain.viewDown = false;
   expect(chain.deleted).toEqual([]);
   expect(log).toHaveBeenCalledWith(expect.stringMatching(/^list: \d+ targets/));
+});
+
+it("writes each new series right after creating it, so a fresh contract gets prices before the whole listing is created", async () => {
+  vi.spyOn(console, "log").mockImplementation(() => {});
+  vi.spyOn(Date, "now").mockReturnValue((EXPIRY - 86_400) * 1000);
+  const target = (strike: bigint): Target => ({ id: `BTC-${strike}-C`, underlying: "BTC", kind: "call", strike, width: 1_000_000_000n, expiry: EXPIRY, usd: 1_000 });
+  chain.series = [];
+  chain.held = { "nep141:usdc": 10n ** 12n };
+  chain.paused = false;
+  chain.wanted = [target(1n), target(2n), target(3n)];
+  chain.actions = [];
+
+  await listCommand({ optionsId: "opt.testnet", accountId: "mm.testnet", settings: { maxSeriesUsd: 1 } } as Config, true);
+
+  chain.paused = true;
+  chain.wanted = undefined;
+  expect(chain.actions).toEqual(["create 1", "write", "create 2", "write", "create 3", "write"]);
 });
