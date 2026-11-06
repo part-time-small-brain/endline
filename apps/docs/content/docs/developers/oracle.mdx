@@ -62,7 +62,7 @@ The run uses the latest 08:00 UTC fixing at least one minute in the past. Logic 
 
 | Step | Rule |
 |---|---|
-| `request_settlement(underlying, expiry)` | Anyone. Needs a series at that expiry, `E + 300 ≤ now < E + oracle_window_sec`, no existing proposal, no request in flight. Attach ≥ 0.01 NEAR (a run costs about 0.0012, the rest is refunded), 300 TGas (less is refused) |
+| `request_settlement(underlying, expiry)` | Anyone. Needs a series at that expiry, `E + 300 ≤ now < E + oracle_window_sec`, no existing proposal, no request in flight. Attach ≥ 0.01 NEAR (a run costs about 0.0012 and OutLayer refunds the unused part to the caller; if OutLayer rejects `request_execution` outright, the deposit goes back to the options contract and stays there), 300 TGas (less is refused) |
 | OutLayer call | `request_execution` with the pinned `{url, hash}`, build target `wasm32-wasip2`. The yield times out after 200 blocks (about 2 min) |
 | `on_settlement_result` | Never panics. Requires `ok`, the echoed `index` and `expiry`, and `price > 0`. Anything else is logged and nothing is stored |
 | Proposed | Final at `now + dispute_window_sec`. The owner may override before then |
