@@ -38,7 +38,7 @@ decimals() {
 
 [[ $url == https://* && $url != *[\'\"\ ]* ]] || fail "ORACLE_WASM_URL must be https:// without quotes or spaces"
 [[ $sha =~ ^[0-9a-f]{64}$ ]] || fail "ORACLE_WASM_SHA256 must be 64 lowercase hex chars"
-git -C "$repo" diff --quiet HEAD -- contracts/options || fail "contracts/options has uncommitted changes"
+[ -z "$(git -C "$repo" status --porcelain -- contracts/options Cargo.toml Cargo.lock)" ] || fail "contracts/options, Cargo.toml or Cargo.lock has uncommitted changes"
 [ -e "$HOME/.near-credentials/mainnet/$root.json" ] || [ -d "$HOME/.near-credentials/mainnet/$root" ] || fail "import $root into the legacy keychain (~/.near-credentials/mainnet)"
 [ "$(curl -sfL "$url" | shasum -a 256 | cut -d' ' -f1)" = "$sha" ] || fail "$url does not serve sha256 $sha"
 balance="$(near_balance "$root")"
@@ -46,7 +46,7 @@ balance="$(near_balance "$root")"
 [ "$(near_balance "$opt")" -eq -1 ] || fail "$opt already exists: the contract is not upgradeable, pick a new account"
 [ "$(near_balance "$oracle")" -ge 0 ] || fail "$oracle does not exist"
 [ "$(decimals "$usdc")" = 6 ] || fail "$usdc is not 6 decimals"
-(cd "$repo/contracts/options" && cargo near build non-reproducible-wasm >&2)
+(cd "$repo/contracts/options" && cargo near build reproducible-wasm >&2)
 echo "preflight ok. Contract $(git -C "$repo" rev-parse --short HEAD), wasm sha256 $(shasum -a 256 "$wasm" | cut -d' ' -f1)" >&2
 
 net="network-config mainnet"
