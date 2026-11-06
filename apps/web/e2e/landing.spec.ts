@@ -1,4 +1,4 @@
-import type { Page } from "@playwright/test";
+import type { CDPSession, Page } from "@playwright/test";
 import { expect, handleOf, money, settle, sideways, test, valueOf } from "./fixtures.ts";
 
 const hero = (page: Page) => page.locator("#top");
@@ -12,6 +12,41 @@ async function horizon(page: Page) {
     return { band: band.getBoundingClientRect().top, handle: handle.top + handle.height / 2, titleBottom: title.bottom, titleHeight: title.height };
   });
 }
+
+async function pixels(page: Page, x: number, y: number, width: number, height: number) {
+  return hero(page)
+    .locator("canvas")
+    .evaluate(
+      (canvas: HTMLCanvasElement, area) => {
+        const box = canvas.getBoundingClientRect();
+        const scale = canvas.width / box.width;
+        const copy = document.createElement("canvas");
+        copy.width = area.width * scale;
+        copy.height = area.height * scale;
+        const ctx = copy.getContext("2d", { willReadFrequently: true }) as CanvasRenderingContext2D;
+        ctx.drawImage(canvas, (area.x - box.left) * scale, (area.y - box.top) * scale, copy.width, copy.height, 0, 0, copy.width, copy.height);
+        return Array.from(ctx.getImageData(0, 0, copy.width, copy.height).data);
+      },
+      { x, y, width, height },
+    );
+}
+
+function tintOf(data: number[]) {
+  let up = 0;
+  let down = 0;
+  for (let i = 0; i < data.length; i += 4) {
+    const [r = 0, g = 0, , a = 0] = data.slice(i, i + 4);
+    if (a > 64 && g - r > 60) up++;
+    if (a > 64 && r - g > 60) down++;
+  }
+  return up && down ? "mixed" : up ? "up" : down ? "down" : "none";
+}
+
+async function tints(page: Page, x: number, y: number) {
+  return { above: tintOf(await pixels(page, x - 30, y - 30, 60, 24)), below: tintOf(await pixels(page, x - 30, y + 6, 60, 24)) };
+}
+
+const cursorLineOpacity = (page: Page) => hero(page).locator("canvas + div").evaluate((line) => Number(getComputedStyle(line).opacity));
 
 test.beforeEach(async ({ page }) => {
   await page.goto("/");
@@ -145,4 +180,85 @@ test("every funding chain shows a loaded logo", async ({ page }) => {
   for (const chain of await chains.all()) {
     await expect.poll(() => chain.locator("img").evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth)).toBeGreaterThan(0);
   }
+});
+
+test("hero dots split Up and Down around the cursor, fade when it leaves, then idle and follow the theme", async ({ page }) => {
+  test.skip(test.info().project.use.isMobile === true, "needs a hovering pointer");
+  const canvas = hero(page).locator("canvas");
+  await canvas.evaluate((element: HTMLCanvasElement) => {
+    const clear = CanvasRenderingContext2D.prototype.clearRect;
+    element.dataset.draws = "0";
+    CanvasRenderingContext2D.prototype.clearRect = function (this: CanvasRenderingContext2D, ...args: Parameters<typeof clear>) {
+      if (this.canvas === element) element.dataset.draws = String(Number(element.dataset.draws) + 1);
+      return clear.apply(this, args);
+    };
+  });
+  const drawsWhileWaiting = async () => {
+    const before = Number(await canvas.getAttribute("data-draws"));
+    await page.waitForTimeout(300);
+    return Number(await canvas.getAttribute("data-draws")) - before;
+  };
+  const spot = { x: 40, y: 320 };
+  expect(await tints(page, spot.x, spot.y)).toEqual({ above: "none", below: "none" });
+  await page.mouse.move(spot.x, spot.y);
+  await expect.poll(() => tints(page, spot.x, spot.y)).toEqual({ above: "up", below: "down" });
+  await expect(canvas).not.toHaveAttribute("data-draws", "0");
+  await expect.poll(() => cursorLineOpacity(page)).toBeGreaterThan(0.8);
+  const line = await hero(page).locator("canvas + div").boundingBox();
+  expect(line && [line.x + line.width / 2, line.y + line.height / 2]).toEqual([spot.x, spot.y]);
+  await expect.poll(drawsWhileWaiting).toBe(0);
+
+  const nav = page.getByRole("navigation", { name: "Main" });
+  const box = await nav.boundingBox();
+  if (!box) throw new Error("no nav");
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await expect.poll(() => tints(page, spot.x, spot.y)).toEqual({ above: "none", below: "none" });
+  await expect.poll(() => cursorLineOpacity(page)).toBeLessThan(0.01);
+  await expect.poll(drawsWhileWaiting).toBe(0);
+
+  const dark = test.info().project.use.colorScheme === "dark";
+  const corner = await canvas.boundingBox();
+  if (!corner) throw new Error("no canvas");
+  const whiteDots = async () => {
+    const data = await pixels(page, corner.x, corner.y, 18, 18);
+    let solidest = 0;
+    for (let i = 4; i < data.length; i += 4) if ((data[i + 3] ?? 0) > (data[solidest + 3] ?? 0)) solidest = i;
+    return (data[solidest] ?? 0) > 128;
+  };
+  expect(await whiteDots()).toBe(dark);
+  await nav.getByTitle(dark ? "Light" : "Dark").click();
+  await expect.poll(whiteDots).toBe(!dark);
+});
+
+test("touch leaves the hero dots alone", async ({ page, context }) => {
+  test.skip(test.info().project.use.hasTouch !== true, "touch only");
+  const box = await handleOf(page).boundingBox();
+  if (!box) throw new Error("no handle");
+  const cdp: CDPSession = await context.newCDPSession(page);
+  const x = box.x + box.width / 2;
+  const y = box.y + box.height / 2;
+  await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x, y }] });
+  for (let i = 1; i <= 10; i++) await cdp.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [{ x, y: y - i * 12 }] });
+  await page.waitForTimeout(500);
+  expect(tintOf(await pixels(page, x - 150, y - 270, 300, 300))).toBe("none");
+  await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+});
+
+test("with reduced motion the hero dots still color but stay on the grid and the cursor line stays hidden", async ({ page }) => {
+  test.skip(test.info().project.use.isMobile === true, "needs a hovering pointer");
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.reload();
+  await settle(handleOf(page));
+  const canvas = hero(page).locator("canvas");
+  await canvas.evaluate((element: HTMLCanvasElement) => {
+    const arc = CanvasRenderingContext2D.prototype.arc;
+    CanvasRenderingContext2D.prototype.arc = function (this: CanvasRenderingContext2D, ...args: Parameters<typeof arc>) {
+      if (this.canvas === element) element.dataset.offGrid = String(Number(element.dataset.offGrid ?? 0) + (args[1] % 18 === 9 ? 0 : 1));
+      return arc.apply(this, args);
+    };
+  });
+  await page.mouse.move(40, 320);
+  await expect.poll(() => tints(page, 40, 320)).toEqual({ above: "up", below: "down" });
+  expect(await cursorLineOpacity(page)).toBe(0);
+  await expect(canvas).toHaveAttribute("data-off-grid", "0");
 });
