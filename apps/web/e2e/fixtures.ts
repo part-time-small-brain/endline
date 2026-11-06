@@ -154,3 +154,14 @@ export async function connectDemo(page: Page) {
   await page.getByRole("button", { name: /Demo wallet/ }).click();
   await expect(page.getByRole("button", { name: /^Buy (Up|Down)/ })).toBeVisible();
 }
+
+export async function openPopover(page: Page, label: string) {
+  const expanded = page.getByRole("button", { expanded: true });
+  if (await expanded.count()) await page.keyboard.press("Escape");
+  const trigger = page.getByRole("button", { name: label, exact: true });
+  await trigger.click();
+  await expect(trigger).toHaveAttribute("aria-expanded", "true");
+  const panel = trigger.locator("..").locator(":scope > span");
+  await expect(panel).toBeVisible();
+  return panel;
+}

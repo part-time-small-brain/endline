@@ -29,7 +29,7 @@ export function Landing() {
       </a>
       <Nav />
       <main id="main">
-        <Hero market={market} nowSec={nowSec} />
+        <Hero nowSec={nowSec} />
         <Tagline />
         {asset && (
           <>

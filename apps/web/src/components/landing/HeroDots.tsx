@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { NO_PULL, pull } from "../../lib/dots.ts";
 
+// Matches the 18px body dot grid in index.css.
 const GAP = 18;
 const REACH = { x: 270, y: 150 };
 const PART = 10;
@@ -84,9 +85,11 @@ export function HeroDots({ still }: { still: boolean }) {
       canvas.width = Math.round(width * scale);
       canvas.height = Math.round(height * scale);
       ctx.setTransform(scale, 0, 0, scale, 0, 0);
+      const box = canvas.getBoundingClientRect();
+      const first = (edge: number) => (((GAP / 2 - edge) % GAP) + GAP) % GAP;
       dots = [];
-      for (let y = GAP / 2; y < height; y += GAP) {
-        for (let x = GAP / 2; x < width; x += GAP) dots.push({ x, y, strength: 0, lift: 0, up: false });
+      for (let y = first(box.top + scrollY); y < height; y += GAP) {
+        for (let x = first(box.left + scrollX); x < width; x += GAP) dots.push({ x, y, strength: 0, lift: 0, up: false });
       }
       cancelAnimationFrame(frame);
       draw();

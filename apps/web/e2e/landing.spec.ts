@@ -1,17 +1,8 @@
 import type { CDPSession, Page } from "@playwright/test";
-import { expect, handleOf, money, settle, sideways, test, valueOf } from "./fixtures.ts";
+import { expect, money, openPopover, sideways, test } from "./fixtures.ts";
 
 const hero = (page: Page) => page.locator("#top");
-
-async function horizon(page: Page) {
-  return hero(page).evaluate((section) => {
-    const band = section.querySelector(":scope > div.absolute.top-0.h-full") as HTMLElement;
-    const slider = section.querySelector("[role=slider]") as HTMLElement;
-    const handle = slider.getBoundingClientRect();
-    const title = (section.querySelector("h1") as HTMLElement).getBoundingClientRect();
-    return { band: band.getBoundingClientRect().top, handle: handle.top + handle.height / 2, titleBottom: title.bottom, titleHeight: title.height };
-  });
-}
+const ready = (page: Page) => expect(hero(page).getByLabel("Maximum payout")).toHaveText(/^\$[\d,.]+$/);
 
 async function pixels(page: Page, x: number, y: number, width: number, height: number) {
   return hero(page)
@@ -50,94 +41,48 @@ const cursorLineOpacity = (page: Page) => hero(page).locator("canvas + div").eva
 
 test.beforeEach(async ({ page }) => {
   await page.goto("/");
-  await settle(handleOf(page));
+  await ready(page);
 });
 
-test("page horizon follows the hero line while dragging and on Down", async ({ page }) => {
-  const handle = handleOf(page);
-  const box = await handle.boundingBox();
-  if (!box) throw new Error("no handle");
-  const x = box.x + box.width / 2;
-  await page.mouse.move(x, box.y + box.height / 2);
-  await page.mouse.down();
-  for (const y of [box.y - 60, box.y + 90, box.y - 20]) {
-    await page.mouse.move(x, y, { steps: 6 });
-    await settle(handle);
-    await settle(hero(page).locator(":scope > div.absolute.top-0.h-full"));
-    const at = await horizon(page);
-    expect(Math.abs(at.band - at.handle)).toBeLessThan(1.5);
-  }
-  await page.mouse.up();
-  await hero(page).getByRole("radio", { name: /^Down/ }).click();
-  await expect(hero(page)).toHaveAttribute("data-side", "down");
-  await settle(hero(page).locator(":scope > div.absolute.top-0.h-full"));
-  const at = await horizon(page);
-  expect(Math.abs(at.band - at.handle)).toBeLessThan(1.5);
-});
-
-for (const width of [null, 800]) {
-  test(`page horizon stays on the hero line at the edge strikes, ${width ? `${width}px` : "default"} viewport`, async ({ page }) => {
-    test.skip(test.info().project.use.isMobile === true && width !== null, "desktop layouts only");
-    if (width) {
-      await page.setViewportSize({ width, height: 900 });
+test("the split line sits under the headline words, clear of the title and the copy below", async ({ page }) => {
+  const sizes = test.info().project.use.isMobile === true ? [undefined] : [{ width: 1440, height: 900 }, { width: 1280, height: 720 }, { width: 1024, height: 768 }];
+  for (const size of sizes) {
+    if (size) {
+      await page.setViewportSize(size);
       await page.reload();
+      await ready(page);
     }
-    const handle = handleOf(page);
-    await settle(handle);
-    for (const name of ["Up", "Down"]) {
-      await hero(page).getByRole("radio", { name: new RegExp(`^${name}`) }).click();
-      await handle.focus();
-      for (const key of ["End", "ArrowDown", "Home", "ArrowUp"]) {
-        await page.keyboard.press(key);
-        await expect(async () => {
-          await settle(handle);
-          await settle(hero(page).locator(":scope > div.absolute.top-0.h-full"));
-          const at = await horizon(page);
-          expect(Math.abs(at.band - at.handle)).toBeLessThan(1.5);
-        }).toPass({ timeout: 5000 });
-      }
-    }
-  });
-}
-
-test("title sits on the horizon", async ({ page }) => {
-  test.skip(test.info().project.use.isMobile === true, "side-by-side hero only");
-  for (const [width, height] of [[1440, 900], [1280, 720], [1024, 768]] as const) {
-    await page.setViewportSize({ width, height });
-    await page.reload();
-    await settle(handleOf(page));
-    const lineHeight = Number.parseFloat(await hero(page).locator("h1").evaluate((h1) => getComputedStyle(h1).lineHeight));
-    expect((await horizon(page)).titleHeight).toBeLessThanOrEqual(lineHeight * 2 + 1);
-    await expect.poll(async () => {
-      const at = await horizon(page);
-      return Math.abs(at.titleBottom - 8 - at.band);
-    }).toBeLessThan(2);
+    const line = hero(page).locator("h1 span[aria-hidden=true]");
+    await expect(line.locator("span").first()).toHaveCSS("background-color", "rgb(0, 236, 151)");
+    await expect(line.locator("span").last()).toHaveCSS("background-color", "rgb(255, 121, 102)");
+    await expect(async () => {
+      const at = await line.evaluate((bar) => {
+        const box = bar.getBoundingClientRect();
+        const title = (bar.closest("h1") as HTMLElement).getBoundingClientRect();
+        const words = (bar.parentElement as HTMLElement).getBoundingClientRect();
+        const lead = [...document.querySelectorAll("#top p")].find((p) => p.textContent?.startsWith("Choose whether"))?.getBoundingClientRect();
+        return { above: box.top - title.bottom, below: (lead?.top ?? 0) - box.bottom, left: box.left - words.left };
+      });
+      expect(at.above, `${size?.width ?? "phone"} gap above`).toBeGreaterThanOrEqual(8);
+      expect(at.below, `${size?.width ?? "phone"} gap below`).toBeGreaterThanOrEqual(24);
+      expect(at.left).toBe(0);
+    }).toPass({ timeout: 5000 });
   }
 });
 
-test("hero CTA opens the same trade", async ({ page }) => {
-  await hero(page).getByRole("radio", { name: "ETH" }).click();
-  await hero(page).getByRole("radio", { name: /^Down/ }).click();
-  await hero(page).getByRole("radio", { name: "$100", exact: true }).click();
-  const handle = handleOf(page);
-  await settle(handle);
-  await handle.focus();
-  await page.keyboard.press("ArrowUp");
-  const strike = await valueOf(handle);
-  const cta = hero(page).getByRole("link", { name: "Try ETH Down for $100" });
-  await cta.click();
-  await expect(page).toHaveURL(/\/app/);
+test("the hero ticket opens the same trade in the app", async ({ page }) => {
+  await (await openPopover(page, "Trade asset")).getByRole("radio", { name: /^ETH/ }).click();
+  await (await openPopover(page, "Trade direction")).getByRole("radio", { name: /^Down/ }).click();
+  await (await openPopover(page, "Trade amount")).getByRole("radio", { name: "$100", exact: true }).click();
+  await (await openPopover(page, "Price to beat")).getByRole("radio", { checked: false }).first().click();
+  const strike = await money(page.getByRole("button", { name: "Price to beat", exact: true }));
+  await hero(page).getByRole("link", { name: "Try ETH Down for $100" }).click();
+  await expect(page).toHaveURL(/\/app\?/);
   await expect(page.getByRole("button", { name: "Lite", exact: true })).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByRole("button", { name: "Trade asset", exact: true })).toHaveText("ETH");
   await expect(page.getByRole("button", { name: "Trade direction", exact: true })).toContainText("below");
   await expect(page.getByRole("button", { name: "Trade amount", exact: true })).toHaveText("$100");
   await expect.poll(() => money(page.getByRole("button", { name: "Price to beat", exact: true }))).toBe(strike);
-  await page.getByRole("button", { name: "Pro", exact: true }).click();
-  await expect(page.getByRole("radio", { name: /^ETH\b/ })).toHaveAttribute("aria-checked", "true");
-  await expect(page.getByRole("radiogroup", { name: "Direction" }).getByRole("radio", { name: /^Down/ })).toHaveAttribute("aria-checked", "true");
-  await expect(page.getByRole("radio", { name: "$100", exact: true })).toHaveAttribute("aria-checked", "true");
-  await expect(handleOf(page)).toHaveAttribute("aria-valuenow", String(strike));
-  await expect.poll(() => money(page.locator("output strong"))).toBe(strike);
 });
 
 test("whole page scrolls without horizontal overflow and every section shows up", async ({ page }) => {
@@ -156,7 +101,7 @@ test("whole page scrolls without horizontal overflow and every section shows up"
 test("the 320px landing keeps risk copy and payout controls inside the viewport", async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 568 });
   await page.reload();
-  await settle(handleOf(page));
+  await ready(page);
   await expect.poll(() => sideways(page)).toBeLessThanOrEqual(0);
   const risk = hero(page).getByText("Choose whether Bitcoin or Ethereum ends above or below your price. The most you can lose is what you pay.");
   expect(await risk.evaluate((element) => element.getBoundingClientRect().right - document.documentElement.clientWidth)).toBeLessThanOrEqual(0);
@@ -233,11 +178,11 @@ test("hero dots split Up and Down around the cursor, fade when it leaves, then i
 
 test("touch leaves the hero dots alone", async ({ page, context }) => {
   test.skip(test.info().project.use.hasTouch !== true, "touch only");
-  const box = await handleOf(page).boundingBox();
-  if (!box) throw new Error("no handle");
+  const box = await hero(page).locator("h1").boundingBox();
+  if (!box) throw new Error("no title");
   const cdp: CDPSession = await context.newCDPSession(page);
-  const x = box.x + box.width / 2;
-  const y = box.y + box.height / 2;
+  const x = box.x + 40;
+  const y = box.y + box.height;
   await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x, y }] });
   for (let i = 1; i <= 10; i++) await cdp.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [{ x, y: y - i * 12 }] });
   await page.waitForTimeout(500);
@@ -245,16 +190,17 @@ test("touch leaves the hero dots alone", async ({ page, context }) => {
   await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
 });
 
-test("with reduced motion the hero dots still color but stay on the grid and the cursor line stays hidden", async ({ page }) => {
+test("with reduced motion the hero dots still color but stay on the page's dot grid and the cursor line stays hidden", async ({ page }) => {
   test.skip(test.info().project.use.isMobile === true, "needs a hovering pointer");
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.reload();
-  await settle(handleOf(page));
+  await ready(page);
   const canvas = hero(page).locator("canvas");
   await canvas.evaluate((element: HTMLCanvasElement) => {
     const arc = CanvasRenderingContext2D.prototype.arc;
+    const top = element.getBoundingClientRect().top + scrollY;
     CanvasRenderingContext2D.prototype.arc = function (this: CanvasRenderingContext2D, ...args: Parameters<typeof arc>) {
-      if (this.canvas === element) element.dataset.offGrid = String(Number(element.dataset.offGrid ?? 0) + (args[1] % 18 === 9 ? 0 : 1));
+      if (this.canvas === element) element.dataset.offGrid = String(Number(element.dataset.offGrid ?? 0) + ((args[1] + top) % 18 === 9 ? 0 : 1));
       return arc.apply(this, args);
     };
   });

@@ -1,5 +1,5 @@
 import type { Locator, Page } from "@playwright/test";
-import { connectDemo, dollars, expect, money, settle, sideways, test } from "./fixtures.ts";
+import { connectDemo, dollars, expect, money, openPopover, settle, sideways, test } from "./fixtures.ts";
 
 test("Lite is the default and Pro persists across reload", async ({ page }) => {
   await page.goto("/app");
@@ -39,17 +39,6 @@ test("Lite buys through the same confirm sheet", async ({ page }) => {
 });
 
 const CHIP_LABELS = ["End date", "Trade asset", "Trade direction", "Price to beat", "Trade amount"] as const;
-
-async function openPopover(page: Page, label: string) {
-  const expanded = page.getByRole("button", { expanded: true });
-  if (await expanded.count()) await page.keyboard.press("Escape");
-  const trigger = page.getByRole("button", { name: label, exact: true });
-  await trigger.click();
-  await expect(trigger).toHaveAttribute("aria-expanded", "true");
-  const panel = trigger.locator("..").locator(":scope > span");
-  await expect(panel).toBeVisible();
-  return panel;
-}
 
 async function ready(page: Page) {
   await page.goto("/app");

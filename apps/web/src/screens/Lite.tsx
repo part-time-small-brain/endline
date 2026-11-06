@@ -17,6 +17,7 @@ interface Props {
   state: ReturnType<typeof useTicket>;
   nowSec: number;
   action: ReactNode;
+  className?: string;
 }
 
 const label = "font-mono text-[0.625rem] font-medium tracking-[0.14em] text-ink-3 uppercase";
@@ -33,7 +34,7 @@ function Meter({ chance, lit, className }: { chance: number; lit: string; classN
   );
 }
 
-export function Lite({ state, nowSec, action }: Props) {
+export function Lite({ state, nowSec, action, className = "mx-auto w-full max-w-2xl flex-1 px-4 pt-3 lg:px-6 lg:pt-6" }: Props) {
   const {
     data, quoteDecimals, unit, symbol, symbols, kind, expiry, budget,
     setSymbol, setKind, setExpiry, setSeries, setBudget,
@@ -90,7 +91,7 @@ export function Lite({ state, nowSec, action }: Props) {
   const Glyph = ASSET_ICONS[symbol];
 
   return (
-    <div data-side={up ? "up" : "down"} className="mx-auto w-full max-w-2xl flex-1 px-4 pt-3 lg:px-6 lg:pt-6">
+    <div data-side={up ? "up" : "down"} className={className}>
       <section aria-label="Trade ticket">
         <div className="relative rounded-md border border-rule bg-surface p-4 min-[375px]:px-[1.125rem] sm:p-6 lg:p-8">
           <Brackets color="border-side" />
