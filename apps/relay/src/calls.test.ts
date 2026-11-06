@@ -124,6 +124,24 @@ describe("free calls", () => {
     expect(await play(DAYS[5]!, 83_000)).toBe(1);
   });
 
+  it("keeps a streak when an older round is scored after a newer one, and keeps scoring other rounds while one price can't be read", async () => {
+    const t = setup();
+    for (const day of [DAYS[0]!, DAYS[1]!]) {
+      at(day - 2 * 3_600);
+      await t.call(series(81_000, day).id);
+    }
+    t.settlements.set(`BTC:${DAYS[1]}`, { price: String(83_000n * USD), final_at: DAYS[1]! + 3_900 });
+    const settlement = t.chain.settlement;
+    t.chain.settlement = async (underlying, expiry) => (expiry === DAYS[0] ? Promise.reject(new Error("rpc down")) : settlement(underlying, expiry));
+    at(DAYS[1]! + 3_960);
+    await t.calls.score();
+    expect(t.calls.board("alice.near").you?.today).toMatchObject({ points: 400, streak: 1 });
+    t.chain.settlement = settlement;
+    t.settlements.set(`BTC:${DAYS[0]}`, { price: String(83_000n * USD), final_at: DAYS[0]! + 3_900 });
+    await t.calls.score();
+    expect(t.calls.board("alice.near").you?.today).toMatchObject({ points: 400, streak: 2 });
+  });
+
   it("ranks ties by wins then account, sums the last 7 rounds for the week, and finds you beyond the top 20", async () => {
     const t = setup();
     for (const [i, day] of DAYS.slice(0, 8).entries()) {

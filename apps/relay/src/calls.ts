@@ -1,4 +1,4 @@
-import { AccountId, Call, type CallRequest, callPoints, CLAIM_WINDOW_SEC, FREE_CALLS_PER_ROUND, type Leaderboard, type Mark, roundOf, SECONDS_PER_DAY, type Series, type Standing, termsOf, TWAP_WINDOW_SEC } from "@endline/sdk";
+import { AccountId, Call, type CallRequest, callPoints, FREE_CALLS_PER_ROUND, type Leaderboard, type Mark, roundOf, SECONDS_PER_DAY, type Series, type Standing, termsOf, TWAP_WINDOW_SEC } from "@endline/sdk";
 import { z } from "zod";
 import { FINAL_MARGIN_SEC } from "./collect.ts";
 import { JsonFile } from "./jsonFile.ts";
@@ -9,13 +9,15 @@ import type { Sessions } from "./session.ts";
 const MAX_CALLS = 10_000;
 const BOARD_SIZE = 20;
 const ROUNDS_KEPT = 7;
+const WIN_DAYS_KEPT = 60;
+const UNPRICED_KEEP_SEC = 7 * SECONDS_PER_DAY;
 
 const Score = z.object({ points: z.number().int(), wins: z.number().int() });
 type Score = z.infer<typeof Score>;
 const State = z.object({
   calls: z.array(Call),
   rounds: z.array(z.object({ date: z.string(), players: z.record(z.string(), Score) })),
-  streaks: z.record(z.string(), z.object({ streak: z.number().int(), last: z.string() })),
+  wins: z.record(z.string(), z.array(z.string())),
 });
 type State = z.infer<typeof State>;
 
@@ -24,7 +26,8 @@ const newestFirst = <T extends { date: string }>(rounds: T[]) => [...rounds].sor
 
 export class Calls {
   private file: JsonFile<State>;
-  private state: State = { calls: [], rounds: [], streaks: {} };
+  private state: State = { calls: [], rounds: [], wins: {} };
+  private ranked: Omit<Leaderboard, "you"> | undefined;
 
   constructor(
     private chain: Chain,
@@ -38,6 +41,7 @@ export class Calls {
 
   async load(): Promise<void> {
     this.state = await this.file.read(this.state);
+    this.ranked = undefined;
   }
 
   async add({ series_id, signer, session }: CallRequest): Promise<Call> {
@@ -80,20 +84,35 @@ export class Calls {
     let changed = false;
     for (const [first, ...rest] of due.values()) {
       if (!first) continue;
-      const settlement = await this.chain.settlement(first.terms.underlying, first.terms.expiry);
+      const settlement = await this.chain.settlement(first.terms.underlying, first.terms.expiry).catch((error: unknown) => {
+        console.error("free calls: can't read the settlement yet", first.terms.underlying, first.terms.expiry, error);
+        return null;
+      });
       if (!settlement || nowSec < settlement.final_at + FINAL_MARGIN_SEC) continue;
       for (const call of [first, ...rest]) this.settle(call, settlement.price);
       changed = true;
     }
-    if (this.prune(nowSec) || changed) await this.file.write(this.state);
+    if (this.prune(nowSec) || changed) {
+      this.ranked = undefined;
+      await this.file.write(this.state);
+    }
   }
 
   board(accountId?: string): Leaderboard {
+    const board = (this.ranked ??= this.rank());
+    if (accountId === undefined) return { ...board, today: board.today.slice(0, BOARD_SIZE), week: board.week.slice(0, BOARD_SIZE) };
+    const find = (rows: Standing[]) => rows.find((s) => s.account_id === accountId) ?? null;
+    return { round: board.round, today: board.today.slice(0, BOARD_SIZE), week: board.week.slice(0, BOARD_SIZE), you: { today: find(board.today), week: find(board.week) } };
+  }
+
+  private rank(): Omit<Leaderboard, "you"> {
     const rounds = newestFirst(this.state.rounds);
     const latest = rounds[0];
     const streakOf = (id: string) => {
-      const s = this.state.streaks[id];
-      return s && s.last === latest?.date ? s.streak : 0;
+      const won = new Set(this.state.wins[id]);
+      let streak = 0;
+      for (let day = latest?.date; day && won.has(day); day = dayBefore(day)) streak++;
+      return streak;
     };
     const rank = (players: Record<string, Score>): Standing[] =>
       Object.entries(players)
@@ -107,11 +126,7 @@ export class Calls {
         total.wins += s.wins;
       }
     }
-    const today = rank(latest?.players ?? {});
-    const all = rank(week);
-    const board = { round: latest?.date ?? null, today: today.slice(0, BOARD_SIZE), week: all.slice(0, BOARD_SIZE) };
-    if (accountId === undefined) return board;
-    return { ...board, you: { today: today.find((s) => s.account_id === accountId) ?? null, week: all.find((s) => s.account_id === accountId) ?? null } };
+    return { round: latest?.date ?? null, today: rank(latest?.players ?? {}), week: rank(week) };
   }
 
   private settle(call: Call, price: string): void {
@@ -124,18 +139,16 @@ export class Calls {
     player.points += points;
     if (points <= 0) return;
     player.wins += 1;
-    const streak = this.state.streaks[call.account_id];
-    if (streak?.last === date) return;
-    this.state.streaks[call.account_id] = { streak: streak?.last === dayBefore(date) ? streak.streak + 1 : 1, last: date };
+    const won = this.state.wins[call.account_id] ?? [];
+    if (!won.includes(date)) this.state.wins[call.account_id] = [...won, date].sort();
   }
 
   private prune(nowSec: number): boolean {
-    const calls = this.state.calls.filter((c) => c.terms.expiry > nowSec - (c.result ? SECONDS_PER_DAY : CLAIM_WINDOW_SEC));
+    const calls = this.state.calls.filter((c) => c.terms.expiry > nowSec - (c.result ? SECONDS_PER_DAY : UNPRICED_KEEP_SEC));
     const rounds = newestFirst(this.state.rounds).slice(0, ROUNDS_KEPT);
-    const latest = rounds[0]?.date;
-    const streaks = Object.fromEntries(Object.entries(this.state.streaks).filter(([, s]) => latest === undefined || s.last >= dayBefore(latest)));
-    const changed = calls.length !== this.state.calls.length || rounds.length !== this.state.rounds.length || Object.keys(streaks).length !== Object.keys(this.state.streaks).length;
-    this.state = { calls, rounds, streaks };
+    const entries = Object.entries(this.state.wins).map(([id, days]) => [id, days.slice(-WIN_DAYS_KEPT)] as const);
+    const changed = calls.length !== this.state.calls.length || rounds.length !== this.state.rounds.length || entries.some(([id, days]) => days.length !== this.state.wins[id]?.length);
+    this.state = { calls, rounds, wins: Object.fromEntries(entries) };
     return changed;
   }
 }

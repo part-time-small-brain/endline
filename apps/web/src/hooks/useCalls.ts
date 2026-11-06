@@ -1,5 +1,5 @@
 import { callMultiple, type ListedSeries, termsOf } from "@endline/sdk";
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { RelayError } from "../api/relay.ts";
 import { useApp } from "../app/context.ts";
 import { useData } from "../app/data.tsx";
@@ -19,16 +19,19 @@ function messageOf(error: unknown): string {
 export function useCalls() {
   const { config, services } = useApp();
   const { wallet } = useWallet();
-  const { quoteDecimals, reload } = useData();
+  const { quoteDecimals, reloadCalls } = useData();
   const [states, setStates] = useState<Record<string, TapState>>({});
   const [notice, setNotice] = useState<{ text: string; failed: boolean }>();
+  const busy = useRef(new Set<string>());
 
   const call = useCallback(
     async (series: ListedSeries) => {
-      if (!wallet) return;
       const id = series.id;
+      if (!wallet || busy.current.has(id)) return;
+      busy.current.add(id);
       setStates((current) => ({ ...current, [id]: { status: "busy" } }));
       const finish = (state: TapState, text: string) => {
+        busy.current.delete(id);
         setStates((current) => ({ ...current, [id]: state }));
         setNotice({ text, failed: state.status === "failed" });
         setTimeout(() => setStates((current) => (current[id] === state ? Object.fromEntries(Object.entries(current).filter(([key]) => key !== id)) : current)), SHOWN_MS);
@@ -36,14 +39,14 @@ export function useCalls() {
       try {
         const session = await (cachedSession(wallet) ?? signSession(wallet, config.intentsId, services.chain.salt));
         const made = await services.relay.call({ series_id: id, signer: { standard: wallet.standard, signer_id: wallet.accountId }, session });
-        reload();
+        reloadCalls();
         finish({ status: "done" }, `Called ${seriesTitle(series, quoteDecimals)} at ${formatMultiple(callMultiple(termsOf(made.terms), BigInt(made.ask)))}.`);
       } catch (error) {
         if (error instanceof RelayError && error.status === 401) forgetSession(wallet);
         finish({ status: "failed" }, messageOf(error));
       }
     },
-    [wallet, config.intentsId, services, quoteDecimals, reload],
+    [wallet, config.intentsId, services, quoteDecimals, reloadCalls],
   );
 
   return { states, notice, call };

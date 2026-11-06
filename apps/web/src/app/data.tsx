@@ -29,6 +29,7 @@ export interface AppData {
   settlements: Record<string, SettlementView | null>;
   optionAsset(seriesId: string): string;
   reload(): void;
+  reloadCalls(): void;
 }
 
 export const settlementKey = (s: Pick<ListedSeries, "underlying" | "expiry">) => `${s.underlying}:${s.expiry}`;
@@ -126,6 +127,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     settlements: settlements.data ?? {},
     optionAsset,
     reload,
+    reloadCalls: calls.reload,
   };
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>;
 }

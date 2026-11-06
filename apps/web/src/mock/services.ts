@@ -198,6 +198,7 @@ export function createMockServices(config: Config): Services {
       if (mine.some((c) => c.series_id === series_id)) throw new RelayError("you already called this cell", 409);
       const mark = markOf(series);
       if (!mark) throw new RelayError("no price for this cell right now", 503);
+      if (BigInt(mark.ask) >= BigInt(series.width)) throw new RelayError("this cell can't pay more than it costs", 409);
       if (mine.filter((c) => roundOf(c.terms.expiry) === round).length >= FREE_CALLS_PER_ROUND) throw new RelayError(`you've used your ${FREE_CALLS_PER_ROUND} free calls for this round`, 429);
       const { id, ...terms } = series;
       const call = { series_id: id, account_id: signer.signer_id, terms, ask: mark.ask, at_ms: Date.now() };

@@ -197,7 +197,7 @@ export function Tap({ state, nowSec, views, onConnect, onAddFunds, onQuote }: Pr
                             change={own?.change}
                             called={cell !== undefined && calledHere.has(cell.series.id) && !own}
                             pays={multiple === undefined ? undefined : formatMultiple(multiple)}
-                            blocked={free && (roundOf(expiry) !== nextRound || (cell !== undefined && calledHere.has(cell.series.id)))}
+                            blocked={free && (roundOf(expiry) !== nextRound || (cell !== undefined && (calledHere.has(cell.series.id) || calls.states[cell.series.id]?.status === "busy")))}
                             state={cell && (free ? calls.states : taps.states)[cell.series.id]}
                             onTap={onTap}
                           />

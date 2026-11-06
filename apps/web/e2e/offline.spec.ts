@@ -899,7 +899,7 @@ test.describe("Tap", () => {
     try {
       await page.clock.fastForward((expiry + 3_900) * 1000 - (await page.evaluate(() => Date.now())));
       await expect(page.getByRole("table").getByRole("group", { name: /^Up · BTC ends above \$81,000 · result · free call · \+400 pts$/ })).toBeVisible();
-      await expect(page.getByText(/Your free calls: \+400 points\.$/)).toBeVisible();
+      await expect(page.getByText(/Your BTC free calls: \+400 points\.$/)).toBeVisible();
       await page.evaluate(() => Object.assign(navigator, { canShare: undefined }));
       const download = page.waitForEvent("download");
       await page.getByRole("button", { name: "Share" }).click();

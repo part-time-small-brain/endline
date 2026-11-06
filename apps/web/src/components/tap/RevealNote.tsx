@@ -31,7 +31,7 @@ export function RevealNote({ closing: { phase, settlement }, price, stakes, call
         {phase === "awaiting_price" && (price === undefined ? "Ended · waiting for the final price." : `Ended · average ≈ ${at}, waiting for the final price. ${ESTIMATE}`)}
         {phase === "proposed" && settlement && `Proposed final price ${at}, final at ${formatClock(settlement.finalAt)}.`}
         {phase === "final" && `Final price ${at}.${total > 0n ? ` You get ${formatUsd(total, quoteDecimals)} back.` : ""}`}
-        {scored.length > 0 && ` Your free calls: ${final ? "" : "≈ "}${points > 0 ? "+" : ""}${points} points.`}
+        {scored.length > 0 && ` Your ${scored[0]!.call.terms.underlying} free calls: ${final ? "" : "≈ "}${points > 0 ? "+" : ""}${points} points.`}
       </p>
       {card && <ShareButton card={card} />}
     </div>
