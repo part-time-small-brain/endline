@@ -1011,6 +1011,10 @@ fn intents_withdrawals_to_new_rows_are_paid_from_the_receivers_storage_credit() 
     let credit = c.storage_deposit(Some(bob.clone()), None).available.0;
     assert!(credit > 0 && credit < DEPOSIT);
     assert_eq!(c.storage_balance_of(bob.clone()).unwrap().total.0, credit);
+    ctx(alice(), T0, DEPOSIT);
+    let topped_up = c.storage_deposit(Some(bob.clone()), None).available.0;
+    assert_eq!(topped_up, credit + DEPOSIT);
+    let credit = topped_up;
 
     let tokens = vec![id.clone(), short(&id)];
     let send = |c: &mut Contract, to: &AccountId| {

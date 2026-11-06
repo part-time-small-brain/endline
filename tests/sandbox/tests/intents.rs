@@ -493,23 +493,44 @@ async fn withdraw_with_msg_never_loses_options_at_tight_gas() -> anyhow::Result<
         anyhow::Ok(total)
     };
     let before = held().await?;
-    let mut reached_opt = false;
-    for tx_gas in (100..=200).step_by(4) {
-        let outcome = env
-            .alice
-            .call(env.intents.id(), "mt_withdraw")
-            .args_json(json!({"token": env.opt.id(), "receiver_id": env.alice.id(), "token_ids": tokens, "amounts": vec!["1000"; tokens.len()], "msg": "x"}))
-            .deposit(ONE_YOCTO)
-            .gas(Gas::from_tgas(tx_gas))
-            .transact()
-            .await?;
-        reached_opt |= outcome
-            .receipt_outcomes()
-            .iter()
-            .any(|r| r.executor_id == *env.opt.id());
-        assert_eq!(held().await?, before, "options lost at {tx_gas} TGas");
+    for credit in [false, true] {
+        if credit {
+            env.storage_deposit(&env.alice, env.alice.id(), NearToken::from_near(1))
+                .await?;
+        }
+        let mut reached_opt = false;
+        let mut short_of_credit = false;
+        for tx_gas in (100..=200).step_by(4) {
+            let outcome = env
+                .alice
+                .call(env.intents.id(), "mt_withdraw")
+                .args_json(json!({"token": env.opt.id(), "receiver_id": env.alice.id(), "token_ids": tokens, "amounts": vec!["1000"; tokens.len()], "msg": "x"}))
+                .deposit(ONE_YOCTO)
+                .gas(Gas::from_tgas(tx_gas))
+                .transact()
+                .await?;
+            reached_opt |= outcome
+                .receipt_outcomes()
+                .iter()
+                .any(|r| r.executor_id == *env.opt.id());
+            short_of_credit |= outcome
+                .logs()
+                .iter()
+                .any(|l| l.contains("more yoctoNEAR of storage credit"));
+            assert_eq!(
+                held().await?,
+                before,
+                "options lost at {tx_gas} TGas, credit {credit}"
+            );
+        }
+        assert!(reached_opt, "intents never called the options contract");
+        assert_eq!(short_of_credit, !credit);
+        if !credit {
+            for token in &tokens {
+                assert_eq!(env.ledger_balance(env.alice.id(), token).await?, 0);
+            }
+        }
     }
-    assert!(reached_opt, "intents never called the options contract");
     Ok(())
 }
 
