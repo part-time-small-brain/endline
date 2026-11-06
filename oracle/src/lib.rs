@@ -12,6 +12,7 @@ const DELIVERY_TIME_OF_DAY: u64 = 8 * 3_600;
 const TWAP_WINDOW_SEC: u64 = 1_800;
 const MIN_CANDLES: usize = 25;
 const MIN_SOURCES: usize = 4;
+const MIN_SOURCES_WITH_DERIBIT: usize = 3;
 const MIN_DELAY_AFTER_EXPIRY_SEC: u64 = 60;
 const MAX_QUOTE_DECIMALS: u8 = 9;
 const USDT_USD_BOUNDS: (f64, f64) = (0.97, 1.03);
@@ -93,7 +94,12 @@ pub fn fix(req: &Request, now: Option<u64>, http: &impl Http) -> Fixing {
             out.venues.insert(venue.name, usd);
         }
     }
-    out.cex_median = (out.venues.len() >= MIN_SOURCES)
+    let min_sources = if daily {
+        MIN_SOURCES_WITH_DERIBIT
+    } else {
+        MIN_SOURCES
+    };
+    out.cex_median = (out.venues.len() >= min_sources)
         .then(|| median(out.venues.values().copied().collect()))
         .flatten();
 

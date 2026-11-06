@@ -81,7 +81,7 @@ fn btc(expiry: u64) -> Request {
         index: "btc_usd".into(),
         expiry,
         quote_decimals: 6,
-        max_dev_bps: 50,
+        max_dev_bps: 20,
     }
 }
 
@@ -107,7 +107,7 @@ fn deribit_down_blocks_a_daily_price_so_its_check_cannot_be_skipped() {
 }
 
 #[test]
-fn off_hour_expiry_settles_on_the_median_alone() {
+fn off_hour_expiry_settles_on_the_median_of_at_least_four_venues() {
     let expiry = EXPIRY + 3_600;
     let rows = |p: f64| {
         (0..30)
@@ -120,14 +120,18 @@ fn off_hour_expiry_settles_on_the_median_alone() {
     let bitfinex = (0..30)
         .map(|i| json!([(expiry - 1_800 + i * 60) * 1_000, 0, 81_030.0, 0, 0, 0]))
         .collect::<Vec<_>>();
-    let http = Recorded::only(&[])
-        .with("products/BTC-USD", json!(rows(81_000.0)).to_string())
-        .with(
-            "pair=XBTUSD",
-            json!({"result": {"XXBTZUSD": rows(81_020.0)}}).to_string(),
-        )
-        .with("bitstamp.net", json!({"data": {"ohlc": bitstamp}}).to_string())
-        .with("bitfinex.com", json!(bitfinex).to_string());
+    let three = || {
+        Recorded::only(&[])
+            .with("products/BTC-USD", json!(rows(81_000.0)).to_string())
+            .with(
+                "pair=XBTUSD",
+                json!({"result": {"XXBTZUSD": rows(81_020.0)}}).to_string(),
+            )
+            .with("bitstamp.net", json!({"data": {"ohlc": bitstamp}}).to_string())
+    };
+    let f = fix(&btc(expiry), Some(expiry + 300), &three());
+    assert_eq!((f.ok, f.source, f.venues.len()), (false, "no data", 3));
+    let http = three().with("bitfinex.com", json!(bitfinex).to_string());
     let f = fix(&btc(expiry), Some(expiry + 300), &http);
     assert_eq!(
         (f.ok, f.source, f.deribit, f.price.as_deref()),
@@ -207,16 +211,16 @@ fn rejects_disagreeing_sources() {
 }
 
 #[test]
-fn a_median_needs_four_venues() {
-    let three = ["deribit.com", "products/BTC-USD", "pair=XBTUSD", "bitstamp.net"];
-    let f = fix(&btc(EXPIRY), AFTER, &Recorded::only(&three));
-    assert_eq!((f.ok, f.venues.len(), f.cex_median), (false, 3, None));
-    let four = fix(
+fn with_the_deribit_veto_three_venues_are_enough_and_two_are_not() {
+    let two = ["deribit.com", "products/BTC-USD", "bitstamp.net"];
+    let f = fix(&btc(EXPIRY), AFTER, &Recorded::only(&two));
+    assert_eq!((f.ok, f.venues.len(), f.cex_median), (false, 2, None));
+    let three = fix(
         &btc(EXPIRY),
         AFTER,
-        &Recorded::only(&[&three[..], &["bitfinex.com"]].concat()),
+        &Recorded::only(&[&two[..], &["pair=XBTUSD"]].concat()),
     );
-    assert_eq!((four.ok, four.venues.len()), (true, 4));
+    assert_eq!((three.ok, three.venues.len()), (true, 3));
 }
 
 #[test]
@@ -328,8 +332,8 @@ fn rejects_unknown_index_and_decimals_floats_cannot_represent() {
 fn median_and_deviation_edges() {
     assert_eq!(median(vec![]), None);
     assert_eq!(median(vec![3.0, 1.0, 2.0, 10.0]), Some(2.5));
-    assert!(within_bps(10_000.0, 10_050.0, 50));
-    assert!(!within_bps(10_000.0, 10_051.0, 50));
+    assert!(within_bps(10_000.0, 10_020.0, 20));
+    assert!(!within_bps(10_000.0, 10_021.0, 20));
 }
 
 #[test]

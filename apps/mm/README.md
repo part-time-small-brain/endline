@@ -124,7 +124,7 @@ Burn and redeem cover series that expired up to 7 days ago. Unpaired longs (boug
 
 | Alert | When | Prints |
 |---|---|---|
-| `settle` | Proposal before `final_at` that is off the reference (measured against the lower price) by more than 20 bps, well inside the oracle's 50 bps veto, so two tampered sources can't slip a price under it; or that has no reference (Deribit down or no data) | `override_settlement` with `<price>` to fill in (derive it from the [oracle rules](https://docs.endline.trade/developers/oracle#what-it-computes), never paste Deribit), signed by the owner |
+| `settle` | Proposal before `final_at` that is off the reference (measured against the lower price) by more than 20 bps, the same tolerance as the oracle's Deribit veto; or that has no reference (Deribit down or no data) | `override_settlement` with `<price>` to fill in (derive it from the [oracle rules](https://docs.endline.trade/developers/oracle#what-it-computes), never paste Deribit), signed by the owner |
 | `missing` | No proposal at expiry + `oracle_window_sec` | `propose_settlement` with `<price>` to fill in, signed by the first `get_oracles` account |
 | `reserve <account>` | `amount − storage_usage × 10^19` yocto below 2 NEAR, for the options contract, `INTENTS_ID` and `RELAYER_ACCOUNT_ID` each | |
 | `uptime` | `HEALTH_URL` set and it doesn't answer `200` with `{"ok":true}` within 5 s | The URL and the error |

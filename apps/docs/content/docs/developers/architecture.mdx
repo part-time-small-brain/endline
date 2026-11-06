@@ -73,4 +73,4 @@ Testnet ids are in `deploy/testnet.json`. RPC: `https://rpc.testnet.fastnear.com
 | Oracle WASM | Add one row to `MARKETS` in `oracle/src/sources.rs`, rebuild, host, `set_oracle_wasm` |
 | Market maker, relay, web | Nothing. They read assets and series from the contract |
 
-Deribit must list options on the asset, since the market maker prices from Deribit's volatility, and at least 4 of the oracle's 7 exchanges must list a spot pair.
+Deribit must list options on the asset, since the market maker prices from Deribit's volatility, and at least 3 of the oracle's 7 exchanges must list a spot pair (4 for expiries other than 08:00 UTC).
