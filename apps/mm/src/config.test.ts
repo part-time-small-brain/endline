@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { loadConfig, loadMonitorConfig, loadRelayConfig } from "./config.ts";
+import { loadConfig, loadMonitorConfig, loadProposerConfig, loadRelayConfig } from "./config.ts";
 
 const ENV = {
   MM_ACCOUNT_ID: "mm.near-options-dev.testnet",
@@ -26,6 +26,12 @@ describe("config", () => {
   it("only accepts a websocket relay and a real API key", () => {
     expect(() => loadRelayConfig({ RELAY_WS_URL: "https://relay.example/mm", MM_API_KEY: "k".repeat(16) })).toThrow();
     expect(() => loadRelayConfig({ RELAY_WS_URL: "wss://relay.example/mm", MM_API_KEY: "short" })).toThrow();
+  });
+
+  it("never runs the proposer on the relayer's key", () => {
+    const relayer = { ...ENV, RELAYER_ACCOUNT_ID: "relayer.testnet", RELAYER_PRIVATE_KEY: ENV.MM_PRIVATE_KEY };
+    expect(() => loadProposerConfig(relayer)).toThrow();
+    expect(loadProposerConfig({ ...relayer, ORACLE_ACCOUNT_ID: "oracle.testnet", ORACLE_PRIVATE_KEY: ENV.MM_PRIVATE_KEY }).oracleAccountId).toBe("oracle.testnet");
   });
 
   it("runs the monitor without an account or key, defaulting to mainnet commands", () => {
