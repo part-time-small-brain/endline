@@ -342,6 +342,65 @@ async fn write_and_burn_pair_round_trip_through_real_intents() -> anyhow::Result
 }
 
 #[tokio::test]
+async fn a_series_counts_its_open_options_through_real_intents_and_stays_until_a_week_after_its_end(
+) -> anyhow::Result<()> {
+    let env = setup().await?;
+    let usdc = asset(&env.usdc);
+    let long = env.option_asset(&env.series);
+    let short = env.option_asset(&format!("{}-SHORT", env.series));
+    let series = || async {
+        anyhow::Ok(
+            env.opt
+                .view("get_series")
+                .args_json(json!({"series_id": env.series}))
+                .await?
+                .json::<Value>()?,
+        )
+    };
+    let created = series().await?;
+    assert_eq!(created["created_by"], env.alice.id().as_str());
+    assert!(created["storage_paid"].as_str().unwrap().parse::<u128>()? > 0);
+
+    env.send_to_opt(
+        &[&usdc],
+        &[WIDTH],
+        json!({"action": "write", "series_id": env.series}),
+    )
+    .await?
+    .into_result()?;
+    env.send_to_opt(
+        &[&short, &long],
+        &[CONTRACT / 4, CONTRACT / 4],
+        json!({"action": "burn_pair"}),
+    )
+    .await?
+    .into_result()?;
+    let open = series().await?;
+    let three_quarters = (CONTRACT * 3 / 4).to_string();
+    assert_eq!(
+        (&open["long_open"], &open["short_open"]),
+        (&json!(three_quarters), &json!(three_quarters))
+    );
+
+    let deletable: Vec<String> = env
+        .opt
+        .view("deletable_series")
+        .args_json(json!({"series_ids": [env.series]}))
+        .await?
+        .json()?;
+    assert!(deletable.is_empty());
+    let early = env
+        .worker
+        .root_account()?
+        .call(env.opt.id(), "delete_series")
+        .args_json(json!({"series_ids": [env.series]}))
+        .transact()
+        .await?;
+    assert_panicked_with(&early, "can't be deleted yet");
+    Ok(())
+}
+
+#[tokio::test]
 async fn unlisted_asset_is_refunded_by_intents() -> anyhow::Result<()> {
     let env = setup().await?;
     let fake = asset(&env.fake);
