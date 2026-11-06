@@ -1,6 +1,7 @@
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useState } from "react";
 import { useApp } from "../app/context.ts";
 import { demoWallet } from "./demo.ts";
+import { forgetSession } from "./session.ts";
 import { connectEvm } from "./evm.ts";
 import { connectNear, restoreNear } from "./near.ts";
 import type { Wallet } from "./wallet.ts";
@@ -32,9 +33,10 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   );
 
   const disconnect = useCallback(async () => {
+    if (wallet) forgetSession(wallet, config.intentsId);
     await wallet?.disconnect();
     setWallet(null);
-  }, [wallet]);
+  }, [wallet, config.intentsId]);
 
   return <WalletContext.Provider value={{ wallet, connect, disconnect }}>{children}</WalletContext.Provider>;
 }

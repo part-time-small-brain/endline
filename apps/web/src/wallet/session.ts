@@ -10,7 +10,7 @@ interface Session {
 }
 
 const sessions = new WeakMap<Wallet, Session>();
-const keyOf = (wallet: Wallet) => `session:${wallet.standard}:${wallet.accountId}`;
+const keyOf = (wallet: Wallet, intentsId: string) => `session:${intentsId}:${wallet.standard}:${wallet.accountId}`;
 
 const tab = {
   get: (key: string) => {
@@ -32,13 +32,13 @@ const tab = {
   },
 };
 
-function restored(wallet: Wallet): Session | undefined {
-  const text = tab.get(keyOf(wallet));
+function restored(wallet: Wallet, intentsId: string): Session | undefined {
+  const text = tab.get(keyOf(wallet, intentsId));
   if (!text) return undefined;
   try {
     const signed = SignedPayload.parse(JSON.parse(text));
-    const { signer_id, deadline } = readPayload(signed);
-    if (signer_id !== wallet.accountId) return undefined;
+    const { signer_id, verifying_contract, deadline } = readPayload(signed);
+    if (signer_id !== wallet.accountId || verifying_contract !== intentsId) return undefined;
     const session = { deadlineMs: Date.parse(deadline), signed: Promise.resolve(signed) };
     sessions.set(wallet, session);
     return session;
@@ -47,8 +47,8 @@ function restored(wallet: Wallet): Session | undefined {
   }
 }
 
-export function cachedSession(wallet: Wallet): Promise<SignedPayload> | undefined {
-  const current = sessions.get(wallet) ?? restored(wallet);
+export function cachedSession(wallet: Wallet, intentsId: string): Promise<SignedPayload> | undefined {
+  const current = sessions.get(wallet) ?? restored(wallet, intentsId);
   return current && Date.now() < current.deadlineMs - RENEW_BEFORE_MS ? current.signed : undefined;
 }
 
@@ -59,7 +59,7 @@ export function signSession(wallet: Wallet, intentsId: string, salt: () => Promi
   sessions.set(wallet, { deadlineMs, signed });
   signed.then(
     (value) => {
-      if (sessions.get(wallet)?.signed === signed) tab.set(keyOf(wallet), JSON.stringify(value));
+      if (sessions.get(wallet)?.signed === signed) tab.set(keyOf(wallet, intentsId), JSON.stringify(value));
     },
     () => {
       if (sessions.get(wallet)?.signed === signed) sessions.delete(wallet);
@@ -68,7 +68,7 @@ export function signSession(wallet: Wallet, intentsId: string, salt: () => Promi
   return signed;
 }
 
-export function forgetSession(wallet: Wallet): void {
+export function forgetSession(wallet: Wallet, intentsId: string): void {
   sessions.delete(wallet);
-  tab.remove(keyOf(wallet));
+  tab.remove(keyOf(wallet, intentsId));
 }

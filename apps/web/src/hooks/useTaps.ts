@@ -57,10 +57,10 @@ export function useTaps(owner: string | undefined) {
   const trade = useCallback(
     async (payer: Wallet, { series, size, stake, multiple }: TapOrder, at: number): Promise<bigint> => {
       if (at !== generation.current) throw new Cancelled();
-      const session = await (cachedSession(payer) ?? signSession(payer, config.intentsId, services.chain.salt));
+      const session = await (cachedSession(payer, config.intentsId) ?? signSession(payer, config.intentsId, services.chain.salt));
       const signer = { standard: payer.standard, signer_id: payer.accountId };
       const quote = await services.relay.quote({ series_id: series.id, side: "buy", size: size.toString(), signer, session }).catch((error: unknown) => {
-        if (error instanceof RelayError && error.status === 401) forgetSession(payer);
+        if (error instanceof RelayError && error.status === 401) forgetSession(payer, config.intentsId);
         throw error;
       });
       checkTrade(readPayload(quote.payload), quote, { signerId: payer.accountId, intentsId: config.intentsId, optionAsset: optionAsset(series.id), quoteAsset: config.quoteAsset, side: "buy", size: size.toString() });

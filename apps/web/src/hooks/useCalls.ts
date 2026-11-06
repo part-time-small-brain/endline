@@ -37,12 +37,12 @@ export function useCalls() {
         setTimeout(() => setStates((current) => (current[id] === state ? Object.fromEntries(Object.entries(current).filter(([key]) => key !== id)) : current)), SHOWN_MS);
       };
       try {
-        const session = await (cachedSession(wallet) ?? signSession(wallet, config.intentsId, services.chain.salt));
+        const session = await (cachedSession(wallet, config.intentsId) ?? signSession(wallet, config.intentsId, services.chain.salt));
         const made = await services.relay.call({ series_id: id, signer: { standard: wallet.standard, signer_id: wallet.accountId }, session });
         reloadCalls();
         finish({ status: "done" }, `Called ${seriesTitle(series, quoteDecimals)} at ${formatMultiple(callMultiple(termsOf(made.terms), BigInt(made.ask)))}.`);
       } catch (error) {
-        if (error instanceof RelayError && error.status === 401) forgetSession(wallet);
+        if (error instanceof RelayError && error.status === 401) forgetSession(wallet, config.intentsId);
         finish({ status: "failed" }, messageOf(error));
       }
     },
