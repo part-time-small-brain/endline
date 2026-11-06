@@ -1,4 +1,4 @@
-import { callableAt, callMultiple, FREE_CALLS_PER_ROUND, type ListedSeries, nextRound as roundAfter, roundOf, termsOf } from "@endline/sdk";
+import { callableAt, callMultiple, FREE_CALLS_PER_ROUND, type ListedSeries, nextRound, roundOf, termsOf } from "@endline/sdk";
 import { useState } from "react";
 import { settlementKey } from "../app/data.tsx";
 import type { useTicket } from "../app/useTicket.ts";
@@ -77,9 +77,9 @@ export function Tap({ state, nowSec, views, onConnect, onAddFunds, onQuote }: Pr
   const yours = views?.filter((v) => v.series.underlying === symbol) ?? [];
   const here = data.listing?.series.filter((s) => s.underlying === symbol) ?? [];
   const callable = (s: ListedSeries) => s.quotable && callableAt(s.expiry, nowSec);
-  const nextRound = roundAfter((data.listing?.series ?? []).filter(callable).map((s) => s.expiry));
-  const callableHere = (s: ListedSeries) => callable(s) && roundOf(s.expiry) === nextRound;
-  const left = FREE_CALLS_PER_ROUND - (data.calls ?? []).filter((c) => roundOf(c.terms.expiry) === nextRound).length;
+  const callRound = nextRound((data.listing?.series ?? []).filter(callable).map((s) => s.expiry));
+  const callableHere = (s: ListedSeries) => callable(s) && roundOf(s.expiry) === callRound;
+  const left = FREE_CALLS_PER_ROUND - (data.calls ?? []).filter((c) => roundOf(c.terms.expiry) === callRound).length;
   const calledHere = new Map((data.calls ?? []).filter((c) => c.terms.underlying === symbol).map((c) => [c.series_id, c]));
   const settlementOf = (expiry: number) => data.settlements[settlementKey({ underlying: symbol, expiry })] ?? null;
   const closing = closingOf(here.map((s) => s.expiry), [...yours.map((v) => v.series.expiry), ...[...calledHere.values()].map((c) => c.terms.expiry)], settlementOf, nowSec);

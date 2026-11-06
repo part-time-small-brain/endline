@@ -898,8 +898,8 @@ test.describe("Tap", () => {
     await expect(page.getByRole("table").getByRole("button", { name: /^Up · BTC ends above \$82,000 · Tomorrow .* · pays up to 106831\.9× · you called this$/ })).toBeEnabled();
   });
 
-  test("a call still in flight when the wallet changes reports nothing to the next wallet, and a refused sign-in says to Enable", async ({ page }) => {
-    const { relay } = await freeCalls(page);
+  test("a call still in flight when the wallet changes reports nothing to the next wallet, which signs in afresh", async ({ page }) => {
+    const { relay, signs } = await freeCalls(page);
     let release = () => {};
     relay.hold = new Promise((resolve) => (release = resolve));
     const grid = page.getByRole("table");
@@ -911,12 +911,12 @@ test.describe("Tap", () => {
     await page.getByRole("button", { name: /Ethereum wallet/ }).click();
     await expect(grid.locator("[aria-busy=true]")).toHaveCount(0);
     release();
-    await expect.poll(() => relay.calls.length).toBe(1);
-    await page.clock.fastForward(1_000);
+    await expect(grid.getByRole("button", { name: /^Up · BTC ends above \$81,000 · Tomorrow .* · you called this$/ })).toBeVisible();
     await expect(page.getByRole("status").filter({ hasText: /^Called / })).toHaveCount(0);
-    await page.evaluate(() => Object.assign(window, { refuseCalls: { status: 401, error: "session refused: no such public key" } }));
+    await page.evaluate(() => Object.assign(window, { refuseCalls: { status: 401, error: "session refused: deadline out of range" } }));
     await grid.getByRole("button", { name: /^Up · BTC ends above \$82,000 · Tomorrow / }).click();
-    await expect(page.getByRole("status").filter({ hasText: "Your wallet couldn't sign in. A NEAR wallet needs Enable first, the one-time step before your first buy." })).toBeVisible();
+    await expect(page.getByRole("status").filter({ hasText: "Your wallet couldn't sign in. Tap again to sign in again." })).toBeVisible();
+    expect(await signs()).toBe(2);
   });
 
   test("a call on an end that's over drops off the grid even while its UTC day is still the next round", async ({ page }) => {

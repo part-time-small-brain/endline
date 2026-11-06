@@ -7,12 +7,13 @@ import { seriesTitle } from "../lib/labels.ts";
 import { formatMultiple } from "../lib/money.ts";
 import { useWallet } from "../wallet/context.tsx";
 import { cachedSession, forgetSession, signSession } from "../wallet/session.ts";
+import type { Wallet } from "../wallet/wallet.ts";
 import type { TapState } from "./useTaps.ts";
 
 const SHOWN_MS = 3_000;
 
-function messageOf(error: unknown): string {
-  if (error instanceof RelayError && error.status === 401) return "Your wallet couldn't sign in. A NEAR wallet needs Enable first, the one-time step before your first buy.";
+function messageOf(error: unknown, wallet: Wallet): string {
+  if (error instanceof RelayError && error.status === 401) return wallet.kind === "near" ? "Your wallet couldn't sign in. Enable it first if you haven't, the one-time step before your first buy, then tap again." : "Your wallet couldn't sign in. Tap again to sign in again.";
   const text = error instanceof RelayError && !error.message.startsWith("relay returned") ? error.message : "That call didn't go through. Try again.";
   return `${text.charAt(0).toUpperCase()}${text.slice(1).replace(/\.?$/, ".")}`;
 }
@@ -52,7 +53,7 @@ export function useCalls() {
         finish({ status: "done" }, `Called ${seriesTitle(series, quoteDecimals)} at ${formatMultiple(callMultiple(termsOf(made.terms), BigInt(made.ask)))}.`);
       } catch (error) {
         if (error instanceof RelayError && error.status === 401) forgetSession(wallet, config.intentsId);
-        finish({ status: "failed" }, messageOf(error));
+        finish({ status: "failed" }, messageOf(error, wallet));
       }
     },
     [wallet, config.intentsId, services, quoteDecimals, reloadCalls],

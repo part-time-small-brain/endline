@@ -194,7 +194,7 @@ export function createMockServices(config: Config): Services {
       if (!callable(series)) throw new RelayError("the final round has started: calls close when the averaging window opens", 409);
       const round = roundOf(series.expiry);
       if (round !== nextRound(world.series.filter(callable).map((s) => s.expiry))) throw new RelayError("free calls are open only for the next round", 409);
-      if ((wallet(signer.signer_id).get(config.quoteAsset) ?? 0n) < 10n ** BigInt(QUOTE_DECIMALS)) throw new RelayError("a free call needs at least $1 of USDC in your NEAR Intents balance: deposit first", 402);
+      if ((wallet(signer.signer_id).get(config.quoteAsset) ?? 0n) < 10n ** BigInt(QUOTE_DECIMALS)) throw new RelayError("a free call needs at least $1 of USDC in this wallet's NEAR Intents balance (a Tap balance doesn't count): deposit first", 402);
       const mine = called.filter((c) => c.account_id === signer.signer_id);
       if (mine.some((c) => c.series_id === series_id)) throw new RelayError("you already called this cell", 409);
       const mark = markOf(series);
