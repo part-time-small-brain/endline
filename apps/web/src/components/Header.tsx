@@ -11,7 +11,7 @@ import { Button } from "./Button.tsx";
 import { Mark, Wordmark } from "./Glyphs.tsx";
 import { Money } from "./Money.tsx";
 import { Popover } from "./Popover.tsx";
-import { ThemeCycle, ThemeSwitch } from "./ThemeSwitch.tsx";
+import { ThemeToggle } from "./ThemeToggle.tsx";
 
 interface Props {
   route: Route;
@@ -48,13 +48,13 @@ export function Header({ route, open, toCollect, onConnect, onAddFunds }: Props)
 
   const navigation = (
     <>
-      <nav aria-label="App" className="flex shrink-0 rounded-xl bg-track near:bg-transparent min-[360px]:near:gap-2">
+      <nav aria-label="App" className="flex shrink-0 min-[360px]:gap-2">
         {tabs.map(({ href, label, Icon, current }) => (
           <Link
             key={href}
             href={href}
             aria-current={current ? "page" : undefined}
-            className={`relative inline-flex h-11 items-center gap-2 rounded-xl px-2 text-sm font-semibold transition-colors duration-150 sm:px-3.5 near:rounded-none near:border-y-2 near:border-t-transparent near:px-1 near:font-mono near:text-xs near:tracking-[0.06em] near:uppercase ${current ? "bg-paper text-ink near:border-b-up near:bg-transparent" : "text-ink-2 hover:text-ink near:border-b-transparent"}`}
+            className={`relative inline-flex h-11 items-center gap-2 border-y-2 border-t-transparent px-1 font-mono text-xs font-semibold tracking-[0.06em] uppercase transition-colors duration-150 ${current ? "border-b-up text-ink" : "border-b-transparent text-ink-2 hover:text-ink"}`}
           >
             <Icon size={18} aria-hidden="true" className="hidden sm:block" />
             <span className="sm:sr-only lg:not-sr-only">{label}</span>
@@ -63,14 +63,14 @@ export function Header({ route, open, toCollect, onConnect, onAddFunds }: Props)
         ))}
       </nav>
       {route === "trade" && (
-        <div aria-label="Trade view" role="group" className="flex shrink-0 grow rounded-xl bg-track sm:grow-0 near:bg-transparent near:ring-1 near:ring-ink/20 near:ring-inset">
+        <div aria-label="Trade view" role="group" className="flex shrink-0 grow rounded-xl ring-1 ring-ink/20 ring-inset sm:grow-0">
           {(Object.keys(VIEWS) as TradeMode[]).map((view) => (
             <button
               key={view}
               type="button"
               aria-pressed={mode === view}
               onClick={() => setTradeMode(view)}
-              className={`h-11 min-w-11 grow rounded-xl px-2 text-sm font-semibold transition-colors min-[360px]:px-3 sm:px-4 near:font-mono near:text-[11px] near:tracking-[0.06em] near:uppercase ${mode === view ? "bg-ink text-on-ink" : "text-ink-2 hover:text-ink"}`}
+              className={`h-11 min-w-11 grow rounded-xl px-2 font-mono text-[11px] font-semibold tracking-[0.06em] uppercase transition-colors min-[360px]:px-3 sm:px-4 ${mode === view ? "bg-ink text-on-ink" : "text-ink-2 hover:text-ink"}`}
             >
               {VIEWS[view]}
             </button>
@@ -81,7 +81,7 @@ export function Header({ route, open, toCollect, onConnect, onAddFunds }: Props)
   );
 
   return (
-    <header className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 px-4 py-1.5 sm:min-h-16 sm:px-6 sm:py-0 near:border-b near:border-rule">
+    <header className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-b border-rule px-4 py-1.5 sm:min-h-16 sm:px-6 sm:py-0">
       <div className="flex shrink-0 items-center gap-3">
         <Link href="/" aria-label="Endline home" className="-m-2 rounded-lg p-2 sm:m-0 sm:p-0">
           <span className="hidden sm:inline">
@@ -94,23 +94,18 @@ export function Header({ route, open, toCollect, onConnect, onAddFunds }: Props)
         <div className="hidden sm:contents">{navigation}</div>
       </div>
       <div className="ml-auto flex shrink-0 items-center gap-2 sm:gap-3">
-        <div className="hidden md:block">
-          <ThemeSwitch />
+        <div className={wallet ? "hidden md:block" : undefined}>
+          <ThemeToggle />
         </div>
-        {!wallet && (
-          <div className="md:hidden">
-            <ThemeCycle />
-          </div>
-        )}
         {tag && (
-          <span className="inline-flex h-6 shrink-0 items-center gap-1.5 rounded-md bg-ink px-2 text-xs font-semibold text-on-ink near:border near:border-ink/20 near:bg-transparent near:font-mono near:text-[10px] near:font-medium near:tracking-[0.12em] near:text-ink-2 near:uppercase">
+          <span className="inline-flex h-6 shrink-0 items-center gap-1.5 rounded-md border border-ink/20 px-2 font-mono text-[10px] font-medium tracking-[0.12em] text-ink-2 uppercase">
             <span className="size-1.5 rounded-full bg-up" aria-hidden="true" />
             {tag}
           </span>
         )}
         {wallet ? (
           <>
-            <button type="button" onClick={onAddFunds} className="h-11 rounded-xl bg-surface px-3 font-semibold xl:hidden near:border near:border-ink/20 near:font-mono near:text-[13px] near:font-medium" aria-label="Balance, add funds">
+            <button type="button" onClick={onAddFunds} className="h-11 rounded-xl border border-ink/20 bg-surface px-3 font-mono text-[13px] font-medium xl:hidden" aria-label="Balance, add funds">
               {money}
             </button>
             <div className="hidden h-12 items-center gap-3 rounded-xl bg-surface py-1 pr-1 pl-4 xl:flex">
@@ -135,8 +130,8 @@ export function Header({ route, open, toCollect, onConnect, onAddFunds }: Props)
               panelClassName="w-64 rounded-2xl bg-surface p-2 shadow-[0_12px_32px_rgb(0_0_0/0.18)]"
             >
               <span className="block px-2 py-2 text-sm font-semibold break-all">{wallet.accountId}</span>
-              <div className="mb-2 px-2 md:hidden">
-                <ThemeSwitch />
+              <div className="mb-2 md:hidden">
+                <ThemeToggle withLabel />
               </div>
               <Button tone="ghost" className="w-full" onClick={() => void disconnect()}>
                 <SignOut size={16} weight="bold" aria-hidden="true" />

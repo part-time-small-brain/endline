@@ -1,5 +1,5 @@
 import type { Locator, Page } from "@playwright/test";
-import { connectDemo, dollars, expect, money, settle, sideways, test } from "./fixtures.ts";
+import { connectDemo, dollars, expect, money, openPopover, settle, sideways, test } from "./fixtures.ts";
 
 test("Lite is the default and Pro persists across reload", async ({ page }) => {
   await page.goto("/app");
@@ -39,17 +39,6 @@ test("Lite buys through the same confirm sheet", async ({ page }) => {
 });
 
 const CHIP_LABELS = ["End date", "Trade asset", "Trade direction", "Price to beat", "Trade amount"] as const;
-
-async function openPopover(page: Page, label: string) {
-  const expanded = page.getByRole("button", { expanded: true });
-  if (await expanded.count()) await page.keyboard.press("Escape");
-  const trigger = page.getByRole("button", { name: label, exact: true });
-  await trigger.click();
-  await expect(trigger).toHaveAttribute("aria-expanded", "true");
-  const panel = trigger.locator("..").locator(":scope > span");
-  await expect(panel).toBeVisible();
-  return panel;
-}
 
 async function ready(page: Page) {
   await page.goto("/app");
@@ -464,45 +453,32 @@ test("Lite baseline and six popovers fit the viewport and support Escape", async
   }
 });
 
-const look = (page: Page) => page.evaluate(() => [
-  document.documentElement.dataset.look ?? "none",
-  getComputedStyle(document.documentElement).backgroundColor,
-  document.querySelector('meta[name="theme-color"]')?.getAttribute("content"),
-]);
-const NEAR = { Dark: ["near", "rgb(10, 10, 10)", "#0a0a0a"], Light: ["near", "rgb(242, 241, 233)", "#f2f1e9"] };
+const paint = (page: Page) => page.evaluate(() => [getComputedStyle(document.documentElement).backgroundColor, document.querySelector('meta[name="theme-color"]')?.getAttribute("content")]);
+const DARK = ["rgb(10, 10, 10)", "#0a0a0a"];
+const LIGHT = ["rgb(242, 241, 233)", "#f2f1e9"];
 
-async function chooseTheme(page: Page, isMobile: boolean, theme: "Light" | "Dark") {
-  if (!isMobile) return page.getByRole("group", { name: "Theme", exact: true }).getByTitle(theme).click();
-  const cycle = page.getByRole("button", { name: /^Theme: / });
-  for (let i = 0; i < 3 && !(await cycle.getAttribute("aria-label"))?.startsWith(`Theme: ${theme}.`); i++) await cycle.click();
-}
-
-test("every app screen wears the NEAR look in the theme picked in the header, kept after reload, and the landing keeps its own", async ({ page, isMobile }) => {
+test("one toggle switches the landing and the app between dark and light, painted before load and kept after reload", async ({ page, isMobile }) => {
+  const toggle = page.getByRole("button", { name: "Light theme" });
+  await page.goto("/");
+  expect(await paint(page)).toEqual(DARK);
+  await expect(toggle).toHaveAttribute("aria-pressed", "false");
+  await toggle.click();
+  await expect(toggle).toHaveAttribute("aria-pressed", "true");
+  expect(await paint(page)).toEqual(LIGHT);
   await page.goto("/app");
   await expect(page.getByLabel("Trade sentence")).toBeVisible();
-  await chooseTheme(page, isMobile, "Dark");
-  expect(await look(page)).toEqual(NEAR.Dark);
-  await chooseTheme(page, isMobile, "Light");
-  expect(await look(page)).toEqual(NEAR.Light);
-  for (const mode of ["Pro", "Tap", "Lite"]) {
-    await page.getByRole("button", { name: mode, exact: true }).click();
-    expect(await look(page), mode).toEqual(NEAR.Light);
-  }
-  await page.getByRole("link", { name: /Positions/ }).click();
-  await expect(page).toHaveURL(/\/positions$/);
-  expect(await look(page)).toEqual(NEAR.Light);
+  expect(await paint(page)).toEqual(LIGHT);
   await page.reload();
-  expect(await look(page)).toEqual(NEAR.Light);
+  expect(await paint(page)).toEqual(LIGHT);
+  await connectDemo(page);
   if (isMobile) {
-    await page.goto("/app");
-    await connectDemo(page);
-    await expect(page.getByRole("button", { name: /^Theme: / })).toBeHidden();
+    await expect(toggle).toBeHidden();
     await page.getByRole("button", { name: /^Account / }).click();
-    await page.getByRole("group", { name: "Theme", exact: true }).getByTitle("Dark").click();
-    expect(await look(page)).toEqual(NEAR.Dark);
   }
-  await page.goto("/");
-  await expect(page.locator("html")).not.toHaveAttribute("data-look", /./);
+  await toggle.click();
+  expect(await paint(page)).toEqual(DARK);
+  await page.reload();
+  expect(await paint(page)).toEqual(DARK);
 });
 
 test("the price list runs high to low with now marked between the prices either side", async ({ page }) => {

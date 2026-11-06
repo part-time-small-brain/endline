@@ -7,10 +7,10 @@ export function FinalCta() {
   const { paths } = useApp().config;
   return (
     <section aria-label="Get started" className="relative grid h-[440px] grid-rows-2 overflow-hidden lg:h-[560px]">
-      <div className="flex items-end bg-page text-ink">
+      <div className="flex items-end">
         <h2 className="mx-auto w-full max-w-7xl px-4 pb-1 text-5xl leading-none font-semibold tracking-[-0.04em] lg:px-12 lg:pb-2 lg:text-8xl">Draw your first line.</h2>
       </div>
-      <div className="bg-page">
+      <div>
         <div className="mx-auto max-w-7xl px-4 pt-10 lg:px-12">
           <Link
             href={paths.trade}

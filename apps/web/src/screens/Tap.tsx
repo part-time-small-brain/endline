@@ -25,6 +25,7 @@ import { seriesTitle } from "../lib/labels.ts";
 import { dayLabel, formatClock, formatUtc } from "../lib/time.ts";
 import { useWallet } from "../wallet/context.tsx";
 import { useTap, useTapPayer } from "../wallet/tapBalance.tsx";
+import { LABEL } from "../components/label.ts";
 
 const FREE_KEY = "tap-free";
 
@@ -132,7 +133,7 @@ export function Tap({ state, nowSec, views, onConnect, onAddFunds, onQuote }: Pr
               </colgroup>
               <thead>
                 <tr className="h-10">
-                  <th scope="col" className="text-left eyebrow text-ink-3">
+                  <th scope="col" className={`text-left ${LABEL}`}>
                     Price to beat
                   </th>
                   <td aria-hidden="true" />
@@ -232,7 +233,7 @@ export function Tap({ state, nowSec, views, onConnect, onAddFunds, onQuote }: Pr
       {wallet && (
         <div className="flex items-center justify-between gap-3 rounded-md border border-rule bg-surface p-4 sm:px-6">
           <p className="min-w-0">
-            <span className="flex items-center gap-2 eyebrow text-ink-3">
+            <span className={`flex items-center gap-2 ${LABEL}`}>
               <span aria-hidden="true" className="size-1.5 rounded-full bg-teal shadow-[0_0_8px_var(--teal)]" />
               Tap balance
             </span>
@@ -244,7 +245,7 @@ export function Tap({ state, nowSec, views, onConnect, onAddFunds, onQuote }: Pr
       {sheet && <TapSheet onClose={() => setSheet(false)} />}
       {mine.length > 0 && (
         <section aria-label="Your taps" className="flex flex-col gap-2 rounded-md border border-rule bg-surface p-4 sm:p-6">
-          <h2 className="eyebrow text-ink-3">Your taps</h2>
+          <h2 className={LABEL}>Your taps</h2>
           {mine.map((v) => (
             <div key={v.series.id} className="flex items-center justify-between gap-3">
               <p className="min-w-0 text-sm">
@@ -260,7 +261,7 @@ export function Tap({ state, nowSec, views, onConnect, onAddFunds, onQuote }: Pr
 
       <TapMode free={free} left={left} budget={budget} quoteDecimals={quoteDecimals} onFree={setFree} onBudget={setBudget} />
       {free && <FreeCalls calls={data.calls ?? []} accountId={wallet?.accountId} nowSec={nowSec} quoteDecimals={quoteDecimals} />}
-      <p className="pb-6 text-center eyebrow text-ink-3">Signed in your browser · settled on NEAR Intents</p>
+      <p className={`pb-6 text-center ${LABEL}`}>Signed in your browser · settled on NEAR Intents</p>
     </div>
   );
 }

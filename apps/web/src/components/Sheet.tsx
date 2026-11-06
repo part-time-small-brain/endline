@@ -64,7 +64,7 @@ export function Sheet({ title, onClose, dismissible = true, children }: Props) {
         aria-modal="true"
         aria-label={title}
         tabIndex={-1}
-        className="relative max-h-[92dvh] w-full max-w-md overflow-y-auto rounded-t-3xl bg-surface p-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] outline-none [animation:rise_.25s_var(--ease-drawer)] sm:rounded-3xl [[data-theme=dark]_&]:ring-1 [[data-theme=dark]_&]:ring-rule near:ring-1 near:ring-rule"
+        className="relative max-h-[92dvh] w-full max-w-md overflow-y-auto rounded-t-3xl bg-surface p-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] outline-none [animation:rise_.25s_var(--ease-drawer)] ring-1 ring-rule sm:rounded-3xl"
       >
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-xl font-semibold">{title}</h2>

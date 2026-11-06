@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { formatPrice } from "../lib/money.ts";
 import type { GoodCase, Ticket } from "../lib/ticket.ts";
+import { LABEL } from "./label.ts";
 import { Money } from "./Money.tsx";
 
 interface Props {
@@ -44,7 +45,7 @@ export function Summary({ up, ticket, quoteDecimals, symbol, goodCase }: Props) 
 function Cell({ label, tint = false, children }: { label: string; tint?: boolean; children: ReactNode }) {
   return (
     <div className={`min-w-0 px-4 py-3 first:rounded-l-md last:rounded-r-md [&+&]:shadow-[-1px_0_0_var(--rule)] ${tint ? "bg-side-field" : ""}`}>
-      <dt className="eyebrow text-ink-3">{label}</dt>
+      <dt className={LABEL}>{label}</dt>
       <dd className="mt-1 flex flex-wrap items-baseline gap-x-1.5 font-mono text-xl font-medium whitespace-nowrap">{children}</dd>
     </div>
   );

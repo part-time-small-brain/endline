@@ -2,8 +2,8 @@ import type { ButtonHTMLAttributes } from "react";
 
 const TONES = {
   primary: "bg-ink text-on-ink hover:opacity-90",
-  up: "bg-up text-on-up hover:brightness-105 near:enabled:shadow-[0_0_32px_var(--up-glow)]",
-  down: "bg-down text-on-down hover:brightness-105 near:enabled:shadow-[0_0_32px_var(--down-glow)]",
+  up: "bg-up text-on-up hover:brightness-105 enabled:shadow-[0_0_32px_var(--up-glow)]",
+  down: "bg-down text-on-down hover:brightness-105 enabled:shadow-[0_0_32px_var(--down-glow)]",
   ghost: "bg-well text-ink hover:bg-well-hover",
 } as const;
 

@@ -1,143 +1,131 @@
-import type { OptionKind } from "@endline/sdk";
-import { Scales } from "@phosphor-icons/react";
-import { m, useReducedMotion, useSpring } from "motion/react";
-import { type ReactNode, useLayoutEffect, useRef, useState } from "react";
+import { m, useReducedMotion } from "motion/react";
+import type { ReactNode } from "react";
 import { useApp } from "../../app/context.ts";
 import { Link } from "../../app/router.tsx";
+import { useTicket } from "../../app/useTicket.ts";
+import { formatToken, formatUsd } from "../../lib/money.ts";
+import { Button } from "../Button.tsx";
+import { LABEL } from "../label.ts";
+import { Lite } from "../trade/Lite.tsx";
 import { HeroDots } from "./HeroDots.tsx";
-import { HeroWidget, PLOT_HEIGHT } from "./HeroWidget.tsx";
 import { jump } from "./jump.ts";
-import { EASE_DRAWER, EASE_OUT, SPRING } from "./motion.ts";
-import type { DemoMarket } from "./useDemoMarket.ts";
+import { EASE_DRAWER, EASE_OUT } from "./motion.ts";
 
-const LINES = [
-  ["Pick", "a", "side"],
-  ["of", "the", "line."],
+const FACTS = [
+  ["Final price", "Median of 7 exchanges"],
+  ["Funding", "Any chain, one balance"],
+  ["Settles on", "NEAR Intents"],
 ];
-const SIDE_BY_SIDE = "(min-width: 1024px)";
-const BASELINE_ABOVE_BOTTOM = 8;
-const SEAT_RANGE = [-32, 160] as const;
 
-const offsetIn = (element: HTMLElement, ancestor: HTMLElement) => {
-  let top = 0;
-  for (let node: Element | null = element; node instanceof HTMLElement && node !== ancestor; node = node.offsetParent) top += node.offsetTop;
-  return top;
-};
+const BUTTON = "inline-flex h-14 items-center justify-center rounded-2xl px-6 text-lg font-semibold transition-[transform,opacity,background-color] duration-150 ease-out active:scale-[0.97]";
+const PRIMARY = `${BUTTON} bg-ink text-on-ink hover:opacity-90`;
 
-export function Hero({ market, nowSec }: { market: DemoMarket | undefined; nowSec: number }) {
+export function Hero({ nowSec }: { nowSec: number }) {
   const { paths } = useApp().config;
-  const [kind, setKind] = useState<OptionKind>("call");
-  const [lineY, setLineY] = useState(PLOT_HEIGHT / 2);
-  const [box, setBox] = useState<{ plot: number; title: number; sideBySide: boolean }>();
-  const [pinned, setPinned] = useState<number>();
-  const hero = useRef<HTMLElement>(null);
-  const plot = useRef<HTMLDivElement>(null);
-  const title = useRef<HTMLHeadingElement>(null);
   const reduce = useReducedMotion();
-  const seat = useSpring(0, SPRING);
-  const placed = useRef(false);
-
-  useLayoutEffect(() => {
-    const section = hero.current;
-    if (!section) return;
-    const measure = () => {
-      if (!plot.current || !title.current) return;
-      setBox({ plot: offsetIn(plot.current, section), title: offsetIn(title.current, section) + title.current.offsetHeight, sideBySide: matchMedia(SIDE_BY_SIDE).matches });
-    };
-    measure();
-    const observer = new ResizeObserver(measure);
-    observer.observe(section);
-    void document.fonts.ready.then(measure);
-    return () => observer.disconnect();
-  }, []);
-
-  const horizon = box && box.plot + lineY;
-  const seatTo = box?.sideBySide && horizon !== undefined ? Math.min(Math.max((pinned ?? horizon) - box.title + BASELINE_ABOVE_BOTTOM, SEAT_RANGE[0]), SEAT_RANGE[1]) : 0;
-
-  useLayoutEffect(() => {
-    if (!box) return;
-    if (placed.current && !reduce) seat.set(seatTo);
-    else seat.jump(seatTo);
-    placed.current = true;
-  }, [box, seatTo, reduce, seat]);
-
-  const up = kind === "call";
-  const pin = () => setPinned((value) => value ?? horizon);
+  const state = useTicket(nowSec);
+  const { data, symbol, up, series, current, budget, unit, quoteDecimals, notice, loading } = state;
+  const waiting = (!data.listing && !data.listingError) || (!notice && loading);
+  const label = `Try ${symbol} ${up ? "Up" : "Down"} for ${formatUsd(budget, quoteDecimals).replace(/\.00$/, "")}`;
+  const action = !series ? (
+    <Link href={paths.trade} className={PRIMARY}>
+      Open app
+    </Link>
+  ) : current && current.size > 0n ? (
+    <Link href={`${paths.trade}?${new URLSearchParams({ series: series.id, pay: formatToken(budget, quoteDecimals, 2).replaceAll(",", "") })}`} className={PRIMARY}>
+      {label}
+    </Link>
+  ) : (
+    <Button size="lg" disabled>
+      {budget < unit ? "Enter a valid amount" : label}
+    </Button>
+  );
 
   return (
-    <section ref={hero} id="top" data-side={up ? "up" : "down"} className="relative overflow-hidden">
-      {horizon !== undefined && (
-        <m.div aria-hidden="true" className="absolute inset-x-0 top-0 h-full" initial={false} animate={{ y: horizon }} transition={SPRING}>
-          <div className={`absolute inset-x-0 bottom-full h-full transition-colors duration-300 [mask-image:linear-gradient(to_top,#000,rgb(0_0_0/var(--glow-far)))] ${up ? "bg-up-glow" : "bg-up-glow-soft"}`} />
-          <div className={`absolute inset-0 transition-colors duration-300 [mask-image:linear-gradient(#000,rgb(0_0_0/var(--glow-far)))] ${up ? "bg-down-glow-soft" : "bg-down-glow"}`} />
-          <m.div
-            className="absolute inset-x-0 -top-px h-[2.5px] origin-left bg-ink"
-            initial={{ scaleX: 0 }}
-            animate={{ scaleX: 1 }}
-            transition={{ duration: 1.1, ease: EASE_DRAWER, delay: 0.15 }}
-          />
-        </m.div>
-      )}
+    <section aria-labelledby="hero-title" className="relative overflow-x-clip bg-page">
       <HeroDots still={reduce === true} />
-
-      <div className="relative mx-auto grid max-w-7xl grid-cols-1 gap-8 px-4 pt-24 pb-12 lg:grid-cols-[minmax(0,1fr)_584px] lg:items-start lg:gap-12 lg:px-12 lg:pt-32 lg:pb-16">
-        <m.div style={{ y: seat }} className="lg:pt-6">
-          <h1 ref={title} className="text-5xl leading-none font-semibold tracking-[-0.035em] xl:text-7xl">
-            {LINES.map((words, line) => (
-              <span key={line} className="block">
-                {words.map((word, i) => (
-                  <m.span
-                    key={word}
-                    className="mr-[0.24em] inline-block last:mr-0"
-                    initial={{ opacity: 0, y: 24, filter: "blur(8px)" }}
-                    animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-                    transition={{ duration: 0.9, ease: EASE_OUT, delay: 0.08 + (line * 3 + i) * 0.07 }}
-                  >
-                    {word}
-                  </m.span>
-                ))}
+      <div className="relative mx-auto grid max-w-7xl grid-cols-1 gap-10 px-4 pt-10 pb-16 lg:grid-cols-[minmax(0,1fr)_minmax(0,600px)] lg:items-start lg:gap-12 lg:px-12 lg:pt-16 lg:pb-24">
+        <div className="lg:pt-12">
+          <Rise>
+            <p className="flex items-center gap-2.5 font-mono text-[0.6875rem] font-medium tracking-[0.14em] text-ink-3 uppercase">
+              <span aria-hidden="true" className="h-0.5 w-6 bg-[linear-gradient(to_right,var(--up)_50%,var(--down)_50%)]" />
+              Options on BTC and ETH
+            </p>
+          </Rise>
+          <h1 id="hero-title" className="mt-6 text-5xl leading-none font-semibold tracking-[-0.035em] xl:text-7xl">
+            <span className="block">
+              <Word index={0}>Pick</Word> <Word index={1}>a</Word> <Word index={2}>side</Word>
+            </span>
+            <span className="block">
+              <Word index={3}>of</Word>{" "}
+              <span className="relative inline-block">
+                <m.span
+                  aria-hidden="true"
+                  className="absolute top-full right-[0.18em] left-0 mt-3 flex h-1.5 origin-left"
+                  initial={{ scaleX: 0 }}
+                  animate={{ scaleX: 1 }}
+                  transition={{ duration: 1.1, ease: EASE_DRAWER, delay: 0.5 }}
+                >
+                  <span className="flex-1 bg-up" />
+                  <span className="flex-1 bg-down" />
+                </m.span>
+                <Word index={4}>the</Word> <Word index={5}>line.</Word>
               </span>
-            ))}
+            </span>
           </h1>
           <Rise delay={0.3}>
-            <p className="mt-6 max-w-[520px] text-base lg:text-xl">
+            <p className="mt-12 max-w-[520px] text-base text-ink-2 lg:text-xl">
               Choose whether Bitcoin or Ethereum ends above or below your price. The most you can lose is what you pay.
             </p>
           </Rise>
           <Rise delay={0.42}>
             <div className="mt-8 flex flex-wrap items-center gap-3">
-              <Link
-                href={paths.trade}
-                className="inline-flex h-14 items-center rounded-2xl bg-ink px-6 font-semibold text-on-ink transition-[transform,opacity] duration-150 ease-out hover:opacity-90 active:scale-[0.97]"
-              >
+              <Link href={paths.trade} className={PRIMARY}>
                 Start trading
               </Link>
-              <a
-                href="#how"
-                onClick={jump}
-                className="inline-flex h-14 items-center rounded-2xl px-6 font-semibold shadow-[inset_0_0_0_2px_var(--ink)] transition-[transform,background-color] duration-150 ease-out hover:bg-ink/5 active:scale-[0.97]"
-              >
+              <a href="#how" onClick={jump} className={`${BUTTON} ring-1 ring-ink/20 ring-inset hover:bg-well`}>
                 How it works
               </a>
             </div>
           </Rise>
           <Rise delay={0.54}>
-            <p className="mt-8 flex items-center gap-3 text-sm font-semibold">
-              <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-ink text-on-ink" aria-hidden="true">
-                <Scales size={20} />
-              </span>
-              Final price: median of 7 major exchanges
-            </p>
+            <dl className="mt-10 flex max-w-[520px] flex-wrap gap-x-10 gap-y-4 border-t border-rule pt-4">
+              {FACTS.map(([term, detail]) => (
+                <div key={term}>
+                  <dt className={LABEL}>{term}</dt>
+                  <dd className="mt-1.5 text-[0.9375rem]">{detail}</dd>
+                </div>
+              ))}
+            </dl>
           </Rise>
-        </m.div>
+        </div>
 
         <Rise delay={0.25}>
-          <div onPointerDownCapture={pin} onKeyDownCapture={pin}>
-            <HeroWidget market={market} nowSec={nowSec} kind={kind} onKind={setKind} onLine={setLineY} plotRef={plot} />
-          </div>
+          {waiting ? (
+            <div aria-busy="true" aria-label="Loading prices" className="h-[34rem] animate-pulse rounded-md border border-rule bg-surface" />
+          ) : notice ? (
+            <p role="status" className="grid h-[34rem] place-items-center rounded-md border border-rule bg-surface px-6 text-center text-lg font-semibold">
+              {notice.title}
+            </p>
+          ) : (
+            <Lite state={state} nowSec={nowSec} action={action} />
+          )}
         </Rise>
       </div>
     </section>
+  );
+}
+
+function Word({ index, children }: { index: number; children: ReactNode }) {
+  return (
+    <m.span
+      className="inline-block"
+      initial={{ opacity: 0, y: 24, filter: "blur(8px)" }}
+      animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+      transition={{ duration: 0.9, ease: EASE_OUT, delay: 0.08 + index * 0.07 }}
+    >
+      {children}
+    </m.span>
   );
 }
 

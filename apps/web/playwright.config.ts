@@ -21,10 +21,8 @@ export default defineConfig({
   reporter: "list",
   use: { baseURL: `http://localhost:${PORT}`, trace: "retain-on-failure" },
   projects: [
-    { name: "desktop-light", testIgnore: ONLY_THERE, use: { ...desktop, colorScheme: "light" } },
-    { name: "desktop-dark", testIgnore: ONLY_THERE, use: { ...desktop, colorScheme: "dark" } },
-    { name: "mobile-light", testIgnore: ONLY_THERE, use: { ...mobile, colorScheme: "light" } },
-    { name: "mobile-dark", testIgnore: ONLY_THERE, use: { ...mobile, colorScheme: "dark" } },
+    { name: "desktop", testIgnore: ONLY_THERE, use: desktop },
+    { name: "mobile", testIgnore: ONLY_THERE, use: mobile },
     { name: "testnet", testMatch: [/testnet\.spec/, /positions\.spec/], use: { ...desktop, baseURL: `http://localhost:${TESTNET_PORT}` } },
     { name: "offline", testMatch: /offline\.spec/, use: { ...desktop, baseURL: `http://localhost:${OFFLINE_PORT}` } },
     { name: "split", testMatch: /split\.spec/, use: { ...desktop, baseURL: `http://localhost:${SPLIT_PORT}` } },

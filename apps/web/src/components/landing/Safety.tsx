@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { formatClock, formatUtc } from "../../lib/time.ts";
+import { LABEL } from "../label.ts";
 import { nextDailyEnd } from "./dailyEnd.ts";
 import { Reveal } from "./Reveal.tsx";
 import { SectionHead } from "./SectionHead.tsx";
@@ -35,11 +36,11 @@ export function Safety({ nowSec }: { nowSec: number }) {
       <Row title="Fully collateralized" line="Every payout is locked in the contract before you buy.">
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="rounded-2xl bg-well p-4">
-            <p className="text-xs text-ink-2">Behind every Up and Down</p>
+            <p className={LABEL}>Behind every Up and Down</p>
             <p className="mt-1 font-display text-xl font-semibold">Its whole payout in USDC</p>
           </div>
           <div className="rounded-2xl bg-well p-4">
-            <p className="text-xs text-ink-2">Paid out</p>
+            <p className={LABEL}>Paid out</p>
             <p className="mt-1 font-display text-xl font-semibold">In USDC, to your balance</p>
           </div>
         </div>
@@ -63,13 +64,13 @@ export function Safety({ nowSec }: { nowSec: number }) {
                     style={{ left: `${50 + shift}%` }}
                   />
                 </span>
-                <span className="text-right font-semibold">{cents.format(price)}</span>
-                <span className="hidden text-right text-xs sm:block">{median ? "Median" : outlier ? "Outlier" : ""}</span>
+                <span className="text-right font-mono font-medium">{cents.format(price)}</span>
+                <span className="hidden text-right font-mono text-[0.625rem] tracking-[0.12em] uppercase sm:block">{median ? "Median" : outlier ? "Outlier" : ""}</span>
               </li>
             );
           })}
         </ul>
-        <p className="mt-3 text-xs text-ink-2">BTC, one recorded oracle run</p>
+        <p className="mt-3 font-mono text-[0.625rem] tracking-[0.12em] text-ink-3 uppercase">BTC, one recorded oracle run</p>
       </Row>
 
       <Row title="Time to catch a wrong price" line="A monitor checks every proposed price. The owner can override a wrong one before it's final.">
@@ -79,8 +80,8 @@ export function Safety({ nowSec }: { nowSec: number }) {
               <span
                 className={`absolute top-0 size-4 rounded-full shadow-[inset_0_0_0_2.5px_var(--ink)] ${i === 2 ? "right-0 bg-ink" : "bg-paper"} ${i === 1 ? "left-1/2 -translate-x-1/2" : i === 0 ? "left-0" : ""}`}
               />
-              <b className="block font-semibold">{formatClock(at)}</b>
-              <span className="text-xs text-ink-2">{label}</span>
+              <b className="block font-mono font-medium">{formatClock(at)}</b>
+              <span className={LABEL}>{label}</span>
             </li>
           ))}
         </ol>
@@ -99,7 +100,7 @@ function Row({ title, line, children }: { title: string; line: string; children:
         <h3 className="text-3xl font-semibold">{title}</h3>
         <p className="mt-3 max-w-[520px] text-lg text-ink-2">{line}</p>
       </div>
-      <div className="rounded-3xl bg-surface p-4 lg:p-6">{children}</div>
+      <div className="rounded-md border border-rule bg-surface p-4 lg:p-6">{children}</div>
     </Reveal>
   );
 }

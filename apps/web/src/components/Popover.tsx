@@ -81,7 +81,7 @@ export function Popover({ label, description, button, buttonClassName, panelClas
       >
         <span
           ref={body}
-          className={`block whitespace-normal ${fit ? "overflow-y-auto overscroll-contain" : ""} [[data-theme=dark]_&]:ring-1 [[data-theme=dark]_&]:ring-rule near:ring-1 near:ring-rule ${panelClassName}`}
+          className={`block whitespace-normal ${fit ? "overflow-y-auto overscroll-contain" : ""} ring-1 ring-rule ${panelClassName}`}
         >
           {children}
         </span>

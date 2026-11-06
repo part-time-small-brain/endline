@@ -11,7 +11,7 @@ interface Props {
 export function GlowRect({ side, picked, y = 0, width, height }: Props) {
   const id = useId();
   const color = `var(--${side}-glow${picked ? "" : "-soft"})`;
-  const [top, bottom] = side === "up" ? ["var(--glow-far)", 1] : [1, "var(--glow-far)"];
+  const [top, bottom] = side === "up" ? [0, 1] : [1, 0];
   return (
     <>
       <linearGradient id={id} x1="0" y1="0" x2="0" y2="1">
