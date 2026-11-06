@@ -31,7 +31,7 @@ function setup(list = DAYS.flatMap((day) => [series(81_000, day), series(82_000,
   const book = { marks: list.map((s) => mark(s)) };
   const open = (path = dir) => new Calls(fake.chain, new Sessions(fake.chain, INTENTS), () => book.marks, path, maxCalls);
   const calls = open();
-  const call = (seriesId: string, account = "alice.near", signed = session(account)) => calls.add({ series_id: seriesId, signer: { standard: "nep413", signer_id: account }, session: signed });
+  const call = (seriesId: string, account = "alice.near", signed = session(account), client = `ip-of-${account}`) => calls.add({ series_id: seriesId, signer: { standard: "nep413", signer_id: account }, session: signed }, client);
   const settle = async (expiry: number, price: number) => {
     fake.settlements.set(`BTC:${expiry}`, { price: String(BigInt(price) * USD), final_at: expiry + 3_900 });
     at(expiry + 3_960);
@@ -101,6 +101,43 @@ describe("free calls", () => {
     await expect(t.call(series(81_000, later).id, "bob.near")).resolves.toMatchObject({ account_id: "bob.near" });
     at(NEXT - 2 * 3_600);
     await expect(t.call(series(81_000, NEXT).id, "carol.near")).resolves.toMatchObject({ account_id: "carol.near" });
+  });
+
+  it("allows 100 calls a round per client across accounts, apart per client, again next round, and still after a restart", async () => {
+    const cells = Array.from({ length: 101 }, (_, i) => series(70_000 + i * 500));
+    const t = setup([...cells, series(81_000, NEXT)]);
+    const from = (cell: Series, account: string, client = "2001:db8:1") => t.call(cell.id, account, session(account), client);
+    for (const [i, cell] of cells.slice(0, 100).entries()) await from(cell, `p${Math.floor(i / 10)}.near`);
+    const balanceOf = vi.spyOn(t.chain, "balanceOf");
+    expect(await httpStatus(from(cells[100]!, "p10.near"))).toBe(429);
+    expect(balanceOf).not.toHaveBeenCalled();
+    balanceOf.mockRestore();
+    const reopened = t.open();
+    await reopened.load();
+    expect(await httpStatus(reopened.add({ series_id: cells[100]!.id, signer: { standard: "nep413", signer_id: "p10.near" }, session: session("p10.near") }, "2001:db8:1"))).toBe(429);
+    await expect(from(cells[100]!, "p10.near", "2001:db8:2")).resolves.toMatchObject({ account_id: "p10.near" });
+    expect(t.calls.byAccount("p10.near")[0]).not.toHaveProperty("client");
+    at(NEXT - 2 * 3_600);
+    await expect(from(series(81_000, NEXT), "p0.near")).resolves.toMatchObject({ account_id: "p0.near" });
+  });
+
+  it("holds the per-client cap when many calls from one client arrive at once", async () => {
+    const cells = Array.from({ length: 110 }, (_, i) => series(70_000 + i * 500));
+    const t = setup(cells);
+    const results = await Promise.allSettled(cells.map((cell, i) => t.call(cell.id, `p${i}.near`, session(`p${i}.near`), "1.2.3.4")));
+    expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(100);
+  });
+
+  it("refuses a repeat, a used-up account, client or round without reading the balance", async () => {
+    const strikes = Array.from({ length: 12 }, (_, i) => 75_000 + i * 1_000);
+    const t = setup(strikes.map((k) => series(k)), 11);
+    for (const k of strikes.slice(0, 10)) await t.call(series(k).id);
+    await t.call(series(85_000).id, "bob.near", session("bob.near"), "ip-of-alice.near");
+    const balanceOf = vi.spyOn(t.chain, "balanceOf");
+    expect(await httpStatus(t.call(series(75_000).id))).toBe(409);
+    expect(await httpStatus(t.call(series(86_000).id))).toBe(429);
+    expect(await httpStatus(t.call(series(86_000).id, "carol.near"))).toBe(503);
+    expect(balanceOf).not.toHaveBeenCalled();
   });
 
   it("forgets a call it couldn't save, so the same call can be made again", async () => {

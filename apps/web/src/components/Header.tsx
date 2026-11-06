@@ -11,6 +11,7 @@ import { Button } from "./Button.tsx";
 import { Mark, Wordmark } from "./Glyphs.tsx";
 import { Money } from "./Money.tsx";
 import { Popover } from "./Popover.tsx";
+import { ThemeToggle } from "./ThemeToggle.tsx";
 
 interface Props {
   route: Route;
@@ -93,6 +94,9 @@ export function Header({ route, open, toCollect, onConnect, onAddFunds }: Props)
         <div className="hidden sm:contents">{navigation}</div>
       </div>
       <div className="ml-auto flex shrink-0 items-center gap-2 sm:gap-3">
+        <div className={wallet ? "hidden md:block" : undefined}>
+          <ThemeToggle />
+        </div>
         {tag && (
           <span className="inline-flex h-6 shrink-0 items-center gap-1.5 rounded-md border border-ink/20 px-2 font-mono text-[10px] font-medium tracking-[0.12em] text-ink-2 uppercase">
             <span className="size-1.5 rounded-full bg-up" aria-hidden="true" />
@@ -126,6 +130,9 @@ export function Header({ route, open, toCollect, onConnect, onAddFunds }: Props)
               panelClassName="w-64 rounded-2xl bg-surface p-2 shadow-[0_12px_32px_rgb(0_0_0/0.18)]"
             >
               <span className="block px-2 py-2 text-sm font-semibold break-all">{wallet.accountId}</span>
+              <div className="mb-2 md:hidden">
+                <ThemeToggle withLabel />
+              </div>
               <Button tone="ghost" className="w-full" onClick={() => void disconnect()}>
                 <SignOut size={16} weight="bold" aria-hidden="true" />
                 Disconnect

@@ -7,6 +7,7 @@ import type { Chain } from "./rpc.ts";
 import type { Sessions } from "./session.ts";
 
 const MAX_CALLS = 10_000;
+const MAX_CALLS_PER_CLIENT = 10 * FREE_CALLS_PER_ROUND;
 const BOARD_SIZE = 20;
 const ROUNDS_KEPT = 7;
 const WIN_DAYS_KEPT = 60;
@@ -15,7 +16,7 @@ const UNPRICED_KEEP_SEC = 7 * SECONDS_PER_DAY;
 const Score = z.object({ points: z.number().int(), wins: z.number().int() });
 type Score = z.infer<typeof Score>;
 const State = z.object({
-  calls: z.array(Call),
+  calls: z.array(Call.extend({ client: z.string().optional() })),
   rounds: z.array(z.object({ date: z.string(), players: z.record(z.string(), Score) })),
   wins: z.record(z.string(), z.array(z.string())),
 });
@@ -44,7 +45,7 @@ export class Calls {
     this.ranked = undefined;
   }
 
-  async add({ series_id, signer, session }: CallRequest): Promise<Call> {
+  async add({ series_id, signer, session }: CallRequest, client: string): Promise<Call> {
     if (!AccountId.safeParse(signer.signer_id).success) throw new HttpError(400, "signer_id is not a valid intents account");
     await this.sessions.check(session, signer);
     const [all, contract] = await Promise.all([this.chain.listSeries(), this.chain.contractConfig()]);
@@ -55,29 +56,39 @@ export class Calls {
     if (!callable(series)) throw new HttpError(409, "the final round has started: calls close when the averaging window opens");
     const round = roundOf(series.expiry);
     if (round !== nextRound(all.filter(callable).map((s) => s.expiry))) throw new HttpError(409, "free calls are open only for the next round");
-    const dollar = 10n ** BigInt(contract.quote_decimals);
-    if ((await this.chain.balanceOf(signer.signer_id, contract.quote_asset)) < dollar) throw new HttpError(402, "a free call needs at least $1 of USDC in this wallet's NEAR Intents balance (a Tap balance doesn't count): deposit first");
-    const mine = this.state.calls.filter((c) => c.account_id === signer.signer_id);
-    if (mine.some((c) => c.series_id === series_id)) throw new HttpError(409, "you already called this cell");
+    const checkRoom = () => {
+      if (this.state.calls.some((c) => c.account_id === signer.signer_id && c.series_id === series_id)) throw new HttpError(409, "you already called this cell");
+      const inRound = this.state.calls.filter((c) => roundOf(c.terms.expiry) === round);
+      if (inRound.filter((c) => c.account_id === signer.signer_id).length >= FREE_CALLS_PER_ROUND) throw new HttpError(429, `you've used your ${FREE_CALLS_PER_ROUND} free calls for this round`);
+      if (inRound.filter((c) => c.client === client).length >= MAX_CALLS_PER_CLIENT) throw new HttpError(429, "your network has used its free calls for this round");
+      if (inRound.filter((c) => !c.result).length >= this.maxCalls) throw new HttpError(503, "free calls are full for this round");
+    };
+    checkRoom();
     const mark = this.marks().find((m) => m.series_id === series_id);
     if (!mark) throw new HttpError(503, "no price for this cell right now");
     if (BigInt(mark.ask) >= BigInt(series.width)) throw new HttpError(409, "this cell can't pay more than it costs");
-    if (mine.filter((c) => roundOf(c.terms.expiry) === round).length >= FREE_CALLS_PER_ROUND) throw new HttpError(429, `you've used your ${FREE_CALLS_PER_ROUND} free calls for this round`);
-    if (this.state.calls.filter((c) => !c.result && roundOf(c.terms.expiry) === round).length >= this.maxCalls) throw new HttpError(503, "free calls are full for this round");
+    const dollar = 10n ** BigInt(contract.quote_decimals);
+    if ((await this.chain.balanceOf(signer.signer_id, contract.quote_asset)) < dollar) throw new HttpError(402, "a free call needs at least $1 of USDC in this wallet's NEAR Intents balance (a Tap balance doesn't count): deposit first");
+    // again: other calls may have landed while balanceOf was awaited
+    checkRoom();
     const { id, ...terms } = series;
     const call: Call = { series_id: id, account_id: signer.signer_id, terms, ask: mark.ask, at_ms: Date.now() };
-    this.state.calls.push(call);
+    const stored = { ...call, client };
+    this.state.calls.push(stored);
     try {
       await this.file.write(this.state);
     } catch (error) {
-      this.state.calls = this.state.calls.filter((c) => c !== call);
+      this.state.calls = this.state.calls.filter((c) => c !== stored);
       throw error;
     }
     return call;
   }
 
   byAccount(accountId: string): Call[] {
-    return this.state.calls.filter((c) => c.account_id === accountId).sort((a, b) => b.at_ms - a.at_ms);
+    return this.state.calls
+      .filter((c) => c.account_id === accountId)
+      .map(({ client: _, ...call }) => call)
+      .sort((a, b) => b.at_ms - a.at_ms);
   }
 
   async score(): Promise<void> {

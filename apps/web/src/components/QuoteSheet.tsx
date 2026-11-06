@@ -6,6 +6,7 @@ import { useQuoteFlow } from "../hooks/useQuoteFlow.ts";
 import { seriesTitle } from "../lib/labels.ts";
 import { formatUsd } from "../lib/money.ts";
 import { formatEnds } from "../lib/time.ts";
+import { SESSION_PROMPT } from "../wallet/session.ts";
 import type { Wallet } from "../wallet/wallet.ts";
 import { AutoCollect } from "./AutoCollect.tsx";
 import { Button } from "./Button.tsx";
@@ -78,7 +79,7 @@ export function QuoteSheet({ wallet, series, side, size, budget, onClose, onAddF
   return (
     <Sheet title={buying ? "Confirm" : "Sell back"} onClose={onClose} dismissible={!["idle", "loading", "refreshing", "signing", "submitting", "unknown"].includes(phase.name)}>
       {(phase.name === "loading" || phase.name === "idle") && flow.sessionPrompt ? (
-        <Status title="Confirm in your wallet" body="One signature lets you get prices for 24 h. No funds move." />
+        <Status {...SESSION_PROMPT} />
       ) : phase.name === "loading" || phase.name === "idle" ? (
         <Status title="Getting a price…" body="Asking market makers for a firm price." />
       ) : phase.name === "refreshing" ? (
