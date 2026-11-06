@@ -44,7 +44,7 @@ services:
     networks: { default: { ipv4_address: 10.86.86.86 } }
 
 networks:
-  default: { ipam: { config: [{ subnet: 10.86.86.0/24 }] } }
+  default: { ipam: { config: [{ subnet: 10.86.86.0/24, ip_range: 10.86.86.128/25 }] } }
 
 volumes:
   relay-data: {}

@@ -3,6 +3,7 @@ name = "options"
 version = "0.1.0"
 edition.workspace = true
 publish.workspace = true
+repository = "https://github.com/part-time-small-brain/endline"
 
 [lib]
 crate-type = ["cdylib", "rlib"]

@@ -332,8 +332,8 @@ fn rejects_unknown_index_and_decimals_floats_cannot_represent() {
 fn median_and_deviation_edges() {
     assert_eq!(median(vec![]), None);
     assert_eq!(median(vec![3.0, 1.0, 2.0, 10.0]), Some(2.5));
-    assert!(within_bps(10_000.0, 10_020.0, 20));
-    assert!(!within_bps(10_000.0, 10_021.0, 20));
+    assert!(within_bps(10_000.0, 10_050.0, 50));
+    assert!(!within_bps(10_000.0, 10_051.0, 50));
 }
 
 #[test]

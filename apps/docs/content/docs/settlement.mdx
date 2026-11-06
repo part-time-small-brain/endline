@@ -46,7 +46,7 @@ A proposed price becomes final when its dispute window ends. Until then our moni
 
 | Problem | What happens |
 |---|---|
-| Fewer than 4 exchanges, median and Deribit more than 0.2% apart, or no Deribit price on an 08:00 market | No automatic price. The oracle account proposes one by hand once the manual window opens |
+| Fewer than 3 exchanges (4 on a market not ending at 08:00 UTC), median and Deribit more than 0.2% apart, or no Deribit price on an 08:00 market | No automatic price. The oracle account proposes one by hand once the manual window opens |
 | OutLayer down or timing out | Our settler retries every 10 min, and anyone can. If none succeeds within 6 h, manual proposal |
 | Wrong price proposed | The owner overrides it inside the dispute window |
 
