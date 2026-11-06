@@ -30,7 +30,9 @@ new(owner_id, intents_id, quote_asset, quote_decimals, dispute_window_sec, oracl
 
 ## Series and token ids
 
-`create_series(underlying, strike, width, expiry, kind)` is permissionless and payable. Attach NEAR for storage (the series plus the empty supply and balance rows its first write fills); the excess is refunded.
+`create_series(underlying, strike, width, expiry, kind)` is permissionless and payable. Attach NEAR for storage (the series plus the empty supply and balance rows its first write fills); the excess is refunded. The series records its creator (`created_by`) and what it paid (`storage_paid`).
+
+`delete_series(series_ids)` (anyone, 1 to 20 ids, also while paused) deletes a series from 7 days after its expiry once nothing in it is owed: no open longs or shorts (`long_open`, `short_open`, counted on every write and close, through intents or not), or none that pays anything at the final price. It refunds the creator the storage the delete frees, never more than they paid. Settlements and the per-expiry listing row stay, so a price can't be proposed twice. A deleted id can't come back: its expiry is in the past. Tokens of a deleted series left in intents accounts are worthless and can't move.
 
 Every series is capped: a call (Up) pays `S−K` and a put (Down) pays `K−S`, each at most `width`. The cap is `K + width` for calls and `K − width` for puts.
 
@@ -90,6 +92,7 @@ Writes close `write_cutoff_sec` before expiry. Exercise and redeem need a final 
 | `override_settlement(underlying, expiry, price)` | Owner | 1 yocto. Only before `final_at`, keeps `final_at` |
 | `set_oracle_wasm(oracle_wasm: {outlayer_id, url, sha256})` | Owner | 1 yocto. Pins the oracle WASM from `now + oracle_delay_sec`: lowercase sha256, `https://` url. A new call replaces a pending WASM and restarts the delay |
 | `add_oracle(account_id)` | Owner | 1 yocto. The account can propose from `now + oracle_delay_sec` |
+| `delete_series(series_ids)` | Anyone | 1 to 20 ids, each 7 days past expiry and owing nothing ([above](#series-and-token-ids)). Refunds go to each series' creator |
 | `add_underlying`, `remove_oracle`, `set_paused` | Owner | 1 yocto |
 | `propose_owner(owner_id \| null)` | Owner | 1 yocto. Replaces any earlier proposal; `null` withdraws it |
 | `accept_owner()` | Proposed owner | 1 yocto. Ownership moves only now, so a typo can't lose it and a multisig or DAO proves it can call before it owns |
@@ -99,14 +102,14 @@ Pause blocks writes and new series only. Exits are never blocked.
 
 ## Views
 
-`get_config` (includes `pending_owner_id`, `oracle_delay_sec`), `get_oracle_wasm` and `get_oracles` (in force now), `get_pending_oracle_changes`, `get_underlyings`, `get_series`, `list_series(from_index, limit ≤ 200)` (every series ever listed), `list_series_by_expiry(from_expiry, after_id, limit ≤ 200)` (series with `expiry ≥ from_expiry` in `(expiry, id)` order; for the next page pass the last one's `expiry` and `id` as `from_expiry` and `after_id`), `get_settlement(underlying, expiry)`, `get_claimable(account_id, asset)`, and NEP-245 `mt_balance_of`, `mt_batch_balance_of`, `mt_supply`, `mt_batch_supply`, `mt_token`.
+`get_config` (includes `pending_owner_id`, `oracle_delay_sec`), `get_oracle_wasm` and `get_oracles` (in force now), `get_pending_oracle_changes`, `get_underlyings`, `get_series` (with `long_open`, `short_open`, `created_by`, `storage_paid`), `deletable_series(series_ids)` (the ids `delete_series` would take now), `list_series(from_index, limit ≤ 200)` (every series not deleted), `list_series_by_expiry(from_expiry, after_id, limit ≤ 200)` (series with `expiry ≥ from_expiry` in `(expiry, id)` order; for the next page pass the last one's `expiry` and `id` as `from_expiry` and `after_id`), `get_settlement(underlying, expiry)`, `get_claimable(account_id, asset)`, and NEP-245 `mt_balance_of`, `mt_batch_balance_of`, `mt_supply`, `mt_batch_supply`, `mt_token`.
 
-`mt_supply` includes retired tokens: options closed through intents stay in the contract's intents balance and are never burned. Open interest = supply minus the contract's own intents balance of that token.
+`mt_supply` includes retired tokens: options closed through intents stay in the contract's intents balance and are never burned. Open interest is the series' `long_open` and `short_open`.
 
 ## Events
 
 - NEP-245 `mt_mint`, `mt_burn`, `mt_transfer` (`standard: "nep245"`, `version: "1.0.0"`).
-- `near-options` `0.2.0` (series gained `width`, close events a single USDC `payout`): `series_created`, `write`, `exercise`, `redeem` and `burn_pair` (each with its USDC `payout`), `settlement_proposed`, `settlement_overridden`, `payout_failed` (`owner_id`, `asset`, `amount`: now claimable).
+- `near-options` `0.2.0` (series gained `width`, close events a single USDC `payout`): `series_created`, `write`, `exercise`, `redeem` and `burn_pair` (each with its USDC `payout`), `settlement_proposed`, `settlement_overridden`, `payout_failed` (`owner_id`, `asset`, `amount`: now claimable), `series_deleted` (`series_id`, `created_by`, `refund`, `dust`: the rounding left in the series, which the contract keeps), `storage_refund_failed` (`account_id`, `amount`: the NEAR stays in the contract).
 
 ## Testnet underlyings
 
