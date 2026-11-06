@@ -151,7 +151,7 @@ test("a bought cell rides into its column's final round, read-only, with the ave
   await openTap(page);
   await setUpTapBalance(page);
   await page.getByRole("radio", { name: "$10", exact: true }).click();
-  const first = (await page.getByRole("columnheader").nth(1).innerText()).split("\n")[0]!;
+  const first = (await grid(page).getByRole("columnheader").filter({ hasNotText: /final round|price to beat/i }).first().innerText()).split("\n")[0]!;
   await cells(page).filter({ hasText: /^[1-9]\.\d×$/ }).and(page.getByRole("button", { name: new RegExp(` · ${first} `, "i") })).first().click();
   await expect(page.getByRole("status").filter({ hasText: /^Bought BTC (Up|Down) \$[\d,]+ for \$/ })).toBeVisible({ timeout: 10_000 });
   const now = await page.evaluate(() => Date.now());
