@@ -9,32 +9,33 @@ const SECTIONS = [
   { id: "faq", label: "FAQ" },
 ];
 
-const LINK = "hidden h-10 items-center rounded-full px-3 text-sm font-medium whitespace-nowrap text-ink-2 transition-colors duration-150 hover:bg-ink/5 hover:text-ink lg:inline-flex";
+const LINK = "inline-flex h-11 items-center px-1 font-mono text-xs font-semibold tracking-[0.06em] whitespace-nowrap text-ink-2 uppercase transition-colors duration-150 hover:text-ink";
 
 export function Nav() {
   const { paths } = useApp().config;
   return (
-    <nav
-      aria-label="Main"
-      className="fixed top-3 left-1/2 z-40 flex -translate-x-1/2 items-center gap-1 rounded-full bg-surface/75 p-1 pl-4 shadow-[inset_0_0_0_1px_rgb(255_255_255/0.08),0_8px_24px_rgb(14_20_32/0.08)] ring-1 ring-ink/5 backdrop-blur-xl backdrop-saturate-150 lg:top-6"
-    >
-      <a href="#top" onClick={jump} aria-label="Endline, back to top" className="mr-2 rounded-lg lg:mr-4">
-        <Wordmark />
-      </a>
-      {SECTIONS.map(({ id, label }) => (
-        <a key={id} href={`#${id}`} onClick={jump} className={LINK}>
-          {label}
+    <header className="flex items-center justify-between gap-3 border-b border-rule px-4 py-1.5 sm:min-h-16 sm:px-6 sm:py-0">
+      <div className="flex items-center gap-7">
+        <a href="#top" onClick={jump} aria-label="Endline, back to top" className="rounded-lg">
+          <Wordmark />
         </a>
-      ))}
-      <a href="/docs" className={LINK}>
-        Docs
-      </a>
+        <nav aria-label="Main" className="hidden gap-4 lg:flex">
+          {SECTIONS.map(({ id, label }) => (
+            <a key={id} href={`#${id}`} onClick={jump} className={LINK}>
+              {label}
+            </a>
+          ))}
+          <a href="/docs" className={LINK}>
+            Docs
+          </a>
+        </nav>
+      </div>
       <Link
         href={paths.trade}
-        className="inline-flex h-10 items-center rounded-full bg-ink px-4 text-sm font-semibold whitespace-nowrap text-on-ink transition-[transform,opacity] duration-150 ease-out hover:opacity-90 active:scale-[0.97]"
+        className="inline-flex h-11 items-center rounded-xl bg-ink px-4 text-sm font-semibold whitespace-nowrap text-on-ink transition-[transform,opacity] duration-150 ease-out hover:opacity-90 active:scale-[0.97]"
       >
         Open app
       </Link>
-    </nav>
+    </header>
   );
 }

@@ -173,6 +173,20 @@ test("risk info lives in one footer line and the page reads as the product", asy
   await expect(footer.getByRole("link", { name: "Safety and risks" })).toHaveAttribute("href", "/docs/safety-and-risks");
 });
 
+test("the header matches the app header and scrolls away with the page", async ({ page }) => {
+  test.skip(test.info().project.use.isMobile === true, "the app header adds a tab row on phones");
+  const bar = (at: Page) => at.getByRole("banner").evaluate((header) => {
+    const style = getComputedStyle(header);
+    const box = header.getBoundingClientRect();
+    return { top: box.top, height: box.height, rule: `${style.borderBottomWidth} ${style.borderBottomColor}` };
+  });
+  const landing = await bar(page);
+  await page.mouse.wheel(0, 600);
+  await expect.poll(async () => (await bar(page)).top).toBeLessThan(-landing.height);
+  await page.goto("/app");
+  expect(await bar(page)).toEqual(landing);
+});
+
 test("every funding chain shows a loaded logo", async ({ page }) => {
   const chains = page.locator("#intents li").filter({ hasText: /^(Bitcoin|Ethereum|Base|Arbitrum|Solana|NEAR)$/ });
   await expect(chains).toHaveCount(6);
