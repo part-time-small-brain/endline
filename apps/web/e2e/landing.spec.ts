@@ -1,4 +1,4 @@
-import type { CDPSession, Page } from "@playwright/test";
+import type { CDPSession, Locator, Page } from "@playwright/test";
 import { expect, money, openPopover, sideways, test } from "./fixtures.ts";
 
 const hero = (page: Page) => page.locator("#top");
@@ -130,6 +130,19 @@ test("the header matches the app header and scrolls away with the page", async (
   await expect.poll(async () => (await bar(page)).top).toBeLessThan(-landing.height);
   await page.goto("/app");
   expect(await bar(page)).toEqual(landing);
+});
+
+test("section labels and cards match the app's ticket", async ({ page }) => {
+  const style = (locator: Locator, names: string[]) => locator.evaluate((element, props) => props.map((prop) => getComputedStyle(element).getPropertyValue(prop)), names);
+  const LABEL = ["font-family", "font-size", "letter-spacing", "text-transform", "color"];
+  const CARD = ["border-top-width", "border-top-color", "border-radius", "background-color"];
+  const label = await style(hero(page).getByText("Payout", { exact: true }), LABEL);
+  for (const [section, text] of [["#top", "Final price"], ["#how", "You give"], ["#floor", "Your side"], ["#safety", "Paid out"], ["#intents", "One balance"]] as const) {
+    expect(await style(page.locator(section).getByText(text, { exact: true }), LABEL), text).toEqual(label);
+  }
+  const card = await style(hero(page).getByRole("region", { name: "Trade ticket" }).locator(":scope > div").first(), CARD);
+  expect(await style(page.locator("#how").getByText("You give", { exact: true }).locator("xpath=../.."), CARD)).toEqual(card);
+  expect(await style(page.locator("#safety").getByText("BTC, one recorded oracle run").locator(".."), CARD)).toEqual(card);
 });
 
 test("every funding chain shows a loaded logo", async ({ page }) => {

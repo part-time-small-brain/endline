@@ -79,7 +79,7 @@ export function FloorDemo({ asset, quoteDecimals: qd }: Props) {
   };
 
   return (
-    <section id="floor" data-side={up ? "up" : "down"} className="bg-surface py-24 lg:py-36">
+    <section id="floor" data-side={up ? "up" : "down"} className="border-y border-rule py-24 lg:py-36">
       <div className="mx-auto max-w-7xl px-4 lg:px-12">
         <SectionHead title="You can't lose more than you pay">Drag where {asset.symbol} ends.</SectionHead>
         <div className="grid grid-cols-1 gap-8 lg:grid-cols-[400px_minmax(0,1fr)] lg:gap-12">
@@ -97,8 +97,8 @@ export function FloorDemo({ asset, quoteDecimals: qd }: Props) {
               };
             })} />
             <Segmented label="You pay" value={payUsd} onChange={setPay} options={PAY_USD.map((usd) => ({ value: usd, label: `$${usd}` }))} />
-            <div aria-live="polite" className={`flex flex-col gap-2 rounded-3xl p-6 transition-colors duration-300 ${won > 0n ? "bg-side-field" : "bg-well"}`}>
-              <p className="text-sm text-ink-2">
+            <div aria-live="polite" className={`flex flex-col gap-2 rounded-md border p-6 transition-colors duration-300 ${won > 0n ? "border-side bg-side-field" : "border-rule bg-surface"}`}>
+              <p className="font-mono text-[0.6875rem] tracking-[0.08em] text-ink-3 uppercase">
                 {asset.symbol} ends at {price(end)}
               </p>
               <p className="font-display text-4xl font-semibold tracking-[-0.02em] lg:text-5xl">
@@ -132,7 +132,7 @@ export function FloorDemo({ asset, quoteDecimals: qd }: Props) {
               onPointerMove={(event) => dragging.current && dragTo(event)}
               onPointerUp={() => (dragging.current = false)}
               onPointerCancel={() => (dragging.current = false)}
-              className="relative h-[440px] cursor-ns-resize touch-none overflow-hidden rounded-3xl bg-well select-none lg:h-[560px]"
+              className="relative h-[440px] cursor-ns-resize touch-none overflow-hidden rounded-md border border-rule bg-surface select-none lg:h-[560px]"
             >
               {width > 0 && (
                 <>
@@ -142,7 +142,7 @@ export function FloorDemo({ asset, quoteDecimals: qd }: Props) {
                     {ticks([low, high], 8)
                       .filter((t) => Math.abs(y(t) - yK) > 12 && Math.abs(y(t) - (up ? yK - 14 : yK + 18)) > 16)
                       .map((t) => (
-                        <text key={t} x={16} y={y(t) + 4} className="fill-ink-2 text-xs">
+                        <text key={t} x={16} y={y(t) + 4} className="fill-ink-2 font-mono text-xs">
                           {price(t)}
                         </text>
                       ))}
@@ -200,8 +200,8 @@ interface SegmentedProps<T> {
 function Segmented<T extends string | number>({ label, value, options, onChange }: SegmentedProps<T>) {
   return (
     <div>
-      <p className="mb-2 text-sm font-semibold">{label}</p>
-      <div role="radiogroup" aria-label={label} className="flex gap-1 rounded-xl bg-well p-1">
+      <p className="mb-2 font-mono text-[0.625rem] font-medium tracking-[0.14em] text-ink-3 uppercase">{label}</p>
+      <div role="radiogroup" aria-label={label} className="flex rounded-xl ring-1 ring-ink/20 ring-inset">
         {options.map((option) => (
           <button
             key={option.value}
@@ -209,8 +209,8 @@ function Segmented<T extends string | number>({ label, value, options, onChange 
             role="radio"
             aria-checked={option.value === value}
             onClick={() => onChange(option.value)}
-            className={`inline-flex min-h-10 min-w-0 flex-1 flex-wrap items-center justify-center gap-2 rounded-lg px-2 py-2 text-sm font-semibold whitespace-normal transition-[background-color,color,transform] duration-150 ease-out active:scale-[0.97] ${
-              option.value === value ? "bg-paper text-ink shadow-[0_1px_2px_rgb(14_20_32/0.08)]" : "text-ink-2 hover:text-ink"
+            className={`inline-flex min-h-11 min-w-0 flex-1 flex-wrap items-center justify-center gap-2 rounded-xl px-2 py-2 text-sm font-semibold whitespace-normal transition-[background-color,color,transform] duration-150 ease-out active:scale-[0.97] ${
+              option.value === value ? "bg-ink text-on-ink" : "text-ink-2 hover:text-ink"
             }`}
           >
             {option.label}

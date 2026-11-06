@@ -28,7 +28,7 @@ export function HowItWorks({ asset, quoteDecimals: qd, nowSec }: Props) {
   return (
     <section id="how" className="mx-auto max-w-7xl scroll-mt-8 px-4 pt-8 pb-24 lg:px-12 lg:pb-32">
       <SectionHead title="Three steps, one signature" />
-      <ol className="relative grid gap-12 before:absolute before:inset-y-0 before:left-[19px] before:w-[2.5px] before:bg-ink lg:grid-cols-[1fr_1.15fr_1fr] lg:gap-8 lg:before:inset-x-0 lg:before:top-[19px] lg:before:bottom-auto lg:before:h-[2.5px] lg:before:w-auto">
+      <ol className="relative grid gap-12 before:absolute before:inset-y-0 before:left-[19.5px] before:w-px before:bg-rule lg:grid-cols-[1fr_1.15fr_1fr] lg:gap-8 lg:before:inset-x-0 lg:before:top-[19.5px] lg:before:bottom-auto lg:before:h-px lg:before:w-auto">
         <Step n={1} dot="bg-ink text-on-ink" title="Pick a side" line="Up or Down, and the price to beat.">
           <div className="grid grid-cols-2 gap-2">
             <span className="flex h-14 items-center gap-2 rounded-xl bg-up px-4 font-display text-xl font-semibold text-on-up">
@@ -51,9 +51,9 @@ export function HowItWorks({ asset, quoteDecimals: qd, nowSec }: Props) {
         <Step n={3} dot="bg-up text-on-up" title="Get paid" line="If you are right, the payout lands in your balance." delay={0.24}>
           <Row label={`${asset.symbol} ended at`} value={price(ended)} />
           <Row label="You paid" value={formatUsd(bought.cost, qd, "up")} />
-          <p className="mt-2 flex h-12 items-center justify-between rounded-xl bg-up px-3 text-sm text-on-up">
+          <p className="mt-2 flex h-12 items-center justify-between rounded-xl border border-up bg-up-field px-3 font-mono text-[0.6875rem] font-medium tracking-[0.12em] text-up-ink uppercase">
             Paid automatically
-            <b className="text-lg font-semibold">{formatUsd(longPayout(bought.terms, bought.size, ended), qd)}</b>
+            <b className="font-sans text-lg font-semibold tracking-normal normal-case">{formatUsd(longPayout(bought.terms, bought.size, ended), qd)}</b>
           </p>
         </Step>
       </ol>
@@ -74,10 +74,10 @@ function Step({ n, dot, title, line, delay = 0, children }: StepProps) {
   return (
     <li>
       <Reveal delay={delay} className="relative pl-14 lg:pl-0">
-        <span className={`absolute top-0 left-0 grid size-10 place-items-center rounded-full font-display font-bold shadow-[inset_0_0_0_2.5px_var(--ink)] lg:static ${dot}`}>{n}</span>
+        <span className={`absolute top-0 left-0 grid size-10 place-items-center rounded-md font-mono text-sm font-medium ring-1 ring-ink/20 ring-inset lg:static ${dot}`}>{String(n).padStart(2, "0")}</span>
         <h3 className="mt-1 text-2xl font-semibold lg:mt-6">{title}</h3>
         <p className="mt-2 text-ink-2">{line}</p>
-        <div className="mt-6 rounded-3xl bg-surface p-4">{children}</div>
+        <div className="mt-6 rounded-md border border-rule bg-surface p-4">{children}</div>
       </Reveal>
     </li>
   );
@@ -86,8 +86,8 @@ function Step({ n, dot, title, line, delay = 0, children }: StepProps) {
 function Row({ label, value }: { label: string; value: string }) {
   return (
     <p className="flex items-center justify-between py-2 text-sm not-first:shadow-[0_-1px_0_var(--rule)]">
-      <span>{label}</span>
-      <b className="font-semibold">{value}</b>
+      <span className="font-mono text-[0.625rem] font-medium tracking-[0.14em] text-ink-3 uppercase">{label}</span>
+      <b className="font-mono font-medium">{value}</b>
     </p>
   );
 }
