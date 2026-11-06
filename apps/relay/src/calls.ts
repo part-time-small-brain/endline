@@ -1,4 +1,4 @@
-import { AccountId, Call, type CallRequest, callPoints, FREE_CALLS_PER_ROUND, type Leaderboard, type Mark, roundOf, SECONDS_PER_DAY, type Series, type Standing, termsOf, TWAP_WINDOW_SEC } from "@endline/sdk";
+import { AccountId, Call, type CallRequest, callableAt, callPoints, FREE_CALLS_PER_ROUND, type Leaderboard, type Mark, nextRound, roundOf, SECONDS_PER_DAY, type Series, type Standing, termsOf } from "@endline/sdk";
 import { z } from "zod";
 import { FINAL_MARGIN_SEC } from "./collect.ts";
 import { JsonFile } from "./jsonFile.ts";
@@ -50,22 +50,29 @@ export class Calls {
     const [all, contract] = await Promise.all([this.chain.listSeries(), this.chain.contractConfig()]);
     const series = all.find((s) => s.id === series_id);
     if (!series) throw new HttpError(404, "unknown series");
-    const callable = (s: Series) => listed(s, contract) && open(s, contract) && Date.now() < (s.expiry - TWAP_WINDOW_SEC) * 1000;
+    const callable = (s: Series) => listed(s, contract) && open(s, contract) && callableAt(s.expiry, Date.now() / 1000);
     if (!listed(series, contract) || !open(series, contract)) throw new HttpError(409, "this market is closed");
     if (!callable(series)) throw new HttpError(409, "the final round has started: calls close when the averaging window opens");
     const round = roundOf(series.expiry);
-    if (round !== all.filter(callable).map((s) => roundOf(s.expiry)).sort()[0]) throw new HttpError(409, "free calls are open only for the next round");
+    if (round !== nextRound(all.filter(callable).map((s) => s.expiry))) throw new HttpError(409, "free calls are open only for the next round");
+    const dollar = 10n ** BigInt(contract.quote_decimals);
+    if ((await this.chain.balanceOf(signer.signer_id, contract.quote_asset)) < dollar) throw new HttpError(402, "a free call needs at least $1 of USDC in your NEAR Intents balance: deposit first");
     const mine = this.state.calls.filter((c) => c.account_id === signer.signer_id);
     if (mine.some((c) => c.series_id === series_id)) throw new HttpError(409, "you already called this cell");
     const mark = this.marks().find((m) => m.series_id === series_id);
     if (!mark) throw new HttpError(503, "no price for this cell right now");
     if (BigInt(mark.ask) >= BigInt(series.width)) throw new HttpError(409, "this cell can't pay more than it costs");
     if (mine.filter((c) => roundOf(c.terms.expiry) === round).length >= FREE_CALLS_PER_ROUND) throw new HttpError(429, `you've used your ${FREE_CALLS_PER_ROUND} free calls for this round`);
-    if (this.state.calls.length >= this.maxCalls) throw new HttpError(503, "free calls are full for this round");
+    if (this.state.calls.filter((c) => !c.result && roundOf(c.terms.expiry) === round).length >= this.maxCalls) throw new HttpError(503, "free calls are full for this round");
     const { id, ...terms } = series;
     const call: Call = { series_id: id, account_id: signer.signer_id, terms, ask: mark.ask, at_ms: Date.now() };
     this.state.calls.push(call);
-    await this.file.write(this.state);
+    try {
+      await this.file.write(this.state);
+    } catch (error) {
+      this.state.calls = this.state.calls.filter((c) => c !== call);
+      throw error;
+    }
     return call;
   }
 
@@ -109,7 +116,7 @@ export class Calls {
     const rounds = newestFirst(this.state.rounds);
     const latest = rounds[0];
     const streakOf = (id: string) => {
-      const won = new Set(this.state.wins[id]);
+      const won = new Set(Object.hasOwn(this.state.wins, id) ? this.state.wins[id] : []);
       let streak = 0;
       for (let day = latest?.date; day && won.has(day); day = dayBefore(day)) streak++;
       return streak;
@@ -118,15 +125,14 @@ export class Calls {
       Object.entries(players)
         .sort(([a, x], [b, y]) => y.points - x.points || y.wins - x.wins || (a < b ? -1 : 1))
         .map(([id, s], i) => ({ account_id: id, rank: i + 1, points: s.points, wins: s.wins, streak: streakOf(id) }));
-    const week: Record<string, Score> = {};
+    const week = new Map<string, Score>();
     for (const round of rounds) {
       for (const [id, s] of Object.entries(round.players)) {
-        const total = (week[id] ??= { points: 0, wins: 0 });
-        total.points += s.points;
-        total.wins += s.wins;
+        const total = week.get(id) ?? { points: 0, wins: 0 };
+        week.set(id, { points: total.points + s.points, wins: total.wins + s.wins });
       }
     }
-    return { round: latest?.date ?? null, today: rank(latest?.players ?? {}), week: rank(week) };
+    return { round: latest?.date ?? null, today: rank(latest?.players ?? {}), week: rank(Object.fromEntries(week)) };
   }
 
   private settle(call: Call, price: string): void {
@@ -135,19 +141,20 @@ export class Calls {
     const date = roundOf(call.terms.expiry);
     let round = this.state.rounds.find((r) => r.date === date);
     if (!round) this.state.rounds.push((round = { date, players: {} }));
-    const player = (round.players[call.account_id] ??= { points: 0, wins: 0 });
-    player.points += points;
+    const before = Object.hasOwn(round.players, call.account_id) ? round.players[call.account_id] : undefined;
+    round.players[call.account_id] = { points: (before?.points ?? 0) + points, wins: (before?.wins ?? 0) + (points > 0 ? 1 : 0) };
     if (points <= 0) return;
-    player.wins += 1;
-    const won = this.state.wins[call.account_id] ?? [];
+    const won = (Object.hasOwn(this.state.wins, call.account_id) && this.state.wins[call.account_id]) || [];
     if (!won.includes(date)) this.state.wins[call.account_id] = [...won, date].sort();
   }
 
   private prune(nowSec: number): boolean {
     const calls = this.state.calls.filter((c) => c.terms.expiry > nowSec - (c.result ? SECONDS_PER_DAY : UNPRICED_KEEP_SEC));
     const rounds = newestFirst(this.state.rounds).slice(0, ROUNDS_KEPT);
-    const entries = Object.entries(this.state.wins).map(([id, days]) => [id, days.slice(-WIN_DAYS_KEPT)] as const);
-    const changed = calls.length !== this.state.calls.length || rounds.length !== this.state.rounds.length || entries.some(([id, days]) => days.length !== this.state.wins[id]?.length);
+    const latest = rounds[0]?.date;
+    const live = Object.entries(this.state.wins).filter(([, days]) => latest === undefined || (days.at(-1) ?? "") >= dayBefore(latest));
+    const entries = live.map(([id, days]) => [id, days.slice(-WIN_DAYS_KEPT)] as const);
+    const changed = calls.length !== this.state.calls.length || rounds.length !== this.state.rounds.length || entries.length !== Object.keys(this.state.wins).length || entries.some(([id, days]) => days.length !== this.state.wins[id]?.length);
     this.state = { calls, rounds, wins: Object.fromEntries(entries) };
     return changed;
   }

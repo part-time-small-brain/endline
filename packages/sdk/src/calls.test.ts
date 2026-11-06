@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { callMultiple, callPoints, roundOf } from "./calls.ts";
+import { callableAt, callMultiple, callPoints, nextRound, roundOf } from "./calls.ts";
 import { termsOf } from "./math.ts";
 
 const USD = 1_000_000n;
@@ -38,5 +38,15 @@ describe("roundOf", () => {
   it("is the UTC date the market ends on, so BTC and ETH share a round", () => {
     expect(roundOf(Date.UTC(2026, 10, 5, 8) / 1000)).toBe("2026-11-05");
     expect(roundOf(Date.UTC(2026, 10, 5, 23, 59) / 1000)).toBe("2026-11-05");
+  });
+});
+
+describe("callableAt and nextRound", () => {
+  it("closes a call when the 30-minute average opens, and the next round is the earliest date still callable", () => {
+    const e = Date.UTC(2026, 10, 5, 8) / 1000;
+    expect(callableAt(e, e - 1_801)).toBe(true);
+    expect(callableAt(e, e - 1_800)).toBe(false);
+    expect(nextRound([e + 86_400, e, e + 3_600])).toBe("2026-11-05");
+    expect(nextRound([])).toBeUndefined();
   });
 });

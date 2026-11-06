@@ -80,14 +80,32 @@ describe("free calls", () => {
     await expect(t.call(series(81_000, NEXT).id)).resolves.toMatchObject({ series_id: series(81_000, NEXT).id });
   });
 
-  it("allows 10 calls a round per account, then 429, and stops everyone once the store is full", async () => {
+  it("allows 10 calls a round per account, then 429, and stops a round once it's full, counting only its calls still waiting", async () => {
     const strikes = Array.from({ length: 11 }, (_, i) => 75_000 + i * 1_000);
-    const t = setup(strikes.map((k) => series(k)), 12);
+    const t = setup([...strikes.map((k) => series(k)), series(81_000, NEXT)], 12);
     for (const k of strikes.slice(0, 10)) await t.call(series(k).id);
     expect(await httpStatus(t.call(series(85_000).id))).toBe(429);
     await t.call(series(85_000).id, "bob.near");
     await t.call(series(84_000).id, "bob.near");
     expect(await httpStatus(t.call(series(83_000).id, "carol.near"))).toBe(503);
+    await t.settle(E, 83_000);
+    at(NEXT - 2 * 3_600);
+    await expect(t.call(series(81_000, NEXT).id, "carol.near")).resolves.toMatchObject({ account_id: "carol.near" });
+  });
+
+  it("needs $1 of USDC in the caller's intents balance, spending none of it", async () => {
+    const t = setup();
+    t.balances.set("alice.near:nep141:usdc.test", 999_999n);
+    expect(await httpStatus(t.call(series(81_000).id))).toBe(402);
+    t.balances.set("alice.near:nep141:usdc.test", 1_000_000n);
+    await expect(t.call(series(81_000).id)).resolves.toMatchObject({ account_id: "alice.near" });
+  });
+
+  it("scores and ranks an account named like an object property", async () => {
+    const t = setup();
+    await t.call(series(81_000).id, "constructor");
+    await t.settle(E, 83_000);
+    expect(t.calls.board("constructor").you?.today).toEqual({ account_id: "constructor", rank: 1, points: 400, wins: 1, streak: 1 });
   });
 
   it("scores only once the price has been final for a minute, at each call's own ask, with the gross capped at 25×", async () => {
