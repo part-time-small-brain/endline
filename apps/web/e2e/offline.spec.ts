@@ -749,6 +749,7 @@ test.describe("Tap", () => {
     await expect(page.getByText("Final price $81,400. You get $8.00 back.")).toBeVisible();
     world.index = 80_000;
     await page.clock.fastForward(5_000);
+    await expect(page.getByRole("radio", { name: /^BTC \$80,000/ })).toBeVisible();
     await expect(group(/^Up · BTC ends above \$81,000 · result · pays \$8\.00 · you hold this$/)).toBeVisible();
     const download = page.waitForEvent("download");
     await page.getByRole("button", { name: "Share" }).click();
@@ -781,15 +782,20 @@ test.describe("Tap", () => {
   for (const [refusal, downloads] of [["NotAllowedError", 1], ["AbortError", 0]] as const) {
     test(`a share sheet that throws ${refusal} ${downloads ? "falls back to a download" : "is left alone"}`, async ({ page }) => {
       await page.addInitScript((name) => {
-        Object.assign(navigator, { canShare: () => true, share: async () => Promise.reject(new DOMException("no", name)) });
+        const w = window as unknown as { shares: number };
+        w.shares = 0;
+        Object.assign(navigator, { canShare: () => true, share: async () => (w.shares++, Promise.reject(new DOMException("no", name))) });
       }, refusal);
       const { expiry, world, until } = await heldThroughTheEnd(page);
       world.settlement = { price: String(81_400 * USD), final_at: expiry + 3_900 };
       await until(expiry + 3_900);
       let downloaded = 0;
       page.on("download", () => downloaded++);
+      const download = downloads ? page.waitForEvent("download") : undefined;
       await page.getByRole("button", { name: "Share" }).click();
-      await page.waitForTimeout(500);
+      await expect.poll(() => page.evaluate(() => (window as unknown as { shares: number }).shares)).toBe(1);
+      await download;
+      await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => setTimeout(resolve))));
       expect(downloaded).toBe(downloads);
     });
   }
