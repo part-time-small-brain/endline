@@ -116,7 +116,7 @@ export function planBurns(holdings: Holding[], writeCutoffSec: number, nowSec: n
     .filter((c) => c.amount > 0n);
 }
 
-export function unpairedShorts(holdings: Holding[]): Holding[] {
+function unpairedShorts(holdings: Holding[]): Holding[] {
   return holdings.filter((h) => h.short > h.long);
 }
 

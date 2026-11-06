@@ -222,6 +222,7 @@ describe("recycling", () => {
     const holdings = [hold(series("A", EXPIRY), 10n, 3n), hold(series("B", EXPIRY), 5n, 5n), hold(series("C", EXPIRY), 4n, 0n), hold(series("D", EXPIRY + DAY), 6n, 0n), hold(series("E", EXPIRY), 0n, 2n)];
     expect(planExercises(holdings, new Map())).toEqual([]);
     expect(planExercises(holdings, new Map([[`BTC ${EXPIRY}`, 80_000_000_000n]]))).toEqual([]);
+    expect(planExercises([hold(series("F", EXPIRY), 1n, 0n)], new Map([[`BTC ${EXPIRY}`, 79_999_999_999n]]))).toEqual([]);
     expect(planExercises(holdings, new Map([[`BTC ${EXPIRY}`, 79_000_000_000n]]))).toEqual([
       [
         { id: "A", amount: 7n },

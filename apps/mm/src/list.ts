@@ -1,5 +1,5 @@
 import { setTimeout as sleep } from "node:timers/promises";
-import { CLAIM_WINDOW_SEC, closeOptions, exerciseOptions, intentsAssetId, shortTokenId, writeOptions } from "@endline/sdk";
+import { CLAIM_WINDOW_SEC, closeOptions, exerciseOptions, intentsAssetId, SECONDS_PER_DAY, shortTokenId, writeOptions } from "@endline/sdk";
 import { Chain } from "./chain.ts";
 import type { Config } from "./config.ts";
 import { indexPrice } from "./deribit.ts";
@@ -12,6 +12,7 @@ const BALANCE_PAGE = 200;
 const ACTION_GAP_MS = 3_000;
 const DELETE_BATCH = 20;
 const DELETE_CHECK = 100;
+const CLEANUP_LOOKBACK_SEC = 30 * SECONDS_PER_DAY;
 
 export async function listCommand(config: Config, once: boolean): Promise<void> {
   const chain = new Chain(config);
@@ -38,7 +39,7 @@ async function attempt(action: string, run: () => Promise<string>): Promise<bool
 }
 
 async function tick(chain: Chain, config: Config): Promise<void> {
-  const [terms, underlyings, listed] = await Promise.all([chain.listingTerms(), chain.underlyings(), chain.seriesFrom(Math.floor(Date.now() / 1000) - CLAIM_WINDOW_SEC)]);
+  const [terms, underlyings, listed] = await Promise.all([chain.listingTerms(), chain.underlyings(), chain.seriesFrom(Math.floor(Date.now() / 1000) - CLAIM_WINDOW_SEC - CLEANUP_LOOKBACK_SEC)]);
   const markets: Market[] = [];
   for (const u of underlyings) {
     try {
@@ -97,9 +98,13 @@ async function tick(chain: Chain, config: Config): Promise<void> {
     await attempt(`exercise ${named(batch)}`, () => chain.submit(exerciseOptions(config.optionsId, tokens), Date.now() + WRITE_TTL_MS));
   }
 
-  const old = await chain.seriesFrom(0, nowSec - CLAIM_WINDOW_SEC);
+  const old = listed.filter((s) => s.expiry <= nowSec - CLAIM_WINDOW_SEC && s.created_by === config.accountId);
   const done: string[] = [];
-  for (let i = 0; i < old.length; i += DELETE_CHECK) done.push(...(await chain.deletableSeries(old.slice(i, i + DELETE_CHECK).map((s) => s.id))));
+  try {
+    for (let i = 0; i < old.length; i += DELETE_CHECK) done.push(...(await chain.deletableSeries(old.slice(i, i + DELETE_CHECK).map((s) => s.id))));
+  } catch (e) {
+    console.error(`list: deletable series: ${e}`);
+  }
   for (let i = 0; i < done.length; i += DELETE_BATCH) {
     const batch = done.slice(i, i + DELETE_BATCH);
     await attempt(`delete ${batch.join(", ")}`, () => chain.deleteSeries(batch));
