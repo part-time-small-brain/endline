@@ -1020,7 +1020,7 @@ fn request_matches_outlayer_contract_shape() {
     let input: Value = serde_json::from_str(args["input_data"].as_str().unwrap()).unwrap();
     assert_eq!(
         input,
-        json!({"index": "btc_usd", "expiry": EXPIRY, "quote_decimals": 6, "max_dev_bps": 50})
+        json!({"index": "btc_usd", "expiry": EXPIRY, "quote_decimals": 6, "max_dev_bps": 20})
     );
     let callback = calls("on_settlement_result");
     assert_eq!(callback[0].1["requested_at"], SETTLE_AT);
