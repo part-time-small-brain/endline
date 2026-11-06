@@ -1,7 +1,7 @@
 import { type Series, seriesId, strikeStepCents } from "@endline/sdk";
 import { describe, expect, it } from "vitest";
 import type { ListingTerms } from "./chain.ts";
-import { expiries, type Holding, type Market, planBurns, planRedeems, planWrites, strikes, targets, watched } from "./listing.ts";
+import { expiries, type Holding, type Market, planBurns, planExercises, planRedeems, planWrites, strikes, targets, watched } from "./listing.ts";
 
 const DAY = 86_400;
 const USDC = "nep141:usdc";
@@ -216,6 +216,18 @@ describe("recycling", () => {
     const puts = Array.from({ length: 12 }, (_, i) => hold(series(`P${i}`, EXPIRY), 0n, 1n));
     const batches = planRedeems([...puts, hold(series("C", EXPIRY, "call"), 0n, 1n)], new Set([`BTC ${EXPIRY}`]));
     expect(batches.map((b) => b.map((c) => c.id))).toEqual([puts.slice(0, 10).map((h) => h.series.id), ["P10", "P11", "C"]]);
+  });
+
+  it("exercises only longs beyond the pairs, only at a final price that pays them", () => {
+    const holdings = [hold(series("A", EXPIRY), 10n, 3n), hold(series("B", EXPIRY), 5n, 5n), hold(series("C", EXPIRY), 4n, 0n), hold(series("D", EXPIRY + DAY), 6n, 0n), hold(series("E", EXPIRY), 0n, 2n)];
+    expect(planExercises(holdings, new Map())).toEqual([]);
+    expect(planExercises(holdings, new Map([[`BTC ${EXPIRY}`, 80_000_000_000n]]))).toEqual([]);
+    expect(planExercises(holdings, new Map([[`BTC ${EXPIRY}`, 79_000_000_000n]]))).toEqual([
+      [
+        { id: "A", amount: 7n },
+        { id: "C", amount: 4n },
+      ],
+    ]);
   });
 
   it("watches series until 7 days after expiry", () => {

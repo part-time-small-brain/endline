@@ -111,15 +111,19 @@ export class ChainReader {
     }
   }
 
-  async seriesFrom(fromExpiry: number): Promise<Series[]> {
+  async seriesFrom(fromExpiry: number, untilExpiry = Infinity): Promise<Series[]> {
     const all: Series[] = [];
     for (;;) {
       const last = all.at(-1);
       const cursor = last ? { from_expiry: last.expiry, after_id: last.id } : { from_expiry: fromExpiry };
       const page = z.array(Series).parse(await this.view(this.optionsId, "list_series_by_expiry", { ...cursor, limit: SERIES_PAGE }));
       all.push(...page);
-      if (page.length < SERIES_PAGE) return all;
+      if (page.length < SERIES_PAGE || (page.at(-1)?.expiry ?? 0) > untilExpiry) return all.filter((s) => s.expiry <= untilExpiry);
     }
+  }
+
+  async deletableSeries(ids: string[]): Promise<string[]> {
+    return z.array(z.string()).parse(await this.view(this.optionsId, "deletable_series", { series_ids: ids }));
   }
 
   async settlementTerms(): Promise<SettlementTerms> {
@@ -189,6 +193,17 @@ export class Chain extends ChainReader {
       args: { underlying, strike: strike.toString(), width: width.toString(), expiry, kind },
       gas: teraToGas(30),
       deposit,
+    });
+    return outcome.transaction.hash;
+  }
+
+  async deleteSeries(ids: string[]): Promise<string> {
+    const outcome = await this.account.callFunctionRaw({
+      contractId: this.optionsId,
+      methodName: "delete_series",
+      args: { series_ids: ids },
+      gas: teraToGas(300),
+      deposit: 0n,
     });
     return outcome.transaction.hash;
   }

@@ -1,4 +1,4 @@
-import { CLAIM_WINDOW_SEC, defaultExpiry, EXPIRY_TIME_OF_DAY, listedWidth, type OptionKind, SECONDS_PER_DAY, type Series, seriesId, strikeStepCents } from "@endline/sdk";
+import { CLAIM_WINDOW_SEC, defaultExpiry, EXPIRY_TIME_OF_DAY, listedWidth, longPayout, type OptionKind, SECONDS_PER_DAY, type Series, seriesId, strikeStepCents, termsOf } from "@endline/sdk";
 import type { ListingTerms } from "./chain.ts";
 import type { Underlying } from "./market.ts";
 
@@ -8,7 +8,7 @@ const SHORT_EVERY_SEC = 4 * 3_600;
 const SHORT_LEAD_SEC = 5_400;
 const STOCK_USD = 500;
 const RESERVE_USD = 500;
-const MAX_REDEEM_TOKENS = 10;
+const MAX_CLOSE_TOKENS = 10;
 const KINDS: OptionKind[] = ["call", "put"];
 
 export interface Market extends Underlying {
@@ -120,9 +120,22 @@ export function unpairedShorts(holdings: Holding[]): Holding[] {
   return holdings.filter((h) => h.short > h.long);
 }
 
+const inBatches = (due: Close[]): Close[][] => Array.from({ length: Math.ceil(due.length / MAX_CLOSE_TOKENS) }, (_, i) => due.slice(i * MAX_CLOSE_TOKENS, (i + 1) * MAX_CLOSE_TOKENS));
+
 export function planRedeems(holdings: Holding[], final: Set<string>): Close[][] {
-  const due = unpairedShorts(holdings)
-    .filter((h) => final.has(settlementKey(h.series)))
-    .map((h) => ({ id: h.series.id, amount: h.short - h.long }));
-  return Array.from({ length: Math.ceil(due.length / MAX_REDEEM_TOKENS) }, (_, i) => due.slice(i * MAX_REDEEM_TOKENS, (i + 1) * MAX_REDEEM_TOKENS));
+  return inBatches(
+    unpairedShorts(holdings)
+      .filter((h) => final.has(settlementKey(h.series)))
+      .map((h) => ({ id: h.series.id, amount: h.short - h.long })),
+  );
+}
+
+export function planExercises(holdings: Holding[], prices: Map<string, bigint>): Close[][] {
+  return inBatches(
+    holdings.flatMap((h) => {
+      const price = prices.get(settlementKey(h.series));
+      const amount = h.long - h.short;
+      return amount > 0n && price !== undefined && longPayout(termsOf(h.series), amount, price) > 0n ? [{ id: h.series.id, amount }] : [];
+    }),
+  );
 }
