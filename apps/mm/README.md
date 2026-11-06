@@ -36,7 +36,7 @@ Read from the process environment.
 | Var | Meaning |
 |---|---|
 | `RELAY_WS_URL` | Relay MM socket, e.g. `ws://localhost:8080/mm`. Quoting only |
-| `MM_API_KEY` | One of the relay's `MM_API_KEYS`, sent as `?key=`. Quoting only |
+| `MM_API_KEY` | One of the relay's `MM_API_KEYS`, sent as `Authorization: Bearer <key>`. Quoting only |
 | `MM_ACCOUNT_ID` | Signer of quotes and writes |
 | `MM_PRIVATE_KEY` | `ed25519:…` key registered for `MM_ACCOUNT_ID` on `INTENTS_ID` |
 | `NEAR_RPC_URL` | NEAR JSON-RPC |
@@ -124,7 +124,7 @@ Burn and redeem cover series that expired up to 7 days ago. Unpaired longs (boug
 
 | Alert | When | Prints |
 |---|---|---|
-| `settle` | Proposal before `final_at` that is off the reference (measured against the lower price) by more than 20 bps, well inside the oracle's 50 bps veto, so two tampered sources can't slip a price under it; or that has no reference (Deribit down or no data) | `override_settlement` with `<price>` to fill in (derive it from the [oracle rules](https://docs.endline.trade/developers/oracle#what-it-computes), never paste Deribit), signed by the owner |
+| `settle` | Proposal before `final_at` that is off the reference (measured against the lower price) by more than 20 bps, the same tolerance as the oracle's Deribit veto; or that has no reference (Deribit down or no data) | `override_settlement` with `<price>` to fill in (derive it from the [oracle rules](https://docs.endline.trade/developers/oracle#what-it-computes), never paste Deribit), signed by the owner |
 | `missing` | No proposal at expiry + `oracle_window_sec` | `propose_settlement` with `<price>` to fill in, signed by the first `get_oracles` account |
 | `reserve <account>` | `amount − storage_usage × 10^19` yocto below 2 NEAR, for the options contract, `INTENTS_ID` and `RELAYER_ACCOUNT_ID` each | |
 | `uptime` | `HEALTH_URL` set and it doesn't answer `200` with `{"ok":true}` within 5 s | The URL and the error |
@@ -145,4 +145,4 @@ Expiries are read one at a time. Deribit is asked only for expiries with a propo
 
 ## Mainnet settler
 
-`pnpm start settle [--once]` (env: `NEAR_RPC_URL`, `OPTIONS_ID`, `RELAYER_ACCOUNT_ID`, `RELAYER_PRIVATE_KEY`). Refuses to start unless the RPC is on mainnet: testnet settles through the proposer. Every minute it reads the contract's series and `oracle_window_sec`; for each `(underlying, expiry)` with a series, from `expiry + 5 min` until `expiry + oracle_window_sec` (6 h), it reads `get_settlement` and, with no price yet, calls `request_settlement` (0.01 NEAR, 300 TGas; OutLayer refunds all but about 0.0012 NEAR). It waits only until the tx is in a final block, not for OutLayer (a run can outlast the RPC's wait): the next try reads the outcome, and the relayer's txs on an explorer show any refusal. One try per key every 10 min, the contract's stale-lock timeout. A failed send is logged, and so is a retry: a key still without a price 10 min after its request means OutLayer failed or the contract logged `settlement rejected`. State is in memory: a restart retries at once. Past the window, the oracle proposes by hand (the monitor's `missing` alert).
+`pnpm start settle [--once]` (env: `NEAR_RPC_URL`, `OPTIONS_ID`, `RELAYER_ACCOUNT_ID`, `RELAYER_PRIVATE_KEY`). Refuses to start unless the RPC is on mainnet: testnet settles through the proposer. Every minute it reads the contract's series and `oracle_window_sec`; for each `(underlying, expiry)` with a series, from `expiry + 5 min` until `expiry + oracle_window_sec` (6 h), it reads `get_settlement` and, with no price yet, calls `request_settlement` (0.01 NEAR, 300 TGas; OutLayer refunds all but about 0.0012 NEAR, unless it rejects the call outright and the options contract keeps the deposit). It waits only until the tx is in a final block, not for OutLayer (a run can outlast the RPC's wait): the next try reads the outcome, and the relayer's txs on an explorer show any refusal. One try per key every 10 min, the contract's stale-lock timeout. A failed send is logged, and so is a retry: a key still without a price 10 min after its request means OutLayer failed or the contract logged `settlement rejected`. State is in memory: a restart retries at once. Past the window, the oracle proposes by hand (the monitor's `missing` alert).

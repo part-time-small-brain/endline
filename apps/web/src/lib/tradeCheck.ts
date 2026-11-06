@@ -1,6 +1,8 @@
 import type { Payload, Quote } from "@endline/sdk";
 
 const MAX_DEADLINE_SLACK_MS = 5_000;
+// the relay's sign-by is at most 57 s after it gets the bid; the rest is slack for a slow client clock
+const MAX_SIGN_WINDOW_MS = 120_000;
 
 export interface Expected {
   signerId: string;
@@ -16,12 +18,13 @@ export interface Leg {
   amount: bigint;
 }
 
-export function checkTrade(message: Payload, quote: Quote, expected: Expected): { pay: Leg; receive: Leg } {
+export function checkTrade(message: Payload, quote: Quote, expected: Expected, receivedAt: number): { pay: Leg; receive: Leg } {
   const fail = (reason: string): never => {
     throw new Error(`Quote doesn't match what you asked for (${reason}). Nothing was signed.`);
   };
   if (message.signer_id !== expected.signerId) fail("signer");
   if (message.verifying_contract !== expected.intentsId) fail("contract");
+  if (!(quote.sign_by_ms <= receivedAt + MAX_SIGN_WINDOW_MS)) fail("deadline");
   if (!(Date.parse(message.deadline) <= quote.sign_by_ms + MAX_DEADLINE_SLACK_MS)) fail("deadline");
   if (quote.side !== expected.side || quote.size !== expected.size) fail("size");
 

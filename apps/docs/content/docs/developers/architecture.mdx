@@ -39,7 +39,7 @@ options contract ── request_settlement ──▶ OutLayer TEE ── runs or
 | Flow | Steps |
 |---|---|
 | Fund | 1Click deposit from any chain (the quote goes through the relay's `POST /deposit-quote`, which adds our partner key), or `ft_transfer_call` into intents → USDC in the user's intents balance |
-| Write (market maker) | Signs an intents `transfer` of USDC collateral (the most the options can pay) to the contract with `{"action":"write"}` → the contract mints long + short into its intents balance |
+| Write (market maker) | Signs an intents `transfer` of USDC collateral (the most the options can pay) to the contract with `{"action":"write"}` → the contract mints long + short into its intents balance. If that deposit fails, they wait in the contract for anyone to call `retry_delivery` |
 | Buy or sell to close | Web asks the relay for a quote → market makers bid → user signs their half → relay submits both halves in one `execute_intents` → USDC and option swap atomically |
 | Settle | From 5 min after expiry our settler (mainnet) or anyone calls `request_settlement` → OutLayer runs the oracle → price proposed → final after the dispute window |
 | Collect | Holder sends longs back with `{"action":"exercise"}`, pre-signed at buy time (auto-collect) or via the Collect button. The relay submits it; the contract pays from locked collateral into the holder's intents balance |
@@ -55,13 +55,13 @@ The official NEAR Intents quote bus needs a partner key and KYC for market maker
 | | Mainnet | Testnet (live) |
 |---|---|---|
 | Intents | `intents.near` | `intents.near-options-dev.testnet`, a copy of the exact mainnet wasm |
-| Options contract | Not deployed | `opt3.near-options-dev.testnet` |
+| Options contract | Not deployed | `opt4.near-options-dev.testnet` |
 | Collateral | Native USDC | Mock USDC (6 decimals) |
 | Expiries | Daily 08:00 UTC (Deribit's grid) | Every minute |
 | Write and sell-back cutoff | 30 min before the end | 60 s before |
 | Dispute window | 1 h | 2 min |
 | Funding | 1Click from any chain | 100 test USDC a day from Add funds (relay `POST /faucet`) |
-| Oracle | `outlayer.near` | `outlayer.testnet`. Manual oracle: `near-options-dev.testnet`, driven by the proposer |
+| Oracle | `outlayer.near` | `outlayer.testnet`. Manual oracle: `oracle.near-options-dev.testnet`, driven by the proposer |
 
 Testnet ids are in `deploy/testnet.json`. RPC: `https://rpc.testnet.fastnear.com`.
 
@@ -73,4 +73,4 @@ Testnet ids are in `deploy/testnet.json`. RPC: `https://rpc.testnet.fastnear.com
 | Oracle WASM | Add one row to `MARKETS` in `oracle/src/sources.rs`, rebuild, host, `set_oracle_wasm` |
 | Market maker, relay, web | Nothing. They read assets and series from the contract |
 
-Deribit must list options on the asset, since the market maker prices from Deribit's volatility, and at least 3 of the oracle's 7 exchanges must list a spot pair.
+Deribit must list options on the asset, since the market maker prices from Deribit's volatility, and at least 3 of the oracle's 7 exchanges must list a spot pair (4 for expiries other than 08:00 UTC).

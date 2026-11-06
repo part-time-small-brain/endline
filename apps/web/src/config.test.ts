@@ -5,7 +5,7 @@ const ENV = {
   VITE_NETWORK: "testnet",
   VITE_RPC_URL: "https://rpc.testnet.fastnear.com",
   VITE_INTENTS_ID: "intents.near-options-dev.testnet",
-  VITE_OPTIONS_ID: "opt3.near-options-dev.testnet",
+  VITE_OPTIONS_ID: "opt4.near-options-dev.testnet",
   VITE_QUOTE_ASSET: "nep141:usdc.testnet",
 };
 

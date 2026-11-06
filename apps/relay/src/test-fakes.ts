@@ -18,7 +18,7 @@ import {
 import oneClickQuote from "../../../testdata/oneclick-quote.json" with { type: "json" };
 import { legs } from "./bid.ts";
 import { HttpError } from "./relay.ts";
-import { type Chain, Rejected } from "./rpc.ts";
+import { type Chain, Rejected, Unsettled } from "./rpc.ts";
 
 export const INTENTS = "intents.test";
 export const OPTIONS = "opt.test";
@@ -54,6 +54,7 @@ export function fakeChain(series: Series[] = [SERIES]) {
   const executed: SignedPayload[][] = [];
   const settlements = new Map<string, Settlement>();
   const balances = new Map<string, bigint>();
+  const txs = new Map<string, "succeeded" | "failed">();
   const simulate = async (batch: SignedPayload[]) => {
     for (const signed of batch) {
       const { signer_id, nonce, deadline } = readPayload(signed);
@@ -74,16 +75,23 @@ export function fakeChain(series: Series[] = [SERIES]) {
     balanceOf: async (accountId: string, asset: string) => balances.get(`${accountId}:${asset}`) ?? 10n ** 18n,
     simulate,
     execute: async (batch: SignedPayload[]) => {
-      const { invariant_violated } = await simulate(batch);
-      if (invariant_violated) throw new Error("unbalanced");
+      const txHash = `tx${txs.size + 1}`;
+      txs.set(txHash, "failed");
+      try {
+        const { invariant_violated } = await simulate(batch);
+        if (invariant_violated) throw new Error("unbalanced");
+      } catch (error) {
+        throw new Unsettled([txHash], error);
+      }
       for (const signed of batch) {
         const { signer_id, nonce } = readPayload(signed);
         used.add(`${signer_id}:${nonce}`);
       }
       executed.push(batch);
-      return `tx${executed.length}`;
+      txs.set(txHash, "succeeded");
+      return txHash;
     },
-    isNonceUsed: async (accountId: string, nonce: string) => used.has(`${accountId}:${nonce}`),
+    txStatus: async (txHash: string) => txs.get(txHash) ?? "unknown",
     finalTimeMs: async () => Date.now(),
   } satisfies Chain;
   return { chain, executed, settlements, balances };

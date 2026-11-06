@@ -42,8 +42,8 @@ pub fn mt_transfer(
 
 pub fn options<T: Serialize>(event: &str, data: &T) {
     emit(
-        "near-options",
-        "0.2.0",
+        "endline",
+        "1.0.0",
         event,
         serde_json::to_value(data).expect("event serialization"),
     );

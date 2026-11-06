@@ -1,3 +1,10 @@
+{
+	servers {
+		trusted_proxies static 10.86.86.86/32
+		client_ip_headers CF-Connecting-IP
+	}
+}
+
 :80 {
 	header {
 		X-Content-Type-Options nosniff
@@ -6,7 +13,7 @@
 	@relay path /health /series /marks /quote /publish /status/* /fills/* /execute /claims /calls /calls/* /leaderboard /leaderboard/* /faucet /deposit-quote
 	handle @relay {
 		reverse_proxy relay:8787 {
-			header_up X-Forwarded-For {http.request.header.CF-Connecting-IP}
+			header_up X-Forwarded-For {client_ip}
 		}
 	}
 	handle {

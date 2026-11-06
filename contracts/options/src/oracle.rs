@@ -6,7 +6,7 @@ use crate::{Contract, ContractExt};
 
 pub const SETTLE_DELAY_SEC: u64 = 300;
 const PENDING_TIMEOUT_SEC: u64 = 600;
-const MAX_DEV_BPS: u32 = 50;
+const MAX_DEV_BPS: u32 = 20;
 const MIN_SETTLE_DEPOSIT: NearToken = NearToken::from_millinear(10);
 const MIN_SETTLE_GAS: Gas = Gas::from_tgas(300);
 const GAS_REQUEST_EXECUTION: Gas = Gas::from_tgas(100);

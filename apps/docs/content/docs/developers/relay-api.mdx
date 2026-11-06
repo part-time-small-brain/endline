@@ -16,7 +16,7 @@ The relay runs the RFQ auction, settles trades with `intents.near::execute_inten
 | `POST /publish` | `{quote_id, signed}` → `StatusUpdate` (200 settled, 422 failed) |
 | `GET /status/:quote_id` | `StatusUpdate`. `expired` from `sign_by_ms`; forgotten after an hour (then 404) |
 | `GET /fills/:account_id` | `Fill[]` for that signer |
-| `POST /execute` | `{signed}` → `{tx_hash}`. Gasless collect. `tx_hash` is `""` when the send errored but the signer's nonce shows it ran |
+| `POST /execute` | `{signed}` → `{tx_hash}`. Gasless collect. `tx_hash` is the relayer's transaction that ran, also when the send errored |
 | `POST /claims` | `{signed}` → `{ok: true}`. Stores a pre-signed exercise for auto-collect |
 | `POST /calls` | `{series_id, signer, session}` → `Call`. A free call ([rules](#free-calls)) |
 | `GET /calls/:account_id` | `Call[]`, newest first, with `result: {price, points}` once scored |
@@ -24,7 +24,7 @@ The relay runs the RFQ auction, settles trades with `intents.near::execute_inten
 | `GET /leaderboard/:account_id` | The same plus `you: {today, week}` |
 | `POST /faucet` | Testnet only. `{account_id}` → `{tx_hash}`. Sends 100 test USDC into that account's intents balance (NEAR account or lowercase `0x` address). CORS only for the relay's `APP_ORIGINS` (the Endline app), `content-type: application/json`. Once per account and once per IP (IPv6: per /48) per 24 h |
 
-`POST /quote`, `/execute`, `/claims`, `/calls`, `/faucet` and `/deposit-quote` share one rate limit: 30 requests per minute per client IP (IPv6: per /64). On top, each signer gets 4 quotes per 25 s, counted once their session and balance check out (quotes refused for funds don't count), and a quote that settles into a trade gives its slot back within that 25 s window, and a buyer needs $1 before any market maker is asked.
+`POST /quote`, `/execute`, `/claims`, `/calls`, `/faucet` and `/deposit-quote` share one rate limit: 30 requests per minute per client IP (IPv6: per /64). `GET /fills` has its own: 600 per minute per client IP. On top, each signer gets 4 quotes per 25 s, counted once their session and balance check out (quotes refused for funds don't count), and a quote that settles into a trade gives its slot back within that 25 s window, and a buyer needs $1 before any market maker is asked.
 
 ## A trade
 
@@ -34,7 +34,7 @@ The relay runs the RFQ auction, settles trades with `intents.near::execute_inten
 | Quote | `POST /quote {series_id, side, size, signer: {standard, signer_id}, session}`. `side` is yours: `buy` or `sell` (to close). A buy must be at least the asset's `min_write` |
 | Auction | The relay asks every connected market maker for 300 to 1500 ms, closing early once all have answered. Best price wins (buy: lowest, sell: highest, ties: first answer) |
 | Sign | The `Quote` carries `premium`, `pay`, `receive`, `sign_by_ms` (market maker deadline − 3 s) and `payload`, exactly what your wallet signs |
-| Publish | `POST /publish {quote_id, signed}`, accepted only if byte-for-byte what the relay issued and unused. The relay simulates both halves, then calls `execute_intents([mm, user])`: both fill or neither does. If that call errors, the quote stays `settling` until the user's nonce is used (`settled`, maybe without `tx_hash`) or a final block passes the deadline with it unused (`failed`) |
+| Publish | `POST /publish {quote_id, signed}`, accepted only if byte-for-byte what the relay issued and unused. The relay simulates both halves, then calls `execute_intents([mm, user])`: both fill or neither does. If that call errors, the relay reads every transaction it signed for it at `final`: `settled` with the one that succeeded, `failed` once all of them failed or a final block passes the deadline with none succeeded. Until then the quote stays `settling` |
 
 ### Signing `Quote.payload`
 
@@ -53,12 +53,12 @@ Free calls move no money, but the caller needs at least $1 of `QUOTE_ASSET` in t
 
 ## Collect: `/execute` and `/claims`
 
-Both accept only an exercise exactly as the SDK's `exerciseOptions` builds and `toSign` encodes it: one `transfer` to the options contract with `msg` `{"action":"exercise"}`, `min_gas` 100 TGas, 1 to 10 long tokens of series in the `GET /series` listing, each at least `min_write`. Anything else is refused before any gas is spent. Each `(signer_id, nonce)` goes on-chain once, one payload per signer is in flight at a time (an errored send stays in flight until its nonce is used or a final block passes its deadline), and every payload must still have 2 minutes left when the relay sends it, with its deadline written exactly as the SDK writes it.
+Both accept only an exercise exactly as the SDK's `exerciseOptions` builds and `toSign` encodes it: one `transfer` to the options contract with `msg` `{"action":"exercise"}`, `min_gas` 100 TGas, 1 to 10 long tokens of series in the `GET /series` listing, each at least `min_write`. Anything else is refused before any gas is spent. Each `(signer_id, nonce)` goes on-chain once, one payload per signer is in flight at a time (an errored send stays in flight until one of the relayer's transactions for it succeeds, all fail, or a final block passes its deadline), and every payload must still have 2 minutes left when the relay sends it, with its deadline written exactly as the SDK writes it.
 
 | Route | Rules |
 |---|---|
 | `/execute` | Expires between 2 and 10 minutes from now. Needs a final price (`now ≥ final_at + 60 s`) and a total payout of at least $1. Simulated, then executed |
-| `/claims` | Only for options you bought through the relay (net of sells), one open claim per buy of that series, with a max payout of at least $1. Your open claims on a token can't exceed that or your balance of it; 1,000 claims in total. Simulated, then stored. Every minute the relay re-simulates each claim, drops ones the verifier refuses (sold, collected, expired, nonce used) or that pay under $1, and submits the rest once final |
+| `/claims` | Only for options you bought through the relay (net of sells), one open claim per buy of that series, with a max payout of at least $1. Your open claims on a token can't exceed that or your balance of it; 100 open claims per account, 1,000 in total. Simulated, then stored. Every minute the relay re-simulates each claim, drops ones the verifier refuses (sold, collected, expired, nonce used) or that pay under $1, and submits the rest once final |
 
 ## Errors
 
@@ -71,25 +71,25 @@ Body: `{error}`.
 | `402` | Your balance doesn't cover the quote (a buy needs at least $1 of USDC before any market maker is asked), or a free call's caller holds under $1. Deposit first |
 | `403` | Faucet off (mainnet) |
 | `404` | Unknown or forgotten series or quote |
-| `409` | Past the write cutoff, a width no market maker lists at that strike, already published, price not final, payload already submitted or another from the same signer still being sent, claims above the options held or above what you bought through the relay, or a free call that's too late, not on the next round, repeated, or on a cell priced at its full payout |
+| `409` | Past the write cutoff, a width no market maker lists at that strike, already published, price not final, payload already submitted or another from the same signer still being sent, claims above the options held, above what you bought through the relay or over 100 open per account, or a free call that's too late, not on the next round, repeated, or on a cell priced at its full payout |
 | `410` | Quote expired |
 | `413` | Body over 64 KB |
 | `415` | Faucet request not `application/json` |
 | `422` | Refused by `simulate_intents` |
-| `500` | A collect errored and its nonce was still unused once a final block passed its deadline: it never ran. If the response never arrives (the relay holds it until then, up to the deadline), check the balance before signing again |
+| `500` | A collect errored and the relayer's transactions for it failed, or none had succeeded once a final block passed its deadline: it never ran. If the response never arrives (the relay holds it until then, up to the deadline), check the balance before signing again |
 | `429` | Rate limit (per IP, or 4 quotes per 25 s per signer), faucet already used in the last 24 h, or 10 free calls used this round (100 per IP) |
 | `502` | Faucet transfer refunded (try again) or of unknown outcome (check your balance; it counts as sent) |
 | `503` | No market maker online, no valid quote, claim queue full, no price for a free call's series right now, or the free-call store full |
 
-## Market maker API (WebSocket `/mm?key=<api key>`)
+## Market maker API (WebSocket `/mm`)
 
-Not exposed on the hosted relay (`api.endline.trade`). To connect a market maker, run your own relay.
+Not exposed on the hosted relay (`api.endline.trade`). To connect a market maker, run your own relay. Send the API key as the upgrade request's `Authorization: Bearer <api key>` header; a key in the URL is refused, since proxies log URLs.
 
 | Direction | Message |
 |---|---|
 | Relay → MM | `{"method":"quote","params":QuoteEvent}`. `side` is the user's side. Answers after `deadline_ms` are dropped |
 | MM → relay | `{"method":"quote_response","params":{quote_id, premium, signed}}`. One answer per quote per connection |
 | MM → relay | `{"method":"marks","params":[{series_id, ask, bid?, vol}]}`. Its current price per series it holds and would quote, replacing its previous marks; dropped 10 s after receipt or when it disconnects |
-| Relay → MM | `{"method":"quote_status","params":StatusUpdate}` to the winner: `settled` (with `tx_hash`, unless the relay settled it by the user's nonce after an RPC error), `failed` with `reason`, or `expired` |
+| Relay → MM | `{"method":"quote_status","params":StatusUpdate}` to the winner: `settled` with `tx_hash`, `failed` with `reason`, or `expired` |
 
 An answer counts only if its `token_diff` is exactly the expected fee-exact market maker leg for that premium, its deadline is 20 to 60 s out with a versioned nonce, and `simulate_intents([mm])` leaves exactly the user's leg open.

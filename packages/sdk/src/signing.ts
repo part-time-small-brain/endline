@@ -1,3 +1,5 @@
+import { sha256 } from "@noble/hashes/sha2.js";
+import { base64 } from "@scure/base";
 import { z } from "zod";
 import { Payload } from "./intents.ts";
 
@@ -36,4 +38,21 @@ export function readPayload(signed: Unsigned): Payload {
       : { ...Nep413Message.parse(JSON.parse(signed.payload.message)), verifying_contract: signed.payload.recipient, nonce: signed.payload.nonce };
   if (signedText(toSign(signed.standard, p)) !== signedText(signed) || btoa(atob(p.nonce)) !== p.nonce) throw new Error("payload is not canonically encoded");
   return p;
+}
+
+const NEP413_TAG = 2 ** 31 + 413;
+
+function u32(n: number): Uint8Array {
+  const bytes = new Uint8Array(4);
+  new DataView(bytes.buffer).setUint32(0, n, true);
+  return bytes;
+}
+
+function borshString(text: string): Uint8Array {
+  const bytes = new TextEncoder().encode(text);
+  return Uint8Array.from([...u32(bytes.length), ...bytes]);
+}
+
+export function nep413Hash({ message, nonce, recipient }: { message: string; nonce: string; recipient: string }): Uint8Array {
+  return sha256(Uint8Array.from([...u32(NEP413_TAG), ...borshString(message), ...base64.decode(nonce), ...borshString(recipient), 0]));
 }

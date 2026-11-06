@@ -1,14 +1,15 @@
 import { isDeepStrictEqual } from "node:util";
-import { exerciseOptions, type Fill, longPayout, MIN_RELAYED_PAYOUT_USD, maxPayout, parseTokenId, readPayload, type Series, type SignedPayload, termsOf } from "@endline/sdk";
+import { exerciseOptions, type Fill, longPayout, MIN_RELAYED_PAYOUT_USD, maxPayout, parseTokenId, readPayload, type Series, type Settlement, type SignedPayload, termsOf } from "@endline/sdk";
 import type { Claims } from "./claims.ts";
 import type { Config } from "./config.ts";
 import type { Fills } from "./fills.ts";
 import { HttpError } from "./relay.ts";
-import { type Chain, ranByNonce, Rejected } from "./rpc.ts";
+import { type Chain, ranTx, Rejected } from "./rpc.ts";
 
 // block time can trail our clock, and an exercise before final_at burns the signer's nonce
 export const FINAL_MARGIN_SEC = 60;
 const MAX_CLAIMS = 1_000;
+const MAX_CLAIMS_PER_ACCOUNT = 100;
 const MAX_DEADLINE_MS = 10 * 60_000;
 // intents rechecks the deadline on-chain, and near-api-js retries a send for up to ~85 s: a payload that expires first burns our gas
 const MIN_DEADLINE_MS = 2 * 60_000;
@@ -55,6 +56,7 @@ export class Collector {
   private claiming: Exercise[] = [];
   private submitted = new Map<string, number>();
   private sending = new Set<string>();
+  private final = new Map<string, Settlement>();
 
   constructor(
     private chain: Chain,
@@ -78,13 +80,15 @@ export class Collector {
     const stored = this.claims.all().filter((claim) => !isDeepStrictEqual(claim, signed));
     const open = [...this.claiming, ...stored.flatMap((claim) => readExercise(claim, this.config) ?? [])];
     if (open.length >= MAX_CLAIMS) throw new HttpError(503, "the claim queue is full");
+    if (open.filter((other) => other.signerId === exercise.signerId).length >= MAX_CLAIMS_PER_ACCOUNT) throw new HttpError(409, `an account can have at most ${MAX_CLAIMS_PER_ACCOUNT} open claims`);
     this.claiming.push(exercise);
     let saved: Promise<void>;
     try {
+      await this.simulate(signed);
       const legs = await this.legs(exercise);
       const maxTotal = legs.reduce((sum, { series, amount }) => sum + maxPayout(termsOf(series), amount), 0n);
       if (maxTotal < (await this.minPayout())) throw new HttpError(400, "auto-collect needs a max payout of at least $1");
-      const bought = relayBuys(await this.fills.byAccount(exercise.signerId));
+      const bought = relayBuys(this.fills.byAccount(exercise.signerId));
       for (const { asset, series, amount } of legs) {
         const mine = open.filter((other) => other.signerId === exercise.signerId && other.tokens[asset] !== undefined);
         const claimed = mine.reduce((sum, other) => sum + (other.tokens[asset] ?? 0n), amount);
@@ -93,7 +97,6 @@ export class Collector {
         if (mine.length >= buys) throw new HttpError(409, "one auto-collect per buy");
         if (claimed > (await this.chain.balanceOf(exercise.signerId, asset))) throw new HttpError(409, "open claims exceed the options held");
       }
-      await this.simulate(signed);
       saved = this.claims.add(signed);
     } finally {
       this.claiming.splice(this.claiming.indexOf(exercise), 1);
@@ -139,7 +142,7 @@ export class Collector {
     return legs;
   }
 
-  private async submit(signed: SignedPayload, { signerId, nonce, deadlineMs }: Exercise, settleByNonce: boolean): Promise<string> {
+  private async submit(signed: SignedPayload, { signerId, nonce, deadlineMs }: Exercise, awaitOutcome: boolean): Promise<string> {
     for (const [key, deadline] of this.submitted) if (deadline < Date.now()) this.submitted.delete(key);
     const key = `${signerId}:${nonce}`;
     if (this.submitted.has(key)) throw new HttpError(409, "this payload was already submitted");
@@ -150,9 +153,10 @@ export class Collector {
       if (deadlineMs < Date.now() + MIN_DEADLINE_MS) throw new HttpError(400, "a payload must stay valid for at least 2 minutes when it is sent");
       this.submitted.set(key, deadlineMs);
       return await this.chain.execute([signed]).catch(async (error: unknown) => {
-        if (settleByNonce) {
-          console.error("execute_intents errored, settling by the user's nonce", key, error);
-          if (await ranByNonce(this.chain, signed, key)) return "";
+        if (awaitOutcome) {
+          console.error("execute_intents errored, settling by the relayer's transactions", key, error);
+          const txHash = await ranTx(this.chain, signed, error, key);
+          if (txHash !== undefined) return txHash;
         } else if (await this.simulate(signed).then(() => true, () => false)) this.submitted.delete(key);
         throw error;
       });
@@ -165,8 +169,10 @@ export class Collector {
     const nowSec = Date.now() / 1000;
     let total = 0n;
     for (const { series, amount } of legs) {
-      const settlement = await this.chain.settlement(series.underlying, series.expiry);
+      const key = `${series.underlying}:${series.expiry}`;
+      const settlement = this.final.get(key) ?? (await this.chain.settlement(series.underlying, series.expiry));
       if (!settlement || nowSec < settlement.final_at + FINAL_MARGIN_SEC) return undefined;
+      this.final.set(key, settlement);
       total += longPayout(termsOf(series), amount, BigInt(settlement.price));
     }
     return total;

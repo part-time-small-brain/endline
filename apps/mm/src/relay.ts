@@ -21,9 +21,7 @@ export class RelayClient {
 
   start(): void {
     if (this.closed) return;
-    const url = new URL(this.url);
-    url.searchParams.set("key", this.apiKey);
-    const ws = new WebSocket(url);
+    const ws = new WebSocket(this.url, { headers: { authorization: `Bearer ${this.apiKey}` } });
     ws.on("open", () => this.log("relay connected"));
     ws.on("message", (data) => this.receive(data.toString()));
     ws.on("error", (e) => this.log(`relay error: ${e.message}`));

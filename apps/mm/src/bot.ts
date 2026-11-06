@@ -65,7 +65,7 @@ export async function runBot(config: Config, relay: { url: string; apiKey: strin
     settings: config.settings,
     intentsId: config.intentsId,
     accountId: config.accountId,
-    sign: nep413Signer(config.accountId, config.privateKey),
+    sign: nep413Signer(config.privateKey),
     send: (r) => client.send(r),
     onFill: () => setTimeout(() => void refreshInventory().then(hedge).catch((e) => log(`post-fill hedge failed: ${e}`)), CHAIN_LAG_MS + 500),
     log,
