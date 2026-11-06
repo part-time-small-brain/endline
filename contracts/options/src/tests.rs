@@ -583,7 +583,7 @@ fn closing_an_up_and_a_down_pays_one_usdc_total_and_debits_each_series() {
 }
 
 #[test]
-fn close_events_report_one_usdc_payout_under_version_0_2_0() {
+fn close_events_report_one_usdc_payout_under_endline_1_0_0() {
     let mut c = setup();
     let id = create(&mut c, 110_000, W, OptionKind::Call);
     write(&mut c, USDC_ASSET, W * USD, &id);
@@ -599,9 +599,9 @@ fn close_events_report_one_usdc_payout_under_version_0_2_0() {
         .iter()
         .filter_map(|l| l.strip_prefix("EVENT_JSON:"))
         .map(|j| serde_json::from_str::<Value>(j).unwrap())
-        .find(|e| e["standard"] == "near-options" && e["event"] == "exercise")
+        .find(|e| e["standard"] == "endline" && e["event"] == "exercise")
         .unwrap();
-    assert_eq!(event["version"], "0.2.0");
+    assert_eq!(event["version"], "1.0.0");
     assert_eq!(u(&event["data"]["payout"]), 6_000 * USD);
 }
 
@@ -702,6 +702,7 @@ fn only_failed_payout_becomes_claimable() {
         (receiver, &args["receiver_id"], u(&args["amount"])),
         (&intents(), &json!("alice.near"), 500)
     );
+    assert_eq!(args["memo"], "endline payout");
     panics_with("nothing claimable", || {
         c.withdraw_claimable(alice(), USDC_ASSET.into())
     });

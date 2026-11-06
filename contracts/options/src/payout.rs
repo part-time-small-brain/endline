@@ -96,7 +96,7 @@ impl Contract {
                 asset.to_string(),
                 U128(amount),
                 None,
-                Some("near-options payout".into()),
+                Some("endline payout".into()),
             )
             .then(
                 Self::ext(env::current_account_id())
