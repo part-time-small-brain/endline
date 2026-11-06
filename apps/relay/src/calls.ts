@@ -56,7 +56,7 @@ export class Calls {
     const round = roundOf(series.expiry);
     if (round !== nextRound(all.filter(callable).map((s) => s.expiry))) throw new HttpError(409, "free calls are open only for the next round");
     const dollar = 10n ** BigInt(contract.quote_decimals);
-    if ((await this.chain.balanceOf(signer.signer_id, contract.quote_asset)) < dollar) throw new HttpError(402, "a free call needs at least $1 of USDC in your NEAR Intents balance: deposit first");
+    if ((await this.chain.balanceOf(signer.signer_id, contract.quote_asset)) < dollar) throw new HttpError(402, "a free call needs at least $1 of USDC in this wallet's NEAR Intents balance (a Tap balance doesn't count): deposit first");
     const mine = this.state.calls.filter((c) => c.account_id === signer.signer_id);
     if (mine.some((c) => c.series_id === series_id)) throw new HttpError(409, "you already called this cell");
     const mark = this.marks().find((m) => m.series_id === series_id);
@@ -152,7 +152,9 @@ export class Calls {
     const calls = this.state.calls.filter((c) => c.terms.expiry > nowSec - (c.result ? SECONDS_PER_DAY : UNPRICED_KEEP_SEC));
     const rounds = newestFirst(this.state.rounds).slice(0, ROUNDS_KEPT);
     const latest = rounds[0]?.date;
-    const live = Object.entries(this.state.wins).filter(([, days]) => latest === undefined || (days.at(-1) ?? "") >= dayBefore(latest));
+    // a round can be scored up to UNPRICED_KEEP_SEC late, and the day before it can extend a streak
+    const oldest = latest && roundOf(Date.parse(latest) / 1000 - UNPRICED_KEEP_SEC - SECONDS_PER_DAY);
+    const live = Object.entries(this.state.wins).filter(([, days]) => !oldest || (days.at(-1) ?? "") >= oldest);
     const entries = live.map(([id, days]) => [id, days.slice(-WIN_DAYS_KEPT)] as const);
     const changed = calls.length !== this.state.calls.length || rounds.length !== this.state.rounds.length || entries.length !== Object.keys(this.state.wins).length || entries.some(([id, days]) => days.length !== this.state.wins[id]?.length);
     this.state = { calls, rounds, wins: Object.fromEntries(entries) };

@@ -18,4 +18,17 @@ describe("JsonFile", () => {
     await file.write([4]);
     expect(await file.read([])).toEqual([4]);
   });
+
+  it("saves a value written while an earlier save is under way", async () => {
+    const file = new JsonFile(mkdtempSync(join(tmpdir(), "json-")), "state.json", z.array(z.number()));
+    const stringify = JSON.stringify;
+    let second: Promise<void> | undefined;
+    vi.spyOn(JSON, "stringify").mockImplementationOnce((value: unknown) => {
+      second = file.write([2]);
+      return stringify(value);
+    });
+    await file.write([1]);
+    await second;
+    expect(await file.read([])).toEqual([2]);
+  });
 });

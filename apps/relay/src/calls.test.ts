@@ -1,16 +1,17 @@
-import { mkdtempSync } from "node:fs";
+import { mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { type Mark, SECONDS_PER_DAY, type Series } from "@endline/sdk";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Calls } from "./calls.ts";
+import { JsonFile } from "./jsonFile.ts";
 import { Sessions } from "./session.ts";
 import { fakeChain, httpStatus, INTENTS, session } from "./test-fakes.ts";
 
 const USD = 1_000_000n;
 const E = Date.UTC(2026, 10, 5, 8) / 1000;
 const NEXT = E + SECONDS_PER_DAY;
-const DAYS = Array.from({ length: 9 }, (_, i) => E + i * SECONDS_PER_DAY);
+const DAYS = Array.from({ length: 10 }, (_, i) => E + i * SECONDS_PER_DAY);
 
 const series = (strike: number, expiry = E): Series => ({
   id: `BTC-${expiry}-${strike}-C`,
@@ -80,17 +81,34 @@ describe("free calls", () => {
     await expect(t.call(series(81_000, NEXT).id)).resolves.toMatchObject({ series_id: series(81_000, NEXT).id });
   });
 
-  it("allows 10 calls a round per account, then 429, and stops a round once it's full, counting only its calls still waiting", async () => {
+  it("allows 10 calls a round per account, then 429, and stops a round once it's full", async () => {
     const strikes = Array.from({ length: 11 }, (_, i) => 75_000 + i * 1_000);
-    const t = setup([...strikes.map((k) => series(k)), series(81_000, NEXT)], 12);
+    const t = setup(strikes.map((k) => series(k)), 12);
     for (const k of strikes.slice(0, 10)) await t.call(series(k).id);
     expect(await httpStatus(t.call(series(85_000).id))).toBe(429);
     await t.call(series(85_000).id, "bob.near");
     await t.call(series(84_000).id, "bob.near");
     expect(await httpStatus(t.call(series(83_000).id, "carol.near"))).toBe(503);
+  });
+
+  it("counts toward a round's cap only its own calls still waiting, not scored ones on the same date or another round's", async () => {
+    const later = E + 4 * 3_600;
+    const t = setup([series(81_000), series(82_000), series(81_000, later), series(81_000, NEXT)], 1);
+    await t.call(series(81_000).id);
+    expect(await httpStatus(t.call(series(82_000).id, "bob.near"))).toBe(503);
     await t.settle(E, 83_000);
+    await expect(t.call(series(81_000, later).id, "bob.near")).resolves.toMatchObject({ account_id: "bob.near" });
     at(NEXT - 2 * 3_600);
     await expect(t.call(series(81_000, NEXT).id, "carol.near")).resolves.toMatchObject({ account_id: "carol.near" });
+  });
+
+  it("forgets a call it couldn't save, so the same call can be made again", async () => {
+    const t = setup();
+    const write = vi.spyOn(JsonFile.prototype, "write").mockRejectedValueOnce(new Error("disk full"));
+    await expect(t.call(series(81_000).id)).rejects.toThrow("disk full");
+    expect(t.calls.byAccount("alice.near")).toEqual([]);
+    write.mockRestore();
+    await expect(t.call(series(81_000).id)).resolves.toMatchObject({ account_id: "alice.near" });
   });
 
   it("needs $1 of USDC in the caller's intents balance, spending none of it", async () => {
@@ -158,6 +176,40 @@ describe("free calls", () => {
     t.settlements.set(`BTC:${DAYS[0]}`, { price: String(83_000n * USD), final_at: DAYS[0]! + 3_900 });
     await t.calls.score();
     expect(t.calls.board("alice.near").you?.today).toMatchObject({ points: 400, streak: 2 });
+  });
+
+  it("keeps a streak whose next round is scored late, after a later date was already partly scored", async () => {
+    const later = DAYS[2]! + 3_600;
+    const t = setup([series(81_000, DAYS[0]), series(81_000, DAYS[1]), series(81_000, DAYS[2]), series(81_000, later)]);
+    at(DAYS[0]! - 2 * 3_600);
+    await t.call(series(81_000, DAYS[0]).id);
+    await t.settle(DAYS[0]!, 83_000);
+    at(DAYS[1]! - 2 * 3_600);
+    await t.call(series(81_000, DAYS[1]).id);
+    at(DAYS[2]! - 2 * 3_600);
+    await t.call(series(81_000, DAYS[2]).id, "bob.near");
+    await t.call(series(81_000, later).id);
+    await t.settle(DAYS[2]!, 83_000);
+    expect(t.calls.board("alice.near").you?.today).toBeNull();
+    t.settlements.set(`BTC:${DAYS[1]}`, { price: String(83_000n * USD), final_at: DAYS[1]! + 3_900 });
+    await t.settle(later, 83_000);
+    expect(t.calls.board("alice.near").you?.today).toMatchObject({ points: 400, streak: 3 });
+  });
+
+  it("drops the win days of an account that can no longer extend a streak", async () => {
+    const t = setup();
+    const saved = () => JSON.parse(readFileSync(join(t.dir, "calls.json"), "utf8")).wins;
+    at(DAYS[0]! - 2 * 3_600);
+    await t.call(series(81_000, DAYS[0]).id);
+    await t.settle(DAYS[0]!, 83_000);
+    at(DAYS[8]! - 2 * 3_600);
+    await t.call(series(81_000, DAYS[8]).id, "bob.near");
+    await t.settle(DAYS[8]!, 83_000);
+    expect(Object.keys(saved())).toEqual(["alice.near", "bob.near"]);
+    at(DAYS[9]! - 2 * 3_600);
+    await t.call(series(81_000, DAYS[9]).id, "bob.near");
+    await t.settle(DAYS[9]!, 83_000);
+    expect(Object.keys(saved())).toEqual(["bob.near"]);
   });
 
   it("ranks ties by wins then account, sums the last 7 rounds for the week, and finds you beyond the top 20", async () => {
