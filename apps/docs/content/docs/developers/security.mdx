@@ -32,7 +32,7 @@ description: The rules every change keeps, what each actor can do, and the gaps 
 | Forced failure of a returned promise | Receivers return plain values; delivery and payouts are detached. Our own transfers into intents carry only a plain deposit `msg` |
 | Payout above collateral | Per-series `collateral_locked`; `long + short ≤ refund ≤ collateral` proven by tests |
 | Spot or pool price used for settlement | Price keyed by exact `(underlying, expiry)`, a 30-min TWAP median, never "latest" |
-| Wrong oracle price | Price > 0, dispute window, owner override, monitor (alerts at 20 bps); median of 7 with at least 3; Deribit 20 bps veto, and no price at all on an 08:00 market without Deribit; the USDT/USD rate needs both sources within 20 bps |
+| Wrong oracle price | Price > 0, dispute window, owner override, monitor (alerts at 20 bps); median of 7 with at least 3 (4 without a Deribit price to check against); Deribit 20 bps veto, and no price at all on an 08:00 market without Deribit; the USDT/USD rate needs both sources within 20 bps |
 | Forged or stale OutLayer result | WASM pinned by sha256; private callback with capped read; a stale callback can't release a newer lock |
 | Missing price | Market stays pending. No fallback payout formula. `burn_pair` always works |
 | Settlement-window games | Writes and quotes stop at the TWAP window start |
