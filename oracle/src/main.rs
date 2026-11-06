@@ -8,7 +8,7 @@ impl Http for WasiHttp {
     fn get(&self, url: &str) -> Result<String, String> {
         let response = wasi_http_client::Client::new()
             .get(url)
-            .header("User-Agent", "near-options-oracle")
+            .header("User-Agent", "endline-oracle")
             .connect_timeout(std::time::Duration::from_secs(10))
             .send()
             .map_err(|e| e.to_string())?;

@@ -117,17 +117,21 @@ fn off_hour_expiry_settles_on_the_median_alone() {
     let bitstamp = (0..30)
         .map(|i| json!({"timestamp": (expiry - 1_800 + i * 60).to_string(), "close": "81010"}))
         .collect::<Vec<_>>();
+    let bitfinex = (0..30)
+        .map(|i| json!([(expiry - 1_800 + i * 60) * 1_000, 0, 81_030.0, 0, 0, 0]))
+        .collect::<Vec<_>>();
     let http = Recorded::only(&[])
         .with("products/BTC-USD", json!(rows(81_000.0)).to_string())
         .with(
             "pair=XBTUSD",
             json!({"result": {"XXBTZUSD": rows(81_020.0)}}).to_string(),
         )
-        .with("bitstamp.net", json!({"data": {"ohlc": bitstamp}}).to_string());
+        .with("bitstamp.net", json!({"data": {"ohlc": bitstamp}}).to_string())
+        .with("bitfinex.com", json!(bitfinex).to_string());
     let f = fix(&btc(expiry), Some(expiry + 300), &http);
     assert_eq!(
         (f.ok, f.source, f.deribit, f.price.as_deref()),
-        (true, "cex_twap_median", None, Some("81010000000"))
+        (true, "cex_twap_median", None, Some("81015000000"))
     );
 }
 
@@ -203,10 +207,16 @@ fn rejects_disagreeing_sources() {
 }
 
 #[test]
-fn two_venues_are_not_enough_for_a_median() {
-    let http = Recorded::only(&["products/BTC-USD", "bitstamp.net"]);
-    let f = fix(&btc(EXPIRY), AFTER, &http);
-    assert_eq!((f.ok, f.venues.len(), f.cex_median), (false, 2, None));
+fn a_median_needs_four_venues() {
+    let three = ["deribit.com", "products/BTC-USD", "pair=XBTUSD", "bitstamp.net"];
+    let f = fix(&btc(EXPIRY), AFTER, &Recorded::only(&three));
+    assert_eq!((f.ok, f.venues.len(), f.cex_median), (false, 3, None));
+    let four = fix(
+        &btc(EXPIRY),
+        AFTER,
+        &Recorded::only(&[&three[..], &["bitfinex.com"]].concat()),
+    );
+    assert_eq!((four.ok, four.venues.len()), (true, 4));
 }
 
 #[test]

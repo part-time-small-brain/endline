@@ -14,6 +14,7 @@ const sleep = vi.hoisted(() => vi.fn());
 const sent = vi.hoisted(() => [] as unknown[]);
 const wasmOutput = vi.hoisted(() => ({ stdout: "" }));
 const spawned = vi.hoisted(() => [] as { args: string[]; env: unknown }[]);
+const inputs = vi.hoisted(() => [] as string[]);
 
 vi.mock("node:timers/promises", () => ({ setTimeout: sleep }));
 vi.mock("near-api-js", () => ({
@@ -29,6 +30,7 @@ vi.mock("node:child_process", () => ({
   spawn: (_: string, args: string[], options: { env: unknown }) => {
     spawned.push({ args, env: options.env });
     const child = Object.assign(new EventEmitter(), { stdout: new PassThrough(), stderr: new PassThrough(), stdin: new PassThrough() });
+    child.stdin.on("data", (d) => inputs.push(String(d)));
     setImmediate(() => {
       child.stdout.emit("data", wasmOutput.stdout);
       child.emit("close", 0);
@@ -109,6 +111,7 @@ describe("proposeCommand", () => {
     Object.assign(listed, { series: [], settlementReads: [], settled: true, network: "testnet" });
     sent.length = 0;
     spawned.length = 0;
+    inputs.length = 0;
   });
 
   it("waits for a pinned wasm, then loads each new pin once", async () => {
@@ -146,6 +149,7 @@ describe("proposeCommand", () => {
 
     expect(sent).toEqual([{ contractId: "opt.testnet", methodName: "propose_settlement", args: { underlying: "BTC", expiry: EXPIRY, price: "80000000000" }, gas: 0n, deposit: 1n }]);
     expect(spawned).toEqual([{ args: ["run", "-S", "http", "--env", `NEAR_BLOCK_TIMESTAMP=${BigInt((EXPIRY + WINDOW) * 1000) * 1_000_000n}`, expect.stringMatching(new RegExp(`^${tmpdir()}/oracle-\\w+/${sha256}\\.wasm$`))], env: { PATH: process.env.PATH } }]);
+    expect(inputs.map((i) => JSON.parse(i))).toEqual([{ expiry: EXPIRY, quote_decimals: 6, max_dev_bps: 20 }]);
   });
 
   it("refuses a mainnet RPC, where OutLayer settles", async () => {

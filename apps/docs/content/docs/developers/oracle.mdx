@@ -14,7 +14,7 @@ One price per `(underlying, expiry)`: the median of 7 exchanges' 30-minute TWAPs
 ## Input and output
 
 ```json
-{"index":"btc_usd","expiry":1792742400,"quote_decimals":6,"max_dev_bps":50}
+{"index":"btc_usd","expiry":1792742400,"quote_decimals":6,"max_dev_bps":20}
 ```
 
 Recorded example output (about 370 bytes; OutLayer's limit is 900):
@@ -31,9 +31,9 @@ Recorded example output (about 370 bytes; OutLayer's limit is 900):
 
 1. Per venue, a 30-minute TWAP of 1-minute closes over `[E−1800, E)`. Candles deduped, on the minute, finite and positive. A venue counts with at least 25 candles.
 2. USDT venues convert with a USDT/USD TWAP over the same window: the average of Coinbase USDT-USD and Kraken USDTUSD, only if both answer within 20 bps of each other. Otherwise, or outside 0.97 to 1.03, USDT venues drop out.
-3. `m` = median of valid venues, only with at least 3.
+3. `m` = median of valid venues, only with at least 4.
 4. `d` = Deribit's `get_delivery_prices` row for the expiry date, only for 08:00 UTC expiries. A veto, never the price. Always `www.deribit.com`.
-5. Result: `m` if `d` is within `max_dev_bps` (50) of it, or for a non-08:00 expiry, which has no `d`. `ok: false` if an 08:00 expiry has no `d` (`deribit unavailable`), if they disagree (`sources disagree`) or if there's no `m` (`no data`). Deribit alone never settles.
+5. Result: `m` if `d` is within `max_dev_bps` (20) of it, or for a non-08:00 expiry, which has no `d`. `ok: false` if an 08:00 expiry has no `d` (`deribit unavailable`), if they disagree (`sources disagree`) or if there's no `m` (`no data`). Deribit alone never settles.
 6. Refuses to run before `E + 60 s`; rejects quote decimals above 9.
 
 | Venue | Pair | Quote |
@@ -52,7 +52,7 @@ Recorded example output (about 370 bytes; OutLayer's limit is 900):
 cargo test -p oracle
 cargo build -p oracle --target wasm32-wasip2 --release
 expiry=$(node -p 'Math.floor((Date.now() / 1000 - 8 * 3600 - 60) / 86400) * 86400 + 8 * 3600')
-printf '{"index":"btc_usd","expiry":%s,"quote_decimals":6,"max_dev_bps":50}\n' "$expiry" \
+printf '{"index":"btc_usd","expiry":%s,"quote_decimals":6,"max_dev_bps":20}\n' "$expiry" \
   | wasmtime run -S http target/wasm32-wasip2/release/oracle.wasm
 ```
 
