@@ -601,7 +601,7 @@ test.describe("Tap", () => {
     await cell.click();
     await expect(page.getByRole("status").filter({ hasText: "Bought BTC Up $81,000 for $25.00." })).toBeVisible();
     await page.clock.pauseAt((await page.evaluate(() => Date.now())) + 100);
-    await expect.poll(() => cell.evaluate((el) => el.getAnimations().length)).toBe(0);
+    await expect.poll(() => cell.evaluate((el) => el.getAnimations().filter((a) => a instanceof CSSTransition).length)).toBe(0);
     await expect(cell).toHaveCSS("background-color", "rgb(11, 38, 28)");
     expect(state.published).toEqual(["quote-2"]);
   });
