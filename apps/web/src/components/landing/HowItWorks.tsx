@@ -4,6 +4,7 @@ import { formatChance, formatPrice, formatUsd, toUnits } from "../../lib/money.t
 import { chance } from "../../lib/odds.ts";
 import { ticket } from "../../lib/ticket.ts";
 import { SideGlyph } from "../Glyphs.tsx";
+import { LABEL } from "../label.ts";
 import { Reveal } from "./Reveal.tsx";
 import { SectionHead } from "./SectionHead.tsx";
 import { balancedOf, type DemoAsset } from "./useDemoMarket.ts";
@@ -86,7 +87,7 @@ function Step({ n, dot, title, line, delay = 0, children }: StepProps) {
 function Row({ label, value }: { label: string; value: string }) {
   return (
     <p className="flex items-center justify-between py-2 text-sm not-first:shadow-[0_-1px_0_var(--rule)]">
-      <span className="font-mono text-[0.625rem] font-medium tracking-[0.14em] text-ink-3 uppercase">{label}</span>
+      <span className={LABEL}>{label}</span>
       <b className="font-mono font-medium">{value}</b>
     </p>
   );

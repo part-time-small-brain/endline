@@ -8,6 +8,7 @@ import solana from "../../assets/chains/solana.svg";
 import { m, useReducedMotion } from "motion/react";
 import { formatPrice } from "../../lib/money.ts";
 import { SideGlyph } from "../Glyphs.tsx";
+import { LABEL } from "../label.ts";
 import { Reveal } from "./Reveal.tsx";
 import { SectionHead } from "./SectionHead.tsx";
 import { useSize } from "./useSize.ts";
@@ -111,7 +112,7 @@ export function Intents({ symbol, strike, quoteDecimals }: Props) {
                 className={`rounded-md border border-rule bg-surface p-4 text-ink ${wide ? "absolute -translate-y-1/2" : ""}`}
                 style={wide ? { left: hubX, top: hubY, width: HUB_W } : undefined}
               >
-                <p className="font-mono text-[0.625rem] font-medium tracking-[0.14em] text-ink-3 uppercase">One balance</p>
+                <p className={LABEL}>One balance</p>
                 <p className="font-display text-3xl font-semibold">$412.58</p>
                 <p className="font-mono text-xs text-ink-3">USDC</p>
               </div>

@@ -400,12 +400,14 @@ for (const status of ["failed", "expired"] as const) {
   });
 }
 
-test("with no relay the hero waits for live prices and never links a series", async ({ page }) => {
+const landingHero = (page: Page) => page.getByRole("region", { name: "Pick a side of the line." });
+
+test("with no relay the hero says it can't reach the market and never links a series", async ({ page }) => {
   await page.route("**/rpc", (route) => route.fulfill({ json: { jsonrpc: "2.0", id: "web", error: { message: "offline" } } }));
   await page.goto("/");
   await page.clock.fastForward(10_000);
-  const hero = page.locator("#top");
-  await expect(hero.getByLabel("Loading prices")).toBeVisible();
+  const hero = landingHero(page);
+  await expect(hero.getByRole("status")).toHaveText("Can't reach the market");
   await expect(hero.getByRole("link", { name: /^Try / })).toHaveCount(0);
   await expect(page.locator('a[href*="series="]')).toHaveCount(0);
 });
@@ -413,10 +415,19 @@ test("with no relay the hero waits for live prices and never links a series", as
 test("with markets listed but nothing priced, the landing ticket says so and opens the app without a series", async ({ page }) => {
   await live(page, () => []);
   await page.goto("/");
-  const hero = page.locator("#top");
+  const hero = landingHero(page);
   await expect(hero.getByRole("status").filter({ hasText: "No prices right now" })).toBeVisible();
   await expect(hero.getByRole("link", { name: "Open app" })).toHaveAttribute("href", "/app");
   await expect(page.locator('a[href*="series="]')).toHaveCount(0);
+});
+
+test("the landing's sections use live marks even when the price history fails", async ({ page }) => {
+  await live(page, () => listed.map((s) => ({ series_id: s.id, ask: String(400 * USD), bid: String(380 * USD), vol: 0.001 })));
+  await page.route("**/get_index_chart_data**", (route) => route.fulfill({ json: { error: "down" } }));
+  await page.goto("/");
+  const chance = page.locator("#how").getByText("Chance it pays", { exact: true }).locator("xpath=following-sibling::b");
+  await chance.scrollIntoViewIfNeeded();
+  await expect(chance).toHaveText("0%");
 });
 
 test("without marks from a market maker nothing is offered", async ({ page }) => {

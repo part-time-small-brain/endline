@@ -7,6 +7,7 @@ import { formatPrice, formatUsd, toNumber, toUnits } from "../../lib/money.ts";
 import { ticket } from "../../lib/ticket.ts";
 import { SideGlyph } from "../Glyphs.tsx";
 import { GlowRect } from "../GlowRect.tsx";
+import { LABEL } from "../label.ts";
 import { Money } from "../Money.tsx";
 import { SPRING } from "./motion.ts";
 import { Reveal } from "./Reveal.tsx";
@@ -200,7 +201,7 @@ interface SegmentedProps<T> {
 function Segmented<T extends string | number>({ label, value, options, onChange }: SegmentedProps<T>) {
   return (
     <div>
-      <p className="mb-2 font-mono text-[0.625rem] font-medium tracking-[0.14em] text-ink-3 uppercase">{label}</p>
+      <p className={`mb-2 ${LABEL}`}>{label}</p>
       <div role="radiogroup" aria-label={label} className="flex rounded-xl ring-1 ring-ink/20 ring-inset">
         {options.map((option) => (
           <button

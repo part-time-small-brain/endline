@@ -8,6 +8,7 @@ import type { PositionStatus } from "../lib/status.ts";
 import { bestWin } from "../lib/shareCard.ts";
 import { countdown, formatEnds, formatUtc } from "../lib/time.ts";
 import { Button } from "./Button.tsx";
+import { LABEL } from "./label.ts";
 import { SettlementNote } from "./SettlementNote.tsx";
 import { ShareButton } from "./ShareButton.tsx";
 import { TxLink } from "./TxLink.tsx";
@@ -107,7 +108,7 @@ export function PositionCard({ view, quoteDecimals, nowSec, onSellBack }: Props)
 function Stat({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="rounded-md bg-well px-3 py-2.5">
-      <dt className="font-mono text-[0.625rem] font-medium tracking-[0.14em] text-ink-3 uppercase">{label}</dt>
+      <dt className={LABEL}>{label}</dt>
       <dd className="mt-1 font-mono font-medium tabular-nums">{children}</dd>
     </div>
   );

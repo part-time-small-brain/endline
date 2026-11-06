@@ -1,8 +1,6 @@
 import { useEffect, useRef } from "react";
 import { NO_PULL, pull } from "../../lib/dots.ts";
 
-// Matches the 18px body dot grid in index.css.
-const GAP = 18;
 const REACH = { x: 270, y: 150 };
 const PART = 10;
 const EASE = 0.15;
@@ -36,6 +34,7 @@ export function HeroDots({ still }: { still: boolean }) {
 
     const style = getComputedStyle(canvas);
     const colors = { grid: style.getPropertyValue("--grid"), up: style.getPropertyValue("--up"), down: style.getPropertyValue("--down") };
+    const gap = Number.parseFloat(style.getPropertyValue("--dot-gap"));
 
     const circle = (dot: Dot, radius: number) => {
       ctx.moveTo(dot.x + radius, dot.y + dot.lift);
@@ -86,10 +85,10 @@ export function HeroDots({ still }: { still: boolean }) {
       canvas.height = Math.round(height * scale);
       ctx.setTransform(scale, 0, 0, scale, 0, 0);
       const box = canvas.getBoundingClientRect();
-      const phase = (edge: number) => (((GAP / 2 - edge) % GAP) + GAP) % GAP;
+      const phase = (edge: number) => (((gap / 2 - edge) % gap) + gap) % gap;
       dots = [];
-      for (let y = phase(box.top + scrollY); y < height; y += GAP) {
-        for (let x = phase(box.left + scrollX); x < width; x += GAP) dots.push({ x, y, strength: 0, lift: 0, up: false });
+      for (let y = phase(box.top + scrollY); y < height; y += gap) {
+        for (let x = phase(box.left + scrollX); x < width; x += gap) dots.push({ x, y, strength: 0, lift: 0, up: false });
       }
       cancelAnimationFrame(frame);
       draw();

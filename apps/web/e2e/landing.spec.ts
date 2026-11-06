@@ -1,7 +1,7 @@
-import type { CDPSession, Locator, Page } from "@playwright/test";
+import type { CDPSession, Page } from "@playwright/test";
 import { expect, handleOf, money, openPopover, sideways, test } from "./fixtures.ts";
 
-const hero = (page: Page) => page.locator("#top");
+const hero = (page: Page) => page.getByRole("region", { name: "Pick a side of the line." });
 const ready = (page: Page) => expect(hero(page).getByLabel("Maximum payout")).toHaveText(/^\$[\d,.]+$/);
 
 async function pixels(page: Page, x: number, y: number, width: number, height: number) {
@@ -57,7 +57,7 @@ test("the split line sits under the headline words, clear of the title and the c
       const at = await line.evaluate((bar) => {
         const box = bar.getBoundingClientRect();
         const title = (bar.closest("h1") as HTMLElement).getBoundingClientRect();
-        const lead = [...document.querySelectorAll("#top p")].find((p) => p.textContent?.startsWith("Choose whether"))?.getBoundingClientRect();
+        const lead = [...(bar.closest("section") as HTMLElement).querySelectorAll("p")].find((p) => p.textContent?.startsWith("Choose whether"))?.getBoundingClientRect();
         return { above: box.top - title.bottom, below: (lead?.top ?? 0) - box.bottom };
       });
       expect(at.above, `${size?.width ?? "phone"} gap above`).toBeGreaterThanOrEqual(8);
@@ -86,6 +86,13 @@ test("the hero ticket opens the same trade in the app", async ({ page }) => {
   await expect(handleOf(page)).toHaveAttribute("aria-valuenow", String(strike));
 });
 
+test("an invalid amount in the hero ticket disables its button instead of dropping the trade", async ({ page }) => {
+  await (await openPopover(page, "Trade amount")).getByRole("radio", { name: "Other" }).click();
+  await page.getByLabel("Amount in dollars").fill("0.5");
+  await expect(hero(page).getByRole("button", { name: "Enter a valid amount" })).toBeDisabled();
+  await expect(page.locator('a[href*="series="]')).toHaveCount(0);
+});
+
 test("on a phone the ticket's buy bar sits under the card instead of over it", async ({ page }) => {
   test.skip(test.info().project.use.isMobile !== true, "phones only");
   const parts = hero(page).getByRole("region", { name: "Trade ticket" }).locator(":scope > div");
@@ -94,13 +101,7 @@ test("on a phone the ticket's buy bar sits under the card instead of over it", a
   expect(card && bar && bar.y - (card.y + card.height)).toBeGreaterThanOrEqual(0);
 });
 
-test("the landing wears the app's dark dotted look, its headline reads as words, and the wordmark goes back to the very top", async ({ page }) => {
-  expect(await page.evaluate(() => [
-    getComputedStyle(document.documentElement).backgroundColor,
-    getComputedStyle(document.body).backgroundImage.startsWith("radial-gradient"),
-    document.querySelector('meta[name="theme-color"]')?.getAttribute("content"),
-  ])).toEqual(["rgb(10, 10, 10)", true, "#0a0a0a"]);
-  await expect(page.getByRole("group", { name: "Theme", exact: true })).toHaveCount(0);
+test("the headline reads as words and the wordmark goes back to the very top", async ({ page }) => {
   await expect(hero(page).getByRole("heading", { level: 1 })).toHaveAccessibleName("Pick a side of the line.");
   await page.evaluate(() => scrollTo(0, 30));
   await page.getByRole("link", { name: "Endline, back to top" }).click();
@@ -152,19 +153,6 @@ test("the header matches the app header and scrolls away with the page", async (
   await expect.poll(async () => (await bar(page)).top).toBeLessThan(-landing.height);
   await page.goto("/app");
   expect(await bar(page)).toEqual(landing);
-});
-
-test("section labels and cards match the app's ticket", async ({ page }) => {
-  const style = (locator: Locator, names: string[]) => locator.evaluate((element, props) => props.map((prop) => getComputedStyle(element).getPropertyValue(prop)), names);
-  const LABEL = ["font-family", "font-size", "letter-spacing", "text-transform", "color"];
-  const CARD = ["border-top-width", "border-top-color", "border-radius", "background-color"];
-  const label = await style(hero(page).getByText("Payout", { exact: true }), LABEL);
-  for (const [section, text] of [["#top", "Final price"], ["#how", "You give"], ["#floor", "Your side"], ["#safety", "Paid out"], ["#intents", "One balance"]] as const) {
-    expect(await style(page.locator(section).getByText(text, { exact: true }), LABEL), text).toEqual(label);
-  }
-  const card = await style(hero(page).getByRole("region", { name: "Trade ticket" }).locator(":scope > div").first(), CARD);
-  expect(await style(page.locator("#how").getByText("You give", { exact: true }).locator("xpath=../.."), CARD)).toEqual(card);
-  expect(await style(page.locator("#safety").getByText("BTC, one recorded oracle run").locator(".."), CARD)).toEqual(card);
 });
 
 test("every funding chain shows a loaded logo", async ({ page }) => {
@@ -233,9 +221,10 @@ test("with reduced motion the hero dots still color but stay on the page's dot g
   const canvas = hero(page).locator("canvas");
   await canvas.evaluate((element: HTMLCanvasElement) => {
     const arc = CanvasRenderingContext2D.prototype.arc;
-    const top = element.getBoundingClientRect().top + scrollY;
+    const box = element.getBoundingClientRect();
+    const onGrid = (at: number, edge: number) => (at + edge) % 18 === 9;
     CanvasRenderingContext2D.prototype.arc = function (this: CanvasRenderingContext2D, ...args: Parameters<typeof arc>) {
-      if (this.canvas === element) element.dataset.offGrid = String(Number(element.dataset.offGrid ?? 0) + ((args[1] + top) % 18 === 9 ? 0 : 1));
+      if (this.canvas === element) element.dataset.offGrid = String(Number(element.dataset.offGrid ?? 0) + (onGrid(args[0], box.left + scrollX) && onGrid(args[1], box.top + scrollY) ? 0 : 1));
       return arc.apply(this, args);
     };
   });

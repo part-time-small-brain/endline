@@ -4,7 +4,9 @@ import { useApp } from "../../app/context.ts";
 import { Link } from "../../app/router.tsx";
 import { useTicket } from "../../app/useTicket.ts";
 import { formatToken, formatUsd } from "../../lib/money.ts";
-import { Lite } from "../../screens/Lite.tsx";
+import { Button } from "../Button.tsx";
+import { LABEL } from "../label.ts";
+import { Lite } from "../trade/Lite.tsx";
 import { HeroDots } from "./HeroDots.tsx";
 import { jump } from "./jump.ts";
 import { EASE_DRAWER, EASE_OUT } from "./motion.ts";
@@ -22,19 +24,25 @@ export function Hero({ nowSec }: { nowSec: number }) {
   const { paths } = useApp().config;
   const reduce = useReducedMotion();
   const state = useTicket(nowSec);
-  const { symbol, up, series, current, budget, quoteDecimals, notice } = state;
-  const action = series && current && current.size > 0n ? (
-    <Link href={`${paths.trade}?${new URLSearchParams({ series: series.id, pay: formatToken(budget, quoteDecimals, 2).replaceAll(",", "") })}`} className={PRIMARY}>
-      Try {symbol} {up ? "Up" : "Down"} for {formatUsd(budget, quoteDecimals).replace(/\.00$/, "")}
-    </Link>
-  ) : (
+  const { data, symbol, up, series, current, budget, unit, quoteDecimals, notice, loading } = state;
+  const waiting = (!data.listing && !data.listingError) || (!notice && loading);
+  const label = `Try ${symbol} ${up ? "Up" : "Down"} for ${formatUsd(budget, quoteDecimals).replace(/\.00$/, "")}`;
+  const action = !series ? (
     <Link href={paths.trade} className={PRIMARY}>
       Open app
     </Link>
+  ) : current && current.size > 0n ? (
+    <Link href={`${paths.trade}?${new URLSearchParams({ series: series.id, pay: formatToken(budget, quoteDecimals, 2).replaceAll(",", "") })}`} className={PRIMARY}>
+      {label}
+    </Link>
+  ) : (
+    <Button size="lg" disabled>
+      {budget < unit ? "Enter a valid amount" : label}
+    </Button>
   );
 
   return (
-    <section id="top" className="relative scroll-mt-16 overflow-x-clip bg-page">
+    <section aria-labelledby="hero-title" className="relative overflow-x-clip bg-page">
       <HeroDots still={reduce === true} />
       <div className="relative mx-auto grid max-w-7xl grid-cols-1 gap-10 px-4 pt-10 pb-16 lg:grid-cols-[minmax(0,1fr)_minmax(0,600px)] lg:items-start lg:gap-12 lg:px-12 lg:pt-16 lg:pb-24">
         <div className="lg:pt-12">
@@ -44,7 +52,7 @@ export function Hero({ nowSec }: { nowSec: number }) {
               Options on BTC and ETH
             </p>
           </Rise>
-          <h1 className="mt-6 text-5xl leading-none font-semibold tracking-[-0.035em] xl:text-7xl">
+          <h1 id="hero-title" className="mt-6 text-5xl leading-none font-semibold tracking-[-0.035em] xl:text-7xl">
             <span className="block">
               <Word index={0}>Pick</Word> <Word index={1}>a</Word> <Word index={2}>side</Word>
             </span>
@@ -84,7 +92,7 @@ export function Hero({ nowSec }: { nowSec: number }) {
             <dl className="mt-10 flex max-w-[520px] flex-wrap gap-x-10 gap-y-4 border-t border-rule pt-4">
               {FACTS.map(([term, detail]) => (
                 <div key={term}>
-                  <dt className="font-mono text-[0.625rem] font-medium tracking-[0.14em] text-ink-3 uppercase">{term}</dt>
+                  <dt className={LABEL}>{term}</dt>
                   <dd className="mt-1.5 text-[0.9375rem]">{detail}</dd>
                 </div>
               ))}
@@ -93,8 +101,12 @@ export function Hero({ nowSec }: { nowSec: number }) {
         </div>
 
         <Rise delay={0.25}>
-          {notice ? (
+          {waiting ? (
             <div aria-busy="true" aria-label="Loading prices" className="h-[34rem] animate-pulse rounded-md border border-rule bg-surface" />
+          ) : notice ? (
+            <p role="status" className="grid h-[34rem] place-items-center rounded-md border border-rule bg-surface px-6 text-center text-lg font-semibold">
+              {notice.title}
+            </p>
           ) : (
             <Lite state={state} nowSec={nowSec} action={action} />
           )}

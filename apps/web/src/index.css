@@ -38,6 +38,7 @@
   --radius-xl: 6px;
   --radius-2xl: 6px;
   --radius-3xl: 14px;
+  --dot-gap: 18px;
 }
 
 :root,
@@ -108,7 +109,7 @@
 
   body {
     background-image: radial-gradient(var(--grid) 1px, transparent 1.5px);
-    background-size: 18px 18px;
+    background-size: var(--dot-gap) var(--dot-gap);
   }
 
   h1,

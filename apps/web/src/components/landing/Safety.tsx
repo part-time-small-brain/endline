@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { formatClock, formatUtc } from "../../lib/time.ts";
+import { LABEL } from "../label.ts";
 import { nextDailyEnd } from "./dailyEnd.ts";
 import { Reveal } from "./Reveal.tsx";
 import { SectionHead } from "./SectionHead.tsx";
@@ -35,11 +36,11 @@ export function Safety({ nowSec }: { nowSec: number }) {
       <Row title="Fully collateralized" line="Every payout is locked in the contract before you buy.">
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="rounded-2xl bg-well p-4">
-            <p className="font-mono text-[0.625rem] font-medium tracking-[0.14em] text-ink-3 uppercase">Behind every Up and Down</p>
+            <p className={LABEL}>Behind every Up and Down</p>
             <p className="mt-1 font-display text-xl font-semibold">Its whole payout in USDC</p>
           </div>
           <div className="rounded-2xl bg-well p-4">
-            <p className="font-mono text-[0.625rem] font-medium tracking-[0.14em] text-ink-3 uppercase">Paid out</p>
+            <p className={LABEL}>Paid out</p>
             <p className="mt-1 font-display text-xl font-semibold">In USDC, to your balance</p>
           </div>
         </div>
@@ -80,7 +81,7 @@ export function Safety({ nowSec }: { nowSec: number }) {
                 className={`absolute top-0 size-4 rounded-full shadow-[inset_0_0_0_2.5px_var(--ink)] ${i === 2 ? "right-0 bg-ink" : "bg-paper"} ${i === 1 ? "left-1/2 -translate-x-1/2" : i === 0 ? "left-0" : ""}`}
               />
               <b className="block font-mono font-medium">{formatClock(at)}</b>
-              <span className="font-mono text-[0.625rem] font-medium tracking-[0.14em] text-ink-3 uppercase">{label}</span>
+              <span className={LABEL}>{label}</span>
             </li>
           ))}
         </ol>

@@ -14,7 +14,7 @@ const LINK = "inline-flex h-11 items-center px-1 font-mono text-xs font-semibold
 export function Nav() {
   const { paths } = useApp().config;
   return (
-    <header className="flex items-center justify-between gap-3 border-b border-rule px-4 py-1.5 sm:min-h-16 sm:px-6 sm:py-0">
+    <header id="top" className="flex items-center justify-between gap-3 border-b border-rule px-4 py-1.5 sm:min-h-16 sm:px-6 sm:py-0">
       <div className="flex items-center gap-7">
         <a href="#top" onClick={jump} aria-label="Endline, back to top" className="rounded-lg">
           <Wordmark />
