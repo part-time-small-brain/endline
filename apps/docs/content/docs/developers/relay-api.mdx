@@ -86,9 +86,9 @@ Body: `{error}`.
 | `502` | Faucet transfer refunded (try again) or of unknown outcome (check your balance; it counts as sent) |
 | `503` | No market maker online, no valid quote, claim queue full, no price for a free call's series right now, or the free-call store full |
 
-## Market maker API (WebSocket `/mm?key=<api key>`)
+## Market maker API (WebSocket `/mm`)
 
-Not exposed on the hosted relay (`api.endline.trade`). To connect a market maker, run your own relay.
+Not exposed on the hosted relay (`api.endline.trade`). To connect a market maker, run your own relay. Send the API key as the upgrade request's `Authorization: Bearer <api key>` header; a key in the URL is refused, since proxies log URLs.
 
 | Direction | Message |
 |---|---|

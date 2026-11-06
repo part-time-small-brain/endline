@@ -36,7 +36,7 @@ Read from the process environment.
 | Var | Meaning |
 |---|---|
 | `RELAY_WS_URL` | Relay MM socket, e.g. `ws://localhost:8080/mm`. Quoting only |
-| `MM_API_KEY` | One of the relay's `MM_API_KEYS`, sent as `?key=`. Quoting only |
+| `MM_API_KEY` | One of the relay's `MM_API_KEYS`, sent as `Authorization: Bearer <key>`. Quoting only |
 | `MM_ACCOUNT_ID` | Signer of quotes and writes |
 | `MM_PRIVATE_KEY` | `ed25519:…` key registered for `MM_ACCOUNT_ID` on `INTENTS_ID` |
 | `NEAR_RPC_URL` | NEAR JSON-RPC |

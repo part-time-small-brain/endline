@@ -57,7 +57,7 @@ function raw(request: string): Promise<string> {
 
 function connect(key: string, path = "/mm"): Promise<WebSocket> {
   return new Promise((resolve, reject) => {
-    const socket = new WebSocket(`ws://${base}${path}?key=${encodeURIComponent(key)}`);
+    const socket = new WebSocket(`ws://${base}${path}`, { headers: { authorization: `Bearer ${key}` } });
     sockets.push(socket);
     socket.once("open", () => resolve(socket));
     socket.once("unexpected-response", (_, response) => reject(new Error(`http ${response.statusCode}`)));
@@ -236,11 +236,15 @@ describe("market maker socket", () => {
     await expect(connect(key)).rejects.toThrow("http 401");
   });
 
+  it("refuses the key in the URL, where proxies log it", async () => {
+    await expect(connect("", `/mm?key=${KEY}`)).rejects.toThrow("http 401");
+  });
+
   it("survives a refused upgrade whose client resets before the answer", async () => {
     for (let i = 0; i < 20; i++) {
       const [host, port] = base.split(":");
       const socket = rawConnect(Number(port), host, () => {
-        socket.write("GET /mm?key=wrong HTTP/1.1\r\nHost: relay\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 13\r\n\r\n");
+        socket.write("GET /mm HTTP/1.1\r\nHost: relay\r\nAuthorization: Bearer wrong\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 13\r\n\r\n");
         socket.resetAndDestroy();
       });
       socket.on("error", () => {});

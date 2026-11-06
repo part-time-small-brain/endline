@@ -77,7 +77,7 @@ Both take only an exercise, exactly as the SDK's `exerciseOptions` builds and `t
 
 Moves USDC between intents accounts, e.g. a user's main balance and their Tap balance. `signed` must be exactly the SDK's `relayedTransfer(receiver, RELAYER_ACCOUNT_ID, QUOTE_ASSET, amount, transferFee(quote_decimals))`: a plain `transfer` of `QUOTE_ASSET` to the receiver, then $0.01 of it to the relayer, both without `msg`, `min_gas` or `memo` (intents calls nothing on either receiver), expiring between 2 and 10 minutes from now. The relayer is `GET /health`'s `relayer_id`. A relayed transfer costs the relayer about 0.0006 NEAR (6 TGas at the minimum gas price; sandbox-tested under 0.001 NEAR), so the fee covers it while NEAR is under $10. Every transfer that lands pays the fee, so bouncing money through the relay costs the sender. Sent once per `(signer_id, nonce)`, one payload per signer in flight (shared with collects), simulated first, so an empty or self-transfer the verifier refuses costs nothing.
 
-## MM API (WebSocket `/mm?key=<api key>`)
+## MM API (WebSocket `/mm`, header `Authorization: Bearer <api key>`)
 
 | Direction | Message |
 |---|---|

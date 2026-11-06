@@ -9,13 +9,13 @@ let server: WebSocketServer | undefined;
 afterEach(() => server?.close());
 
 describe("relay client", () => {
-  it("authenticates with ?key=, skips malformed frames and answers and publishes marks in the relay's MmMessage shape", async () => {
+  it("authenticates with a bearer header, never in the URL, skips malformed frames and answers and publishes marks in the relay's MmMessage shape", async () => {
     server = new WebSocketServer({ port: 0 });
     const { port } = server.address() as AddressInfo;
     const received: unknown[] = [];
-    const urls: string[] = [];
+    const requests: { url: string | undefined; authorization: string | undefined }[] = [];
     server.on("connection", (socket, request) => {
-      urls.push(request.url ?? "");
+      requests.push({ url: request.url, authorization: request.headers.authorization });
       socket.on("message", (data) => received.push(JSON.parse(data.toString())));
       socket.send("not json");
       socket.send(JSON.stringify({ method: "quote", params: { quote_id: "missing fields" } }));
@@ -31,7 +31,7 @@ describe("relay client", () => {
     await expect.poll(() => received.length).toBe(2);
     client.close();
 
-    expect(new URL(urls[0] ?? "", "ws://x").searchParams.get("key")).toBe("secret key with spaces&=");
+    expect(requests).toEqual([{ url: "/mm", authorization: "Bearer secret key with spaces&=" }]);
     expect(quotes[0]?.quote_id).toBe("q1");
     expect(received.map((m) => MmMessage.parse(m))).toEqual(received);
     expect(received[1]).toMatchObject({ method: "marks", params: [{ series_id: PUT.id }] });
