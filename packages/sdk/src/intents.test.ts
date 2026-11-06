@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { feeOf, grossFor, netOf, unmatched } from "./fees.ts";
-import { closeOptions, exerciseOptions, payload, relayedTransfer, tokenDiff, versionedNonce, writeOptions } from "./intents.ts";
-import { readPayload, toSign } from "./signing.ts";
+import { closeOptions, exerciseOptions, payload, tokenDiff, versionedNonce, writeOptions } from "./intents.ts";
 import { buyDiffs, sellDiffs } from "./trade.ts";
 
 const USDC = "nep141:17208628f84f5d6ad33f0da3bbbeb27ffcb398eac501a31bd6ad2011e36133a1";
@@ -120,13 +119,6 @@ describe("intents", () => {
     }
   });
 
-  it("a relayed transfer has no msg, so intents calls nothing on either receiver, and reads back canonically", () => {
-    const moves = relayedTransfer("alice.near", "relayer.near", USDC, 5_000_000n, 10_000n);
-    expect(moves.filter((move) => "msg" in move || "min_gas" in move)).toEqual([]);
-    const p = payload("intents.near", "a".repeat(64), 1_792_742_400_000, salt, random, moves);
-    for (const standard of ["nep413", "erc191"] as const) expect(readPayload(toSign(standard, p))).toStrictEqual(p);
-  });
-
   it.each([
     ["foreign token", () => exerciseOptions("opt.near", { [USDC]: 1n })],
     ["another contract's option", () => exerciseOptions("opt.near", { "nep245:evil.near:BTC-27NOV26-110000_112000-C": 1n })],
@@ -135,8 +127,7 @@ describe("intents", () => {
     ["zero amount", () => exerciseOptions("opt.near", { [LONG]: 0n })],
     ["foreign token in a redeem", () => closeOptions("opt.near", "redeem", { [USDC]: 1n })],
     ["zero collateral", () => writeOptions("opt.near", USDC, 0n, "BTC-27NOV26-95000_93000-P")],
-    ["a zero relayed transfer", () => relayedTransfer("alice.near", "relayer.near", USDC, 0n, 10_000n)],
-  ])("refuses to build a close, write or transfer with %s", (_, call) => {
+  ])("refuses to build a close or write with %s", (_, call) => {
     expect(call).toThrow();
   });
 });

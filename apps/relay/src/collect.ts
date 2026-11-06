@@ -1,5 +1,5 @@
 import { isDeepStrictEqual } from "node:util";
-import { exerciseOptions, type Fill, type Intent, longPayout, MIN_RELAYED_PAYOUT_USD, maxPayout, parseTokenId, readPayload, relayedTransfer, type Series, type SignedPayload, termsOf, transferFee } from "@endline/sdk";
+import { exerciseOptions, type Fill, type Intent, longPayout, MIN_RELAYED_PAYOUT_USD, maxPayout, parseTokenId, readPayload, type Series, type SignedPayload, termsOf } from "@endline/sdk";
 import type { Claims } from "./claims.ts";
 import type { Config } from "./config.ts";
 import type { Fills } from "./fills.ts";
@@ -23,7 +23,7 @@ interface Exercise extends Sent {
   tokens: Record<string, bigint>;
 }
 
-type Settings = Pick<Config, "INTENTS_ID" | "OPTIONS_ID" | "QUOTE_ASSET" | "RELAYER_ACCOUNT_ID">;
+type Settings = Pick<Config, "INTENTS_ID" | "OPTIONS_ID">;
 
 interface Leg {
   asset: string;
@@ -50,19 +50,6 @@ function readExercise(signed: SignedPayload, config: Settings): Exercise | undef
   }
 }
 
-function readTransfer(signed: SignedPayload, config: Settings, fee: bigint): Sent | undefined {
-  try {
-    const read = readSigned(signed, config.INTENTS_ID);
-    const [move] = read?.intents ?? [];
-    if (!read || move?.intent !== "transfer") return undefined;
-    const amount = BigInt(move.tokens[config.QUOTE_ASSET] ?? 0);
-    const expected = relayedTransfer(move.receiver_id, config.RELAYER_ACCOUNT_ID, config.QUOTE_ASSET, amount, fee);
-    return isDeepStrictEqual(read.intents, expected) ? read.sent : undefined;
-  } catch {
-    return undefined;
-  }
-}
-
 function relayBuys(fills: Fill[]): Map<string, { net: bigint; buys: number }> {
   const bought = new Map<string, { net: bigint; buys: number }>();
   for (const { series_id, side, size } of fills) {
@@ -84,10 +71,6 @@ export class Collector {
     private fills: Pick<Fills, "byAccount">,
   ) {}
 
-  get feeAccount(): string {
-    return this.config.RELAYER_ACCOUNT_ID;
-  }
-
   async execute(signed: SignedPayload): Promise<string> {
     const exercise = this.read(signed);
     if (exercise.deadlineMs > Date.now() + MAX_DEADLINE_MS) throw new HttpError(400, "an exercise sent now must expire within 10 minutes");
@@ -96,14 +79,6 @@ export class Collector {
     if (total === 0n) throw new HttpError(400, "these options pay nothing");
     if (total < (await this.minPayout())) throw new HttpError(400, "the relay pays gas only for payouts of at least $1: collect from a NEAR wallet");
     return this.submit(signed, exercise, true);
-  }
-
-  async transfer(signed: SignedPayload): Promise<string> {
-    const fee = transferFee((await this.chain.contractConfig()).quote_decimals);
-    const sent = readTransfer(signed, this.config, fee);
-    if (!sent) throw new HttpError(400, "only one USDC transfer followed by the relay's fee is relayed");
-    if (sent.deadlineMs > Date.now() + MAX_DEADLINE_MS) throw new HttpError(400, "a transfer sent now must expire within 10 minutes");
-    return this.submit(signed, sent, true);
   }
 
   async claim(signed: SignedPayload): Promise<void> {

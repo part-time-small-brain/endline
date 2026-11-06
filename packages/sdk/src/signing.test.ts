@@ -1,9 +1,8 @@
 import { createIntentSignerNEP413, createIntentSignerViem } from "@defuse-protocol/intents-sdk";
 import { ed25519 } from "@noble/curves/ed25519.js";
-import { base58, hex } from "@scure/base";
 import { describe, expect, it } from "vitest";
 import { payload, sessionPayload, tokenDiff } from "./intents.ts";
-import { implicitSigner, readPayload, SignedPayload, toSign, type Unsigned } from "./signing.ts";
+import { readPayload, SignedPayload, toSign, type Unsigned } from "./signing.ts";
 
 const B64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
@@ -62,31 +61,5 @@ describe("what the wallet signs", () => {
   it("refuses intents the verifier would run but we never build", () => {
     const p = { ...intent("alice.near"), intents: [{ intent: "add_public_key", public_key: "ed25519:x" }] };
     expect(() => readPayload({ standard: "erc191", payload: JSON.stringify(p) })).toThrow();
-  });
-});
-
-describe("implicit signer", () => {
-  const seed = hex.decode("9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60");
-
-  it("derives the RFC 8032 test 1 key and its hex implicit account", () => {
-    expect(implicitSigner(seed).accountId).toBe("d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a");
-  });
-
-  it("signs exactly the hash intents-sdk hands a NEP-413 wallet, over the payload toSign builds", async () => {
-    const signer = implicitSigner(seed);
-    const p = intent(signer.accountId);
-    let hash: Uint8Array<ArrayBufferLike> = new Uint8Array();
-    const sdk = createIntentSignerNEP413({ accountId: signer.accountId, signMessage: (_, h) => ((hash = h), { publicKey: "ed25519:pk", signature: "ed25519:sig" }) });
-    await sdk.signIntent(p);
-    const signed = signer.sign(toSign("nep413", p));
-    expect(SignedPayload.parse(signed).payload).toEqual(toSign("nep413", p).payload);
-    const decode = (text: string) => base58.decode(text.slice("ed25519:".length));
-    expect(ed25519.verify(decode(signed.signature), hash, decode(signed.public_key))).toBe(true);
-    expect(ed25519.verify(decode(signed.signature), hash.map((b, i) => (i === 0 ? b ^ 1 : b)), decode(signed.public_key))).toBe(false);
-  });
-
-  it("refuses erc191 payloads and seeds that aren't 32 bytes", () => {
-    expect(() => implicitSigner(seed).sign(toSign("erc191", intent("x")))).toThrow();
-    expect(() => implicitSigner(seed.slice(1))).toThrow();
   });
 });

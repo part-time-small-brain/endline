@@ -42,7 +42,7 @@ description: The rules every change keeps, what each actor can do, and the gaps 
 | Created series or sent tokens crowding out the market maker's prices | It prices only series it holds, ranked by what its tokens there are worth, within the relay's 64 KB message limit. Pushing a series out costs sending it tokens worth more than its position there |
 | Lying relay | The app takes USDC and option decimals from the contract and shows a series only if its id is rebuilt from its terms |
 | Swapped wallet scripts | The app ships the wallet list, with GitHub-hosted wallet scripts pinned to commits |
-| Relay as a free gas payer | `/execute` and `/claims` accept only a canonical exercise of our long tokens; `/transfer` only a plain USDC transfer that pays the relayer $0.01, more than its gas; each nonce sent once; rate limits |
+| Relay as a free gas payer | `/execute` and `/claims` accept only a canonical exercise of our long tokens; each nonce sent once; rate limits |
 | Quote spam | Signed sessions, balance-backed quotes, one open quote per signer, rate limits |
 | Tampered user payload | Relay accepts only the byte-identical payload it issued, once, before expiry |
 | Unbounded loops | Batches capped at 10 tokens; views paginated (≤ 200) |

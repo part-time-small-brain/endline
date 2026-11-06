@@ -45,14 +45,6 @@ export function writeOptions(optionsContract: string, collateralAsset: string, c
   };
 }
 
-export function relayedTransfer(receiverId: string, relayerId: string, asset: string, amount: bigint, fee: bigint): Intent[] {
-  if (amount <= 0n) throw new Error("amount must be positive");
-  return [
-    { intent: "transfer", receiver_id: receiverId, tokens: amounts({ [asset]: amount }) },
-    { intent: "transfer", receiver_id: relayerId, tokens: amounts({ [asset]: fee }) },
-  ];
-}
-
 export function exerciseOptions(optionsContract: string, tokens: Diff): Intent {
   return closeOptions(optionsContract, "exercise", tokens);
 }

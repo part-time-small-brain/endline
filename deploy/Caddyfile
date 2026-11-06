@@ -3,7 +3,7 @@
 		X-Content-Type-Options nosniff
 		Referrer-Policy strict-origin-when-cross-origin
 	}
-	@relay path /health /series /marks /quote /publish /status/* /fills/* /execute /transfer /claims /calls /calls/* /leaderboard /leaderboard/* /faucet /deposit-quote
+	@relay path /health /series /marks /quote /publish /status/* /fills/* /execute /claims /calls /calls/* /leaderboard /leaderboard/* /faucet /deposit-quote
 	handle @relay {
 		reverse_proxy relay:8787 {
 			header_up X-Forwarded-For {http.request.header.CF-Connecting-IP}

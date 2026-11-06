@@ -12,7 +12,7 @@ import type { OneClick } from "./oneClick.ts";
 import { HttpError, type Relay } from "./relay.ts";
 
 const MAX_BODY_BYTES = 64 * 1024;
-const LIMITED = new Set(["POST /quote", "POST /execute", "POST /transfer", "POST /claims", "POST /calls", "POST /faucet", "POST /deposit-quote"]);
+const LIMITED = new Set(["POST /quote", "POST /execute", "POST /claims", "POST /calls", "POST /faucet", "POST /deposit-quote"]);
 const APP_ONLY = new Set(["/faucet", "/deposit-quote"]);
 const MAX_REQUESTS_PER_MINUTE = 30;
 const FaucetRequest = z.object({ account_id: AccountId });
@@ -83,7 +83,7 @@ export function createRelayServer(relay: Relay, fills: Fills, hub: MmHub, collec
 
     switch (endpoint) {
       case "GET /health":
-        return [200, { ok: true, market_makers: hub.ids().length, relayer_id: collector.feeAccount }];
+        return [200, { ok: true, market_makers: hub.ids().length }];
       case "GET /series":
         return [200, await relay.series()];
       case "GET /marks":
@@ -96,8 +96,6 @@ export function createRelayServer(relay: Relay, fills: Fills, hub: MmHub, collec
       }
       case "POST /execute":
         return [200, { tx_hash: await collector.execute((await parseBody(request, SignedRequest)).signed) }];
-      case "POST /transfer":
-        return [200, { tx_hash: await collector.transfer((await parseBody(request, SignedRequest)).signed) }];
       case "POST /claims":
         await collector.claim((await parseBody(request, SignedRequest)).signed);
         return [200, { ok: true }];

@@ -56,7 +56,7 @@ export class Calls {
     const round = roundOf(series.expiry);
     if (round !== nextRound(all.filter(callable).map((s) => s.expiry))) throw new HttpError(409, "free calls are open only for the next round");
     const dollar = 10n ** BigInt(contract.quote_decimals);
-    if ((await this.chain.balanceOf(signer.signer_id, contract.quote_asset)) < dollar) throw new HttpError(402, "a free call needs at least $1 of USDC in this wallet's NEAR Intents balance (a Tap balance doesn't count): deposit first");
+    if ((await this.chain.balanceOf(signer.signer_id, contract.quote_asset)) < dollar) throw new HttpError(402, "a free call needs at least $1 of USDC in this wallet's NEAR Intents balance: deposit first");
     const mine = this.state.calls.filter((c) => c.account_id === signer.signer_id);
     if (mine.some((c) => c.series_id === series_id)) throw new HttpError(409, "you already called this cell");
     const mark = this.marks().find((m) => m.series_id === series_id);
