@@ -27,6 +27,9 @@ it("lets wallet iframes run their scripts by the nonce the CSP allows, and nothi
   const csp = /Content-Security-Policy: (.*)/.exec(readFileSync(new URL("../../public/_headers", import.meta.url), "utf8"))?.[1]?.split("; ") ?? [];
   expect(csp).toContain(`script-src 'self' 'nonce-${cspNonce}'`);
   expect(csp).toContain("frame-ancestors 'none'");
+  const inline = readFileSync(new URL("../../index.html", import.meta.url), "utf8").match(/<script(?![^>]*\ssrc=)[^>]*>/g) ?? [];
+  expect(inline.length).toBeGreaterThan(0);
+  expect(inline.every((tag) => tag.includes(`nonce="${cspNonce}"`))).toBe(true);
 });
 
 it("pins every GitHub-hosted wallet script to a commit, not a branch", () => {

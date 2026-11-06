@@ -25,7 +25,7 @@ describe("theme", () => {
     expect(light).toMatch(/^#/);
     expect(light).not.toBe(dark);
     const initial = /<meta name="theme-color" content="(#[0-9a-f]{6})"/.exec(html)?.[1];
-    const script = /<script>([\s\S]*?)<\/script>/.exec(html)?.[1] ?? "";
+    const script = /<script nonce="[^"]+">([\s\S]*?)<\/script>/.exec(html)?.[1] ?? "";
     expect(script).toContain(`"${THEME_KEY}"`);
     const run = (stored: string | null | Error) => {
       const root = { dataset: {} as Record<string, string> };
