@@ -53,10 +53,9 @@ export function createMockServices(config: Config): Services {
   function wallet(account: string): Map<string, bigint> {
     let balances = balancesOf.get(account);
     if (!balances) {
-      const implicit = /^[0-9a-f]{64}$/.test(account);
-      balances = new Map([[config.quoteAsset, implicit ? 0n : START_BALANCE]]);
+      balances = new Map([[config.quoteAsset, START_BALANCE]]);
       balancesOf.set(account, balances);
-      for (const h of implicit ? [] : world.holdings) {
+      for (const h of world.holdings) {
         balances.set(option(h.series.id), h.size);
         fills.push({
           quote_id: crypto.randomUUID(),
@@ -164,20 +163,6 @@ export function createMockServices(config: Config): Services {
       }
       return txHash();
     },
-    async transfer(signed) {
-      const { signer_id, intents, deadline } = readPayload(signed);
-      relayable(deadline);
-      await sleep(SETTLE_DELAY_MS);
-      const moves = intents.flatMap((intent) => (intent.intent === "transfer" ? Object.entries(intent.tokens).map(([asset, amount]) => ({ to: intent.receiver_id, asset, amount: BigInt(amount) })) : []));
-      const total = moves.reduce((sum, { amount }) => sum + amount, 0n);
-      if (total > (wallet(signer_id).get(config.quoteAsset) ?? 0n)) throw new RelayError("balance not enough", 422);
-      for (const { to, asset, amount } of moves) {
-        move(signer_id, asset, -amount);
-        move(to, asset, amount);
-      }
-      return txHash();
-    },
-    relayerId: async () => "relayer.near",
     claim: () => sleep(SETTLE_DELAY_MS),
     async faucet(accountId) {
       await sleep(SETTLE_DELAY_MS);
@@ -194,7 +179,7 @@ export function createMockServices(config: Config): Services {
       if (!callable(series)) throw new RelayError("the final round has started: calls close when the averaging window opens", 409);
       const round = roundOf(series.expiry);
       if (round !== nextRound(world.series.filter(callable).map((s) => s.expiry))) throw new RelayError("free calls are open only for the next round", 409);
-      if ((wallet(signer.signer_id).get(config.quoteAsset) ?? 0n) < 10n ** BigInt(QUOTE_DECIMALS)) throw new RelayError("a free call needs at least $1 of USDC in this wallet's NEAR Intents balance (a Tap balance doesn't count): deposit first", 402);
+      if ((wallet(signer.signer_id).get(config.quoteAsset) ?? 0n) < 10n ** BigInt(QUOTE_DECIMALS)) throw new RelayError("a free call needs at least $1 of USDC in this wallet's NEAR Intents balance: deposit first", 402);
       const mine = called.filter((c) => c.account_id === signer.signer_id);
       if (mine.some((c) => c.series_id === series_id)) throw new RelayError("you already called this cell", 409);
       const mark = markOf(series);

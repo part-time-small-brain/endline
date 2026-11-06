@@ -2,7 +2,7 @@ import { randomBytes } from "node:crypto";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { type Fill, type Intent, payload, readPayload, relayedTransfer, type SignedPayload, tokenDiff, writeOptions } from "@endline/sdk";
+import { type Fill, type Intent, payload, readPayload, type SignedPayload, tokenDiff, writeOptions } from "@endline/sdk";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Claims } from "./claims.ts";
 import { Collector } from "./collect.ts";
@@ -10,7 +10,6 @@ import { Rejected, Unsettled } from "./rpc.ts";
 import { fakeChain, httpStatus, INTENTS, MIN_WRITE, nep413, OPTION, OPTIONS, SALT, SERIES, USDC } from "./test-fakes.ts";
 
 const SHORT = `${OPTION}-SHORT`;
-const RELAYER = "relayer.test";
 const AMOUNT = "1000000";
 const FINAL_AT = SERIES.expiry + 3_600;
 const transfer = (msg: object, tokens: Record<string, string> = { [OPTION]: AMOUNT }): Intent => ({
@@ -43,7 +42,7 @@ function setup(fills = boughtPlenty) {
   const fake = fakeChain();
   const dir = mkdtempSync(join(tmpdir(), "relay-"));
   const claims = new Claims(dir);
-  const collector = new Collector(fake.chain, { INTENTS_ID: INTENTS, OPTIONS_ID: OPTIONS, QUOTE_ASSET: USDC, RELAYER_ACCOUNT_ID: RELAYER }, claims, fills);
+  const collector = new Collector(fake.chain, { intents_id: INTENTS, options_id: OPTIONS }, claims, fills);
   const settle = (price = "120000000000") => fake.settlements.set(`${SERIES.underlying}:${SERIES.expiry}`, { price, final_at: FINAL_AT });
   return { ...fake, dir, claims, collector, settle };
 }
@@ -101,6 +100,19 @@ describe("gasless collect", () => {
     expect(await httpStatus(collector.execute(signed([exercise], { deadlineMs: Date.now() + 119_999 })))).toBe(400);
     expect(await collector.execute(signed([exercise], { deadlineMs: Date.now() + 10 * 60_000 }))).toBe("tx4");
     expect(await collector.execute(signed([exercise], { deadlineMs: Date.now() + 120_000, signer: "dave.test" }))).toBe("tx5");
+  });
+
+  it("measures the 2 minutes left after its own simulation, right before sending", async () => {
+    const { chain, collector, executed, settle } = setup();
+    settle();
+    const now = Date.now();
+    const simulate = chain.simulate;
+    vi.spyOn(chain, "simulate").mockImplementationOnce(async (batch) => {
+      vi.setSystemTime(now + 1);
+      return simulate(batch);
+    });
+    expect(await httpStatus(collector.execute(signed([exercise], { deadlineMs: now + 120_000 })))).toBe(400);
+    expect(executed).toHaveLength(0);
   });
 
   it.each([
@@ -191,87 +203,8 @@ describe("gasless collect", () => {
   });
 });
 
-describe("gasless transfers that pay the relay's fee", () => {
-  const NOW = (FINAL_AT + 61) * 1000;
-  const TAP = "a".repeat(64);
-  const DOLLAR = 1_000_000n;
-  const FEE = 10_000n;
-  const plain = (receiver: string, tokens: Record<string, string>): Intent => ({ intent: "transfer", receiver_id: receiver, tokens });
-  const fee = plain(RELAYER, { [USDC]: String(FEE) });
-  const move = (receiver = TAP, paid = FEE) => relayedTransfer(receiver, RELAYER, USDC, DOLLAR, paid);
-  beforeEach(() => {
-    vi.useFakeTimers();
-    vi.setSystemTime(NOW);
-  });
-  afterEach(() => vi.useRealTimers());
-
-  it("sends a USDC transfer with the fee once, to a NEAR or an EVM account", async () => {
-    const { collector, executed } = setup();
-    const once = signed(move());
-    expect(await collector.transfer(once)).toBe("tx1");
-    expect(await httpStatus(collector.transfer(once))).toBe(409);
-    expect(await collector.transfer(signed(move("0x1111111111111111111111111111111111111111"), { signer: TAP }))).toBe("tx2");
-    expect(executed).toHaveLength(2);
-  });
-
-  it.each([
-    ["no fee", [plain(TAP, { [USDC]: String(DOLLAR) })], {}],
-    ["a zero amount, which only the simulation would refuse", [plain(TAP, { [USDC]: "0" }), fee], {}],
-    ["a fee one unit short", move(TAP, FEE - 1n), {}],
-    ["the fee paid to someone else", [plain(TAP, { [USDC]: String(DOLLAR) }), plain("mallory.test", { [USDC]: String(FEE) })], {}],
-    ["the fee before the transfer", [...move()].reverse(), {}],
-    ["an option token", [plain(TAP, { [OPTION]: String(DOLLAR) }), fee], {}],
-    ["two assets", [plain(TAP, { [USDC]: String(DOLLAR), [OPTION]: "1" }), fee], {}],
-    ["a message for a contract", [{ ...plain(OPTIONS, { [USDC]: String(DOLLAR) }), msg: JSON.stringify({ action: "write", series_id: SERIES.id }), min_gas: "100000000000000" }, fee], {}],
-    ["an extra intent", [...move(), plain(TAP, { [USDC]: "1" })], {}],
-    ["another verifier", move(), { verifyingContract: "evil.test" }],
-    ["a deadline past 10 minutes", move(), { deadlineMs: NOW + 10 * 60_000 + 1 }],
-    ["a deadline under 2 minutes away, which could expire while the send retries", move(), { deadlineMs: NOW + 119_999 }],
-  ])("refuses %s without sending it", async (_, intents: Intent[], options) => {
-    const { collector, executed } = setup();
-    expect(await httpStatus(collector.transfer(signed(intents, options)))).toBe(400);
-    expect(executed).toHaveLength(0);
-  });
-
-  it("measures the 2 minutes left after its own simulation, right before sending", async () => {
-    const { chain, collector, executed } = setup();
-    const simulate = chain.simulate;
-    vi.spyOn(chain, "simulate").mockImplementationOnce(async (batch) => {
-      vi.setSystemTime(NOW + 1);
-      return simulate(batch);
-    });
-    expect(await httpStatus(collector.transfer(signed(move(), { deadlineMs: NOW + 120_000 })))).toBe(400);
-    expect(executed).toHaveLength(0);
-  });
-
-  it("never sends a transfer while an exercise from the same signer is still being sent", async () => {
-    const { chain, collector, executed, settle } = setup();
-    settle();
-    const execute = chain.execute;
-    let reached!: () => void;
-    let release!: () => void;
-    const sending = new Promise<void>((resolve) => (reached = resolve));
-    const held = new Promise<void>((resolve) => (release = resolve));
-    vi.spyOn(chain, "execute").mockImplementationOnce(async (batch) => {
-      reached();
-      await held;
-      return execute(batch);
-    });
-    const first = collector.execute(signed([exercise]));
-    await sending;
-    expect(await httpStatus(collector.transfer(signed(move())))).toBe(409);
-    release();
-    expect(await first).toBe("tx1");
-    expect(executed).toHaveLength(1);
-  });
-});
-
 describe("gasless sends whose execute call errored", () => {
   const NOW = (FINAL_AT + 61) * 1000;
-  const sends = [
-    ["an exercise", (collector: Collector, s: SignedPayload) => collector.execute(s), (signer?: string) => signed([exercise], { signer })],
-    ["a transfer", (collector: Collector, s: SignedPayload) => collector.transfer(s), (signer?: string) => signed(relayedTransfer("bob.test", RELAYER, USDC, 1_000_000n, 10_000n), { signer })],
-  ] as const;
   beforeEach(() => {
     vi.useFakeTimers();
     vi.setSystemTime(NOW);
@@ -279,51 +212,51 @@ describe("gasless sends whose execute call errored", () => {
   });
   afterEach(() => vi.useRealTimers());
 
-  it.each(sends)("answers %s whose relayer transaction ran as sent, with that transaction, so the user never signs it again", async (_, send, make) => {
+  it("answers an exercise whose relayer transaction ran as sent, with that transaction, so the user never signs it again", async () => {
     const { chain, collector, executed, settle } = setup();
     settle();
     const execute = chain.execute;
     vi.spyOn(chain, "execute").mockImplementationOnce(async (batch) => {
       throw new Unsettled([await execute(batch)], new Error("Internal server error"));
     });
-    expect(await send(collector, make())).toBe("tx1");
+    expect(await collector.execute(signed([exercise]))).toBe("tx1");
     expect(executed).toHaveLength(1);
   });
 
-  it.each(sends)("fails %s whose relayer transaction failed, even though the signer burned the nonce with another payload", async (_, send, make) => {
+  it("fails an exercise whose relayer transaction failed, even though the signer burned the nonce with another payload", async () => {
     const { chain, collector, executed, settle } = setup();
     settle();
     const execute = chain.execute;
-    const s = make();
+    const s = signed([exercise]);
     const burn = nep413({ ...readPayload(s), intents: [] });
     vi.spyOn(chain, "execute").mockImplementationOnce(async (batch) => {
       await execute([burn]);
       return execute(batch);
     });
-    await expect(send(collector, s)).rejects.toThrow("nonce already used");
+    await expect(collector.execute(s)).rejects.toThrow("nonce already used");
     expect(executed).toEqual([[burn]]);
   });
 
-  it.each(sends)("fails %s of unknown outcome only once a final block is past the deadline with its transaction still unknown, never on a read error, and holds the signer's lock until then", async (_, send, make) => {
+  it("fails an exercise of unknown outcome only once a final block is past the deadline with its transaction still unknown, never on a read error, and holds the signer's lock until then", async () => {
     const { chain, collector, executed, settle } = setup();
     settle();
     vi.spyOn(chain, "execute").mockRejectedValueOnce(new Unsettled(["lost"], new Error("Request timeout")));
-    const s = make();
+    const s = signed([exercise]);
     const deadline = Date.parse(readPayload(s).deadline);
     vi.spyOn(chain, "finalTimeMs").mockImplementation(async () => {
       if (Date.now() > deadline + 5_000 && Date.now() < deadline + 12_000) throw new Error("rpc down");
       return Date.now() - 1_000;
     });
     let result: unknown;
-    void send(collector, s).then((tx) => (result = tx), (error: unknown) => (result = error));
+    void collector.execute(s).then((tx) => (result = tx), (error: unknown) => (result = error));
     await vi.advanceTimersByTimeAsync(deadline - Date.now() - 60_000);
     expect(result).toBeUndefined();
-    expect(await httpStatus(send(collector, make()))).toBe(409);
+    expect(await httpStatus(collector.execute(signed([exercise])))).toBe(409);
     await vi.advanceTimersByTimeAsync(60_000 + 11_000);
     expect(result).toBeUndefined();
     await vi.advanceTimersByTimeAsync(6_000);
     expect(result).toMatchObject({ message: "Request timeout" });
-    expect(await send(collector, make())).toBe("tx1");
+    expect(await collector.execute(signed([exercise]))).toBe("tx1");
     expect(executed).toHaveLength(1);
   });
 });

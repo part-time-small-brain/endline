@@ -9,7 +9,7 @@ export interface NearCall {
 }
 
 export interface Wallet {
-  kind: "near" | "evm" | "demo" | "tap";
+  kind: "near" | "evm" | "demo";
   accountId: string;
   standard: Standard;
   publicKey: string | undefined;

@@ -168,21 +168,6 @@ fn borsh_string(bytes: &mut Vec<u8>, s: &str) {
     bytes.extend(s.as_bytes());
 }
 
-fn signed_transfers(
-    key: &SigningKey,
-    signer_id: &str,
-    intents: &AccountId,
-    asset: &str,
-    moves: &[(&AccountId, u128)],
-    nonce: [u8; 32],
-) -> Value {
-    let transfers: Vec<Value> = moves
-        .iter()
-        .map(|(receiver_id, amount)| json!({"intent": "transfer", "receiver_id": receiver_id, "tokens": {asset: amount.to_string()}}))
-        .collect();
-    signed_intents(key, signer_id, intents, transfers, nonce)
-}
-
 fn signed_intents(
     key: &SigningKey,
     signer_id: &str,
@@ -757,88 +742,6 @@ async fn open_series_page_by_expiry_in_the_real_wasm() -> anyhow::Result<()> {
     let later: Vec<Value> = page(expiry + 1, None).await?.json()?;
     assert_eq!(later.len(), 1);
     assert_eq!(later[0]["id"], listed[2].1.as_str());
-    Ok(())
-}
-
-#[tokio::test]
-async fn derived_key_pays_from_its_implicit_account_without_registration() -> anyhow::Result<()> {
-    let env = setup().await?;
-    let root = env.worker.root_account()?;
-    let usdc = asset(&env.usdc);
-    let key = SigningKey::from_bytes(&Sha256::digest(b"tap balance").into());
-    let tap: AccountId = hex::encode(key.verifying_key().as_bytes()).parse()?;
-    for (account, registered) in [(&tap, true), (env.alice.id(), false)] {
-        let has: bool = env
-            .intents
-            .view("has_public_key")
-            .args_json(json!({"account_id": account, "public_key": ed25519_id(&key)}))
-            .await?
-            .json()?;
-        assert_eq!(has, registered, "{account}");
-    }
-
-    env.alice
-        .call(env.intents.id(), "mt_transfer")
-        .args_json(json!({"receiver_id": tap, "token_id": usdc, "amount": WIDTH.to_string()}))
-        .deposit(ONE_YOCTO)
-        .transact()
-        .await?
-        .into_result()?;
-    let alice_before = env.intents_balance(env.alice.id(), &usdc).await?;
-    let relayer = root
-        .create_subaccount("relayer")
-        .initial_balance(NearToken::from_near(10))
-        .transact()
-        .await?
-        .into_result()?;
-    let execute = |signed: &Value| {
-        relayer
-            .call(env.intents.id(), "execute_intents")
-            .args_json(json!({"signed": [signed]}))
-            .gas(MAX_GAS)
-            .transact()
-    };
-    let salt = hex::decode(env.intents.view("current_salt").await?.json::<String>()?)?;
-
-    let fee = WIDTH / 10_000;
-    let back = signed_transfers(
-        &key,
-        tap.as_str(),
-        env.intents.id(),
-        &usdc,
-        &[(env.alice.id(), WIDTH / 4), (relayer.id(), fee)],
-        versioned_nonce(&salt, 1),
-    );
-    let near_before = relayer.view_account().await?.balance;
-    execute(&back).await?.into_result()?;
-    // unused prepaid gas is refunded in a later block than the outcome
-    env.worker.fast_forward(5).await?;
-    let spent = near_before.saturating_sub(relayer.view_account().await?.balance);
-    assert!(
-        spent > NearToken::from_micronear(100) && spent < NearToken::from_millinear(1),
-        "the $0.01 relay fee must cover the relayer's gas while NEAR is under $10: {spent}"
-    );
-    let expected = (WIDTH - WIDTH / 4 - fee, alice_before + WIDTH / 4, fee);
-    let balances = || async {
-        anyhow::Ok((
-            env.intents_balance(&tap, &usdc).await?,
-            env.intents_balance(env.alice.id(), &usdc).await?,
-            env.intents_balance(relayer.id(), &usdc).await?,
-        ))
-    };
-    assert_eq!(balances().await?, expected);
-
-    assert_panicked_with(&execute(&back).await?, "nonce was already used");
-    let forged = signed_transfers(
-        &key,
-        env.alice.id().as_str(),
-        env.intents.id(),
-        &usdc,
-        &[(&tap, WIDTH)],
-        versioned_nonce(&salt, 2),
-    );
-    assert_panicked_with(&execute(&forged).await?, "doesn't exist for account");
-    assert_eq!(balances().await?, expected);
     Ok(())
 }
 

@@ -1,4 +1,4 @@
-import { AccountId } from "@endline/sdk";
+import { Deployment } from "@endline/sdk";
 import { z } from "zod";
 import { PATHS, type Paths, pathsFor } from "./lib/route.ts";
 
@@ -11,11 +11,9 @@ const Live = z.object({
     .refine((url) => URL.canParse(url) && new URL(url).origin === url, "an origin like https://app.example.com: no path, no trailing slash")
     .optional(),
   VITE_NETWORK: Network,
-  VITE_RPC_URL: z.url(),
-  VITE_INTENTS_ID: AccountId,
-  VITE_OPTIONS_ID: AccountId,
-  VITE_QUOTE_ASSET: z.string().startsWith("nep141:"),
 });
+
+const DEPLOYMENTS = import.meta.glob("../../../deploy/*.json", { eager: true, import: "default" });
 
 export interface Config {
   mock: boolean;
@@ -44,14 +42,18 @@ const MOCK_TESTNET: Config = { ...MOCK, network: "testnet", intentsId: "intents.
 export function loadConfig(env: Record<string, unknown>): Config {
   if (env.VITE_MOCK === "1") return env.VITE_NETWORK === "testnet" ? MOCK_TESTNET : MOCK;
   const e = Live.parse(env);
+  const file = DEPLOYMENTS[`../../../deploy/${e.VITE_NETWORK}.json`];
+  if (file === undefined) throw new Error(`no deploy/${e.VITE_NETWORK}.json: ${e.VITE_NETWORK} has no deployment yet`);
+  const d = Deployment.parse(file);
+  if (d.network !== e.VITE_NETWORK) throw new Error(`deploy/${e.VITE_NETWORK}.json is for ${d.network}`);
   return {
     mock: false,
     relayUrl: e.VITE_RELAY_URL ?? window.location.origin,
     paths: e.VITE_APP_URL === undefined ? PATHS : pathsFor(e.VITE_APP_URL, window.location.origin),
     network: e.VITE_NETWORK,
-    rpcUrl: e.VITE_RPC_URL,
-    intentsId: e.VITE_INTENTS_ID,
-    optionsId: e.VITE_OPTIONS_ID,
-    quoteAsset: e.VITE_QUOTE_ASSET,
+    rpcUrl: d.rpc_url,
+    intentsId: d.intents_id,
+    optionsId: d.options_id,
+    quoteAsset: d.quote_asset,
   };
 }

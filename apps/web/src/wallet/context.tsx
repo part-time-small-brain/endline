@@ -6,7 +6,7 @@ import { connectEvm } from "./evm.ts";
 import { connectNear, restoreNear } from "./near.ts";
 import type { Wallet } from "./wallet.ts";
 
-export type WalletKind = Exclude<Wallet["kind"], "tap">;
+export type WalletKind = Wallet["kind"];
 
 interface WalletState {
   wallet: Wallet | null;

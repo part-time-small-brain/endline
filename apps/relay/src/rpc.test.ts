@@ -8,10 +8,7 @@ import { type Chain, nearChain, ranTx, Refunded, Unsettled } from "./rpc.ts";
 import { session } from "./test-fakes.ts";
 
 const config = loadConfig({
-  NEAR_RPC_URL: "https://rpc.example",
   NETWORK_ID: "testnet",
-  OPTIONS_ID: "opt.test",
-  QUOTE_ASSET: "nep141:usdc.test",
   RELAYER_ACCOUNT_ID: "relayer.test",
   RELAYER_PRIVATE_KEY: KeyPair.fromRandom("ed25519").toString(),
   MM_API_KEYS: "0123456789abcdef",
@@ -28,7 +25,7 @@ describe("depositFt", () => {
   it("returns the tx when the token reports the full amount used", async () => {
     const call = returning(used("100"));
     expect(await nearChain(config).depositFt("usdc.test", "alice.testnet", 100n)).toBe("tx");
-    expect(call).toHaveBeenCalledWith(expect.objectContaining({ contractId: "usdc.test", methodName: "ft_transfer_call", deposit: 1n, args: { receiver_id: "intents.near", amount: "100", msg: "alice.testnet" } }));
+    expect(call).toHaveBeenCalledWith(expect.objectContaining({ contractId: "usdc.test", methodName: "ft_transfer_call", deposit: 1n, args: { receiver_id: config.intents_id, amount: "100", msg: "alice.testnet" } }));
   });
 
   it("reports a refund when the token says nothing was used", async () => {

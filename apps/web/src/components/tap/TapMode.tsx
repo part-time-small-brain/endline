@@ -1,5 +1,4 @@
 import { FREE_CALLS_PER_ROUND, MAX_CALL_MULTIPLE } from "@endline/sdk";
-import { maxLossOf } from "../../lib/tap.ts";
 import { formatUsd } from "../../lib/money.ts";
 import { Chips } from "../Chips.tsx";
 import { AmountPicker } from "../trade/AmountPicker.tsx";
@@ -27,12 +26,12 @@ export function TapMode({ free, left, budget, quoteDecimals, onFree, onBudget }:
         ]}
       />
       {free ? (
-        <p className="text-sm text-ink-2">Each tap calls a cell of the next round for free: it stakes 100 points at the cell's multiple, up to {MAX_CALL_MULTIPLE}×, and scores at the final price. No money moves; you need $1 in your balance (the Tap balance doesn't count) to play.</p>
+        <p className="text-sm text-ink-2">Each tap calls a cell of the next round for free: it stakes 100 points at the cell's multiple, up to {MAX_CALL_MULTIPLE}×, and scores at the final price. No money moves; you need $1 in your balance to play.</p>
       ) : (
         <>
           <AmountPicker value={budget} quoteDecimals={quoteDecimals} onChange={onBudget} />
           <p className="text-sm text-ink-2">
-            Each tap buys one option for about {formatUsd(budget, quoteDecimals).replace(/\.00$/, "")}. Max loss {formatUsd(maxLossOf(budget), quoteDecimals, "up")} a tap.
+            Each tap opens a firm quote for one option at about {formatUsd(budget, quoteDecimals).replace(/\.00$/, "")}; you confirm it before anything is bought.
           </p>
         </>
       )}

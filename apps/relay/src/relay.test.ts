@@ -40,7 +40,7 @@ function setup(mmCount = 1, behaviour: MmBehaviour = () => ({})) {
     },
   };
   const fills = new Fills(mkdtempSync(join(tmpdir(), "relay-")));
-  const relay = new Relay({ config: { INTENTS_ID: INTENTS, OPTIONS_ID: OPTIONS, QUOTE_ASSET: USDC }, chain, fills, auctions, mms });
+  const relay = new Relay({ config: { intents_id: INTENTS, options_id: OPTIONS, quote_asset: USDC }, chain, fills, auctions, mms });
   const quote = async (request: QuoteRequest = buy) => {
     const pending = relay.quote(request);
     pending.catch(() => undefined);

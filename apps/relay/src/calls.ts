@@ -68,7 +68,7 @@ export class Calls {
     if (!mark) throw new HttpError(503, "no price for this cell right now");
     if (BigInt(mark.ask) >= BigInt(series.width)) throw new HttpError(409, "this cell can't pay more than it costs");
     const dollar = 10n ** BigInt(contract.quote_decimals);
-    if ((await this.chain.balanceOf(signer.signer_id, contract.quote_asset)) < dollar) throw new HttpError(402, "a free call needs at least $1 of USDC in this wallet's NEAR Intents balance (a Tap balance doesn't count): deposit first");
+    if ((await this.chain.balanceOf(signer.signer_id, contract.quote_asset)) < dollar) throw new HttpError(402, "a free call needs at least $1 of USDC in this wallet's NEAR Intents balance: deposit first");
     // again: other calls may have landed while balanceOf was awaited
     checkRoom();
     const { id, ...terms } = series;

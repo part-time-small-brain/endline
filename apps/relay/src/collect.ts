@@ -1,5 +1,5 @@
 import { isDeepStrictEqual } from "node:util";
-import { exerciseOptions, type Fill, type Intent, longPayout, MIN_RELAYED_PAYOUT_USD, maxPayout, parseTokenId, readPayload, relayedTransfer, type Series, type Settlement, type SignedPayload, termsOf, transferFee } from "@endline/sdk";
+import { exerciseOptions, type Fill, longPayout, MIN_RELAYED_PAYOUT_USD, maxPayout, parseTokenId, readPayload, type Series, type Settlement, type SignedPayload, termsOf } from "@endline/sdk";
 import type { Claims } from "./claims.ts";
 import type { Config } from "./config.ts";
 import type { Fills } from "./fills.ts";
@@ -14,17 +14,14 @@ const MAX_DEADLINE_MS = 10 * 60_000;
 // intents rechecks the deadline on-chain, and near-api-js retries a send for up to ~85 s: a payload that expires first burns our gas
 const MIN_DEADLINE_MS = 2 * 60_000;
 
-interface Sent {
+interface Exercise {
   signerId: string;
   nonce: string;
   deadlineMs: number;
-}
-
-interface Exercise extends Sent {
   tokens: Record<string, bigint>;
 }
 
-type Settings = Pick<Config, "INTENTS_ID" | "OPTIONS_ID" | "QUOTE_ASSET" | "RELAYER_ACCOUNT_ID">;
+type Settings = Pick<Config, "intents_id" | "options_id">;
 
 interface Leg {
   asset: string;
@@ -32,33 +29,15 @@ interface Leg {
   amount: bigint;
 }
 
-function readSigned(signed: SignedPayload, intentsId: string): { sent: Sent; intents: Intent[] } | undefined {
-  const { signer_id, nonce, deadline, verifying_contract, intents } = readPayload(signed);
-  const deadlineMs = Date.parse(deadline);
-  if (verifying_contract !== intentsId || !Number.isFinite(deadlineMs) || new Date(deadlineMs).toISOString() !== deadline) return undefined;
-  return { sent: { signerId: signer_id, nonce, deadlineMs }, intents };
-}
-
 function readExercise(signed: SignedPayload, config: Settings): Exercise | undefined {
   try {
-    const read = readSigned(signed, config.INTENTS_ID);
-    const [intent, ...extra] = read?.intents ?? [];
-    if (!read || intent?.intent !== "transfer" || extra.length > 0) return undefined;
+    const { signer_id, nonce, deadline, verifying_contract, intents } = readPayload(signed);
+    const [intent, ...extra] = intents;
+    const deadlineMs = Date.parse(deadline);
+    if (verifying_contract !== config.intents_id || intent?.intent !== "transfer" || extra.length > 0) return undefined;
+    if (!Number.isFinite(deadlineMs) || new Date(deadlineMs).toISOString() !== deadline) return undefined;
     const tokens = Object.fromEntries(Object.entries(intent.tokens).map(([asset, amount]) => [asset, BigInt(amount)]));
-    return isDeepStrictEqual(intent, exerciseOptions(config.OPTIONS_ID, tokens)) ? { ...read.sent, tokens } : undefined;
-  } catch {
-    return undefined;
-  }
-}
-
-function readTransfer(signed: SignedPayload, config: Settings, fee: bigint): Sent | undefined {
-  try {
-    const read = readSigned(signed, config.INTENTS_ID);
-    const [move] = read?.intents ?? [];
-    if (!read || move?.intent !== "transfer") return undefined;
-    const amount = BigInt(move.tokens[config.QUOTE_ASSET] ?? 0);
-    const expected = relayedTransfer(move.receiver_id, config.RELAYER_ACCOUNT_ID, config.QUOTE_ASSET, amount, fee);
-    return isDeepStrictEqual(read.intents, expected) ? read.sent : undefined;
+    return isDeepStrictEqual(intent, exerciseOptions(config.options_id, tokens)) ? { signerId: signer_id, nonce, deadlineMs, tokens } : undefined;
   } catch {
     return undefined;
   }
@@ -86,10 +65,6 @@ export class Collector {
     private fills: Pick<Fills, "byAccount">,
   ) {}
 
-  get feeAccount(): string {
-    return this.config.RELAYER_ACCOUNT_ID;
-  }
-
   async execute(signed: SignedPayload): Promise<string> {
     const exercise = this.read(signed);
     if (exercise.deadlineMs > Date.now() + MAX_DEADLINE_MS) throw new HttpError(400, "an exercise sent now must expire within 10 minutes");
@@ -98,14 +73,6 @@ export class Collector {
     if (total === 0n) throw new HttpError(400, "these options pay nothing");
     if (total < (await this.minPayout())) throw new HttpError(400, "the relay pays gas only for payouts of at least $1: collect from a NEAR wallet");
     return this.submit(signed, exercise, true);
-  }
-
-  async transfer(signed: SignedPayload): Promise<string> {
-    const fee = transferFee((await this.chain.contractConfig()).quote_decimals);
-    const sent = readTransfer(signed, this.config, fee);
-    if (!sent) throw new HttpError(400, "only one USDC transfer followed by the relay's fee is relayed");
-    if (sent.deadlineMs > Date.now() + MAX_DEADLINE_MS) throw new HttpError(400, "a transfer sent now must expire within 10 minutes");
-    return this.submit(signed, sent, true);
   }
 
   async claim(signed: SignedPayload): Promise<void> {
@@ -163,7 +130,7 @@ export class Collector {
 
   private async legs({ tokens }: Exercise): Promise<Leg[]> {
     const listed = new Map((await this.chain.listSeries()).map((s) => [s.id, s]));
-    const prefix = `nep245:${this.config.OPTIONS_ID}:`;
+    const prefix = `nep245:${this.config.options_id}:`;
     const legs: Leg[] = [];
     for (const [asset, amount] of Object.entries(tokens)) {
       const { seriesId, side } = parseTokenId(asset.slice(prefix.length));
@@ -175,7 +142,7 @@ export class Collector {
     return legs;
   }
 
-  private async submit(signed: SignedPayload, { signerId, nonce, deadlineMs }: Sent, awaitOutcome: boolean): Promise<string> {
+  private async submit(signed: SignedPayload, { signerId, nonce, deadlineMs }: Exercise, awaitOutcome: boolean): Promise<string> {
     for (const [key, deadline] of this.submitted) if (deadline < Date.now()) this.submitted.delete(key);
     const key = `${signerId}:${nonce}`;
     if (this.submitted.has(key)) throw new HttpError(409, "this payload was already submitted");

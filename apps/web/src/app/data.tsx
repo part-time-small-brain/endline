@@ -5,7 +5,6 @@ import { usePoll } from "../hooks/usePoll.ts";
 import { verifiedListing } from "../lib/listing.ts";
 import type { SettlementView } from "../lib/status.ts";
 import { useWallet } from "../wallet/context.tsx";
-import { useTap } from "../wallet/tapBalance.tsx";
 import { useApp } from "./context.ts";
 
 export interface AppData {
@@ -22,9 +21,6 @@ export interface AppData {
   balances: Record<string, bigint> | undefined;
   balance: bigint | undefined;
   fills: Fill[] | undefined;
-  tapBalances: Record<string, bigint> | undefined;
-  tapBalance: bigint | undefined;
-  tapFills: Fill[] | undefined;
   calls: Call[] | undefined;
   settlements: Record<string, SettlementView | null>;
   optionAsset(seriesId: string): string;
@@ -40,7 +36,6 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const { config, services } = useApp();
   const { wallet } = useWallet();
   const account = wallet?.accountId ?? "";
-  const tapAccount = useTap().accountId ?? "";
 
   const relayListing = usePoll(() => services.relay.listing(), 15_000, "listing");
   const contract = usePoll(() => services.chain.contract(), 60_000, "contract");
@@ -66,20 +61,17 @@ export function DataProvider({ children }: { children: ReactNode }) {
   );
   const balances = usePoll(account && listing ? () => services.chain.balances(account, assets) : null, 10_000, `${account}:${assets.length}`);
   const fills = usePoll(account ? () => services.relay.fills(account) : null, 15_000, account);
-  const tapBalances = usePoll(tapAccount && listing ? () => services.chain.balances(tapAccount, assets) : null, 10_000, `${tapAccount}:${assets.length}`);
-  const tapFills = usePoll(tapAccount ? () => services.relay.fills(tapAccount) : null, 15_000, tapAccount);
   const calls = usePoll(account ? () => services.relay.calls(account) : null, 60_000, account);
 
   const ended = useMemo(() => {
     const nowSec = Date.now() / 1000;
-    const touched = new Set([...(fills.data ?? []), ...(tapFills.data ?? [])].map((f) => f.series_id));
-    const held = (s: ListedSeries) => [balances.data, tapBalances.data].some((owned) => (owned?.[optionAsset(s.id)] ?? 0n) > 0n);
+    const touched = new Set((fills.data ?? []).map((f) => f.series_id));
     const keys = (listing?.series ?? [])
-      .filter((s) => s.expiry <= nowSec && (touched.has(s.id) || held(s)))
+      .filter((s) => s.expiry <= nowSec && (touched.has(s.id) || (balances.data?.[optionAsset(s.id)] ?? 0n) > 0n))
       .map(settlementKey);
     const called = (calls.data ?? []).filter((c) => c.terms.expiry <= nowSec).map((c) => settlementKey(c.terms));
     return [...new Set([...keys, ...called])].sort();
-  }, [listing, fills.data, balances.data, tapFills.data, tapBalances.data, calls.data, optionAsset]);
+  }, [listing, fills.data, balances.data, calls.data, optionAsset]);
   const settlements = usePoll(
     ended.length
       ? async () => {
@@ -99,12 +91,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const reload = useCallback(() => {
     balances.reload();
     fills.reload();
-    tapBalances.reload();
-    tapFills.reload();
     settlements.reload();
-    marks.reload();
     calls.reload();
-  }, [balances.reload, fills.reload, tapBalances.reload, tapFills.reload, settlements.reload, marks.reload, calls.reload]);
+  }, [balances.reload, fills.reload, settlements.reload, calls.reload]);
 
   const value: AppData = {
     listing,
@@ -120,9 +109,6 @@ export function DataProvider({ children }: { children: ReactNode }) {
     balances: balances.data,
     balance: balances.data?.[config.quoteAsset],
     fills: fills.data,
-    tapBalances: tapBalances.data,
-    tapBalance: tapBalances.data?.[config.quoteAsset],
-    tapFills: tapFills.data,
     calls: calls.data,
     settlements: settlements.data ?? {},
     optionAsset,

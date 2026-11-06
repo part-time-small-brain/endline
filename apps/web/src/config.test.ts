@@ -1,13 +1,8 @@
 import { afterEach, expect, it, vi } from "vitest";
+import testnet from "../../../deploy/testnet.json" with { type: "json" };
 import { loadConfig } from "./config.ts";
 
-const ENV = {
-  VITE_NETWORK: "testnet",
-  VITE_RPC_URL: "https://rpc.testnet.fastnear.com",
-  VITE_INTENTS_ID: "intents.near-options-dev.testnet",
-  VITE_OPTIONS_ID: "opt4.near-options-dev.testnet",
-  VITE_QUOTE_ASSET: "nep141:usdc.testnet",
-};
+const ENV = { VITE_NETWORK: "testnet" };
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -30,4 +25,14 @@ it("splits landing and app only when VITE_APP_URL is set, matching the app by or
 it("mock mode stays on mainnet ids unless VITE_NETWORK=testnet asks for a testnet-like mock", () => {
   expect(loadConfig({ VITE_MOCK: "1" })).toMatchObject({ mock: true, network: "mainnet", intentsId: "intents.near" });
   expect(loadConfig({ VITE_MOCK: "1", VITE_NETWORK: "testnet" })).toMatchObject({ mock: true, network: "testnet", intentsId: expect.stringMatching(/\.testnet$/) });
+});
+
+it("takes the contract ids from deploy/<VITE_NETWORK>.json, never from env", () => {
+  vi.stubGlobal("window", { location: { origin: "https://app.example.com" } });
+  const stale = { VITE_RPC_URL: "https://rpc.stale.example", VITE_INTENTS_ID: "intents.stale.testnet", VITE_OPTIONS_ID: "opt.stale.testnet", VITE_QUOTE_ASSET: "nep141:usdc.stale.testnet" };
+  expect(loadConfig({ ...ENV, ...stale })).toMatchObject({ network: "testnet", rpcUrl: testnet.rpc_url, intentsId: testnet.intents_id, optionsId: testnet.options_id, quoteAsset: testnet.quote_asset });
+});
+
+it("refuses a network without a deploy file: mainnet until deploy/mainnet.json exists", () => {
+  expect(() => loadConfig({ VITE_NETWORK: "mainnet" })).toThrow("no deploy/mainnet.json");
 });
