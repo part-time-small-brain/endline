@@ -453,6 +453,34 @@ test("Lite baseline and six popovers fit the viewport and support Escape", async
   }
 });
 
+const paint = (page: Page) => page.evaluate(() => [getComputedStyle(document.documentElement).backgroundColor, document.querySelector('meta[name="theme-color"]')?.getAttribute("content")]);
+const DARK = ["rgb(10, 10, 10)", "#0a0a0a"];
+const LIGHT = ["rgb(242, 241, 233)", "#f2f1e9"];
+
+test("one toggle switches the landing and the app between dark and light, painted before load and kept after reload", async ({ page, isMobile }) => {
+  const toggle = page.getByRole("button", { name: "Light theme" });
+  await page.goto("/");
+  expect(await paint(page)).toEqual(DARK);
+  await expect(toggle).toHaveAttribute("aria-pressed", "false");
+  await toggle.click();
+  await expect(toggle).toHaveAttribute("aria-pressed", "true");
+  expect(await paint(page)).toEqual(LIGHT);
+  await page.goto("/app");
+  await expect(page.getByLabel("Trade sentence")).toBeVisible();
+  expect(await paint(page)).toEqual(LIGHT);
+  await page.reload();
+  expect(await paint(page)).toEqual(LIGHT);
+  await connectDemo(page);
+  if (isMobile) {
+    await expect(toggle).toBeHidden();
+    await page.getByRole("button", { name: /^Account / }).click();
+  }
+  await toggle.click();
+  expect(await paint(page)).toEqual(DARK);
+  await page.reload();
+  expect(await paint(page)).toEqual(DARK);
+});
+
 test("the price list runs high to low with now marked between the prices either side", async ({ page }) => {
   await ready(page);
   for (const side of ["Up", "Down"]) {

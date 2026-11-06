@@ -4,6 +4,8 @@ import type { Wallet } from "./wallet.ts";
 const SESSION_MS = 24 * 3_600_000;
 const RENEW_BEFORE_MS = 60_000;
 
+export const SESSION_PROMPT = { title: "Confirm in your wallet", body: "One signature proves this wallet is yours for 24 h. No funds move." };
+
 interface Session {
   deadlineMs: number;
   signed: Promise<SignedPayload>;

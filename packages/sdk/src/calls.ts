@@ -2,7 +2,7 @@ import { longPayout, type Terms } from "./math.ts";
 import { TWAP_WINDOW_SEC } from "./series.ts";
 
 export const FREE_CALLS_PER_ROUND = 10;
-export const CALL_STAKE = 100;
+const CALL_STAKE = 100;
 export const MAX_CALL_MULTIPLE = 25;
 
 const MAX_BACK = BigInt(CALL_STAKE * MAX_CALL_MULTIPLE);

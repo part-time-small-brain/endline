@@ -31,7 +31,7 @@ async function drawCard(card: Card): Promise<File> {
   };
   text("ENDLINE", 140, "500 28px 'Geist Mono Variable'", "--ink-3");
   text(card.title, 250, "600 64px 'Mona Sans Variable'", "--ink");
-  text(card.result, 360, "700 96px 'Mona Sans Variable'", "--up");
+  text(card.result, 360, "700 96px 'Mona Sans Variable'", "--up-ink");
   text(card.detail, 430, "500 32px 'Geist Mono Variable'", "--ink-2");
   text(card.footer, 520, "500 28px 'Geist Mono Variable'", "--ink-3");
   text("endline.trade", 570, "500 28px 'Geist Mono Variable'", "--teal");

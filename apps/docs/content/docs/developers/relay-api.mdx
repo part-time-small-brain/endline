@@ -50,7 +50,7 @@ A new quote expires the signer's earlier unsigned one. Quotes in auction or sett
 
 ## Free calls
 
-Free calls move no money, but the caller needs at least $1 of `QUOTE_ASSET` in their intents balance (read, never spent), so throwaway accounts cost something. Each call is priced at the relay's best ask for that series when it's made (never the request's; scores trust the market makers' marks), only on the next round (the UTC date of the nearest expiry still callable; on a sub-daily grid a round is the whole UTC day), and only until the 30-minute averaging window before its expiry opens (`TWAP_WINDOW_SEC`, `callableAt` in the SDK, even where the contract's cutoff is later). 10 per account per round, one per series, 10,000 waiting calls per round. A call stakes 100 points and is scored once its price has been final for a minute: `min(payout per option × 100 ÷ ask, 2,500) − 100` (`callPoints` in the SDK, so at most 25×). A round's standings rank by points, then wins (calls above 0), then account id; the week sums the last 7 rounds; a streak counts consecutive UTC dates with a win up to the latest scored round (0 if that round wasn't a win, at most 60). Results are kept a day after their round and calls whose price never came a week.
+Free calls move no money, but the caller needs at least $1 of `QUOTE_ASSET` in their intents balance (read, never spent), so throwaway accounts cost something. Each call is priced at the relay's best ask for that series when it's made (never the request's; scores trust the market makers' marks), only on the next round (the UTC date of the nearest expiry still callable; on a sub-daily grid a round is the whole UTC day), and only until the 30-minute averaging window before its expiry opens (`TWAP_WINDOW_SEC`, `callableAt` in the SDK, even where the contract's cutoff is later). 10 per account and 100 per client IP (IPv6: per /48) per round, one per series, 10,000 waiting calls per round. All of these are checked before the balance. A call stakes 100 points and is scored once its price has been final for a minute: `min(payout per option × 100 ÷ ask, 2,500) − 100` (`callPoints` in the SDK, so at most 25×). A round's standings rank by points, then wins (calls above 0), then account id; the week sums the last 7 rounds; a streak counts consecutive UTC dates with a win up to the latest scored round (0 if that round wasn't a win, at most 60). Results are kept a day after their round and calls whose price never came a week.
 
 ## Collect: `/execute` and `/claims`
 
@@ -82,7 +82,7 @@ Body: `{error}`.
 | `415` | Faucet request not `application/json` |
 | `422` | Refused by `simulate_intents` |
 | `500` | A collect or transfer errored and its nonce was still unused once a final block passed its deadline: it never ran. If the response never arrives (the relay holds it until then, up to the deadline), check the balance before signing again |
-| `429` | Rate limit (per IP, or 4 quotes per 25 s per signer), faucet already used in the last 24 h, or 10 free calls used this round |
+| `429` | Rate limit (per IP, or 4 quotes per 25 s per signer), faucet already used in the last 24 h, or 10 free calls used this round (100 per IP) |
 | `502` | Faucet transfer refunded (try again) or of unknown outcome (check your balance; it counts as sent) |
 | `503` | No market maker online, no valid quote, claim queue full, no price for a free call's series right now, or the free-call store full |
 
