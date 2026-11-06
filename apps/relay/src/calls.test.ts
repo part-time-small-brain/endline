@@ -96,6 +96,7 @@ describe("free calls", () => {
     const t = setup([series(81_000), series(82_000), series(81_000, later), series(81_000, NEXT)], 1);
     await t.call(series(81_000).id);
     expect(await httpStatus(t.call(series(82_000).id, "bob.near"))).toBe(503);
+    expect(await httpStatus(t.call(series(81_000, later).id, "bob.near"))).toBe(503);
     await t.settle(E, 83_000);
     await expect(t.call(series(81_000, later).id, "bob.near")).resolves.toMatchObject({ account_id: "bob.near" });
     at(NEXT - 2 * 3_600);

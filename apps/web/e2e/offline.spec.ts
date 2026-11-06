@@ -917,6 +917,10 @@ test.describe("Tap", () => {
     await grid.getByRole("button", { name: /^Up · BTC ends above \$82,000 · Tomorrow / }).click();
     await expect(page.getByRole("status").filter({ hasText: "Your wallet couldn't sign in. Tap again to sign in again." })).toBeVisible();
     expect(await signs()).toBe(2);
+    await page.evaluate(() => Object.assign(window, { refuseCalls: undefined }));
+    await grid.getByRole("button", { name: /^Up · BTC ends above \$82,000 · Tomorrow / }).click();
+    await expect(page.getByRole("status").filter({ hasText: "Called BTC Up $82,000 at 5.0×." })).toBeVisible();
+    expect(await signs()).toBe(3);
   });
 
   test("a call on an end that's over drops off the grid even while its UTC day is still the next round", async ({ page }) => {
