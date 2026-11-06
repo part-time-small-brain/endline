@@ -41,6 +41,10 @@ services:
     command: tunnel --no-autoupdate run
     environment: [TUNNEL_TOKEN]
     depends_on: [web]
+    networks: { default: { ipv4_address: 10.86.86.86 } }
+
+networks:
+  default: { ipam: { config: [{ subnet: 10.86.86.0/24 }] } }
 
 volumes:
   relay-data: {}
