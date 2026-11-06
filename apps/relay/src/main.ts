@@ -26,13 +26,13 @@ const chain = nearChain(config);
 
 const [networkId, contract] = await Promise.all([chain.networkId(), chain.contractConfig()]);
 if (networkId !== config.NETWORK_ID) throw new Error(`RPC is on ${networkId}, expected ${config.NETWORK_ID}`);
-if (contract.intents_id !== config.INTENTS_ID) throw new Error(`${config.OPTIONS_ID} settles through ${contract.intents_id}, not ${config.INTENTS_ID}`);
-if (contract.quote_asset !== config.QUOTE_ASSET) throw new Error(`${config.OPTIONS_ID} quotes in ${contract.quote_asset}, not ${config.QUOTE_ASSET}`);
+if (contract.intents_id !== config.intents_id) throw new Error(`${config.options_id} settles through ${contract.intents_id}, not ${config.intents_id}`);
+if (contract.quote_asset !== config.quote_asset) throw new Error(`${config.options_id} quotes in ${contract.quote_asset}, not ${config.quote_asset}`);
 
 const fills = new Fills(config.DATA_DIR);
 await fills.load();
 const auctions = new Auctions((event, mmId, response, receivedAt) =>
-  checkBid(chain, config.INTENTS_ID, event, mmId, response, receivedAt),
+  checkBid(chain, config.intents_id, event, mmId, response, receivedAt),
 );
 const hub = new MmHub(config.MM_API_KEYS, (mmId, response) => auctions.respond(mmId, response));
 const relay = new Relay({ config, chain, fills, auctions, mms: hub });
@@ -41,7 +41,7 @@ await claims.load();
 const collector = new Collector(chain, config, claims, fills);
 let faucet: Faucet | undefined;
 if (config.FAUCET) {
-  const token = config.QUOTE_ASSET.slice("nep141:".length);
+  const token = config.quote_asset.slice("nep141:".length);
   const amount = FAUCET_TOKENS * 10n ** BigInt(contract.quote_decimals);
   faucet = new Faucet((accountId) => chain.depositFt(token, accountId, amount), config.DATA_DIR);
   await faucet.load();
@@ -55,6 +55,6 @@ await calls.load();
 const scoreCalls = () => void calls.score().catch(console.error).finally(() => setTimeout(scoreCalls, SCORE_MS));
 scoreCalls();
 
-const oneClick = new OneClick(config.QUOTE_ASSET, config.ONECLICK_JWT);
+const oneClick = new OneClick(config.quote_asset, config.ONECLICK_JWT);
 
 createRelayServer(relay, fills, hub, collector, oneClick, calls, faucet, config.TRUST_PROXY, new Set(config.APP_ORIGINS)).listen(config.PORT, () => console.log(`relay listening on :${config.PORT}`));

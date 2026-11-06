@@ -14,7 +14,7 @@ pnpm --filter @endline/web build
 
 Mock mode needs no backend: a demo wallet with $250, a mock relay on the real protocol types (its marks and quotes are Black-76 at a fixed vol per asset, ±1.5 vol points), and positions in every state (active, settling, proposed price, ready to collect, expired). NEAR and EVM wallets work too; signatures are real, settlement is fake.
 
-`test:e2e` runs the Playwright suite in `e2e/` against its own dev servers (Chromium): the mock at 1440 and 390 wide; a testnet-like mock (`VITE_MOCK=1 VITE_NETWORK=testnet`: faucet, copy leaks); and a live config whose relay, RPC and Deribit answers the tests stub per route (landing with no relay, ticket with no or some marks). `Math.random` is seeded and the page clock starts at `E2E_NOW` (default `2026-11-04T12:00:00Z`), so the mock market is the same on every run. First run: `pnpm --filter @endline/web exec playwright install chromium`.
+`test:e2e` runs the Playwright suite in `e2e/` against its own dev servers (Chromium): the mock at 1440 and 390 wide; a testnet-like mock (`VITE_MOCK=1 VITE_NETWORK=testnet`: faucet, copy leaks); and a live testnet config (`deploy/testnet.json`) whose relay, RPC and Deribit answers the tests stub per route (landing with no relay, ticket with no or some marks). `Math.random` is seeded and the page clock starts at `E2E_NOW` (default `2026-11-04T12:00:00Z`), so the mock market is the same on every run. First run: `pnpm --filter @endline/web exec playwright install chromium`.
 
 Against testnet with a running relay and MM: [Running locally](https://docs.endline.trade/developers/running-locally#full-stack-on-testnet). On testnet there is no 1Click: the deposit sheet's "Get 100 test USDC" calls the relay's `POST /faucet` (once a day per account and IP).
 
@@ -39,11 +39,7 @@ Read by Vite from the shell or a `.env` file.
 | `VITE_MOCK` | `1` = in-browser mock, other vars ignored except `VITE_NETWORK=testnet` (testnet ids and a mock faucet instead of 1Click) |
 | `VITE_RELAY_URL` | RFQ relay base URL (`apps/relay`). Optional: defaults to the page's own origin (relay paths proxied on the same host). On another origin, the relay's `APP_ORIGINS` must list the app's, or the faucet and deposits fail |
 | `VITE_APP_URL` | Origin the app runs at, e.g. `https://app.endline.trade`. Optional: unset, the landing is `/` and the app `/app` on one origin |
-| `VITE_NETWORK` | `mainnet` or `testnet` (wallets, explorer links; 1Click only on mainnet) |
-| `VITE_RPC_URL` | NEAR RPC for view calls |
-| `VITE_INTENTS_ID` | Verifier contract (`intents.near`, or our testnet copy) |
-| `VITE_OPTIONS_ID` | Options contract |
-| `VITE_QUOTE_ASSET` | USDC intents asset id, `nep141:…` |
+| `VITE_NETWORK` | `mainnet` or `testnet` (wallets, explorer links; 1Click only on mainnet). Bundles the RPC, intents and options contract ids and quote asset from `deploy/<VITE_NETWORK>.json` at build time. No file (mainnet today): the app says it isn't configured |
 
 ## Where data comes from
 

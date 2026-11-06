@@ -21,7 +21,7 @@ interface Exercise {
   tokens: Record<string, bigint>;
 }
 
-type Settings = Pick<Config, "INTENTS_ID" | "OPTIONS_ID">;
+type Settings = Pick<Config, "intents_id" | "options_id">;
 
 interface Leg {
   asset: string;
@@ -34,10 +34,10 @@ function readExercise(signed: SignedPayload, config: Settings): Exercise | undef
     const { signer_id, nonce, deadline, verifying_contract, intents } = readPayload(signed);
     const [intent, ...extra] = intents;
     const deadlineMs = Date.parse(deadline);
-    if (verifying_contract !== config.INTENTS_ID || intent?.intent !== "transfer" || extra.length > 0) return undefined;
+    if (verifying_contract !== config.intents_id || intent?.intent !== "transfer" || extra.length > 0) return undefined;
     if (!Number.isFinite(deadlineMs) || new Date(deadlineMs).toISOString() !== deadline) return undefined;
     const tokens = Object.fromEntries(Object.entries(intent.tokens).map(([asset, amount]) => [asset, BigInt(amount)]));
-    return isDeepStrictEqual(intent, exerciseOptions(config.OPTIONS_ID, tokens)) ? { signerId: signer_id, nonce, deadlineMs, tokens } : undefined;
+    return isDeepStrictEqual(intent, exerciseOptions(config.options_id, tokens)) ? { signerId: signer_id, nonce, deadlineMs, tokens } : undefined;
   } catch {
     return undefined;
   }
@@ -130,7 +130,7 @@ export class Collector {
 
   private async legs({ tokens }: Exercise): Promise<Leg[]> {
     const listed = new Map((await this.chain.listSeries()).map((s) => [s.id, s]));
-    const prefix = `nep245:${this.config.OPTIONS_ID}:`;
+    const prefix = `nep245:${this.config.options_id}:`;
     const legs: Leg[] = [];
     for (const [asset, amount] of Object.entries(tokens)) {
       const { seriesId, side } = parseTokenId(asset.slice(prefix.length));
