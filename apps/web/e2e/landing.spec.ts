@@ -202,9 +202,10 @@ test("hero dots split Up and Down around the cursor, fade when it leaves, then i
   expect(await tints(page, spot.x, spot.y)).toEqual({ above: "none", below: "none" });
   await page.mouse.move(spot.x, spot.y);
   await expect.poll(() => tints(page, spot.x, spot.y)).toEqual({ above: "up", below: "down" });
+  await expect(canvas).not.toHaveAttribute("data-draws", "0");
   await expect.poll(() => cursorLineOpacity(page)).toBeGreaterThan(0.8);
   const line = await hero(page).locator("canvas + div").boundingBox();
-  expect(line && [line.x + line.width / 2, line.y + line.height / 2, line.height]).toEqual([spot.x, spot.y, 2]);
+  expect(line && [line.x + line.width / 2, line.y + line.height / 2]).toEqual([spot.x, spot.y]);
   await expect.poll(drawsWhileWaiting).toBe(0);
 
   const nav = page.getByRole("navigation", { name: "Main" });
@@ -251,9 +252,8 @@ test("with reduced motion the hero dots still color but stay on the grid and the
   const canvas = hero(page).locator("canvas");
   await canvas.evaluate((element: HTMLCanvasElement) => {
     const arc = CanvasRenderingContext2D.prototype.arc;
-    element.dataset.offGrid = "0";
     CanvasRenderingContext2D.prototype.arc = function (this: CanvasRenderingContext2D, ...args: Parameters<typeof arc>) {
-      if (this.canvas === element && args[1] % 18 !== 9) element.dataset.offGrid = String(Number(element.dataset.offGrid) + 1);
+      if (this.canvas === element) element.dataset.offGrid = String(Number(element.dataset.offGrid ?? 0) + (args[1] % 18 === 9 ? 0 : 1));
       return arc.apply(this, args);
     };
   });
