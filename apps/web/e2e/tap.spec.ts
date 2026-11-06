@@ -166,6 +166,22 @@ test("a bought cell rides into its column's final round, read-only, with the ave
   await expect(page.getByText("Ended · waiting for the final price.", { exact: true })).toBeVisible();
 });
 
+test("free calls with the demo wallet: call a cell of the next round, see it called and counted, and the board", async ({ page }) => {
+  await openTap(page);
+  await connect(page, /Demo wallet/);
+  await page.getByRole("radio", { name: /^Free call/ }).click();
+  await expect(page.getByRole("radio", { name: /^Free call/ })).toContainText("10 of 10 left this round");
+  await cells(page).filter({ hasText: /^[1-9]\.\d×$/ }).and(page.getByRole("button", { name: / · Tomorrow / })).first().click();
+  await expect(page.getByRole("status").filter({ hasText: /^Called BTC (Up|Down) \$[\d,]+ at \d+\.\d×\.$/ })).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByRole("radio", { name: /^Free call/ })).toContainText("9 of 10 left this round");
+  await expect(grid(page).getByRole("button", { name: / · you called this$/ })).toHaveCount(1);
+  const panel = page.getByRole("region", { name: "Free calls" });
+  await expect(panel.getByText(/· at \d+\.\d×/)).toBeVisible();
+  await expect(panel.getByRole("list").first().getByRole("listitem").first()).toContainText("sun.near");
+  await page.getByRole("radio", { name: /^Buy/ }).click();
+  await expect(page.getByRole("region", { name: "Free calls" })).toHaveCount(0);
+});
+
 test("a custom stake's max loss rounds up, so no tap costs more than it says", async ({ page }) => {
   await openTap(page);
   await page.getByRole("radio", { name: "Other" }).click();
@@ -193,6 +209,22 @@ test("the Tap key outlives a reload, and a disconnect drops it and every tap sti
   await page.getByRole("button", { name: "Disconnect" }).click();
   expect(await seeds(page)).toEqual([]);
   await expect(grid(page).locator("[aria-busy=true]")).toHaveCount(0, { timeout: 10_000 });
+});
+
+test("a Tap balance that won't open doesn't hide what a free call says", async ({ page }) => {
+  await stubEvm(page);
+  await openTap(page);
+  await setUpTapBalance(page, /Ethereum wallet/);
+  await page.getByRole("button", { name: /^Account / }).click();
+  await page.getByRole("button", { name: "Disconnect" }).click();
+  await signWith(page, "22");
+  await connect(page, /Ethereum wallet/);
+  await cells(page).filter({ hasText: /^[1-9]\.\d×$/ }).first().click();
+  const status = page.getByRole("region", { name: "Tap grid" }).getByRole("status");
+  await expect(status).toHaveText("This wallet signed differently than last time, so it can't open the same Tap balance.");
+  await page.getByRole("radio", { name: /^Free call/ }).click();
+  await cells(page).filter({ hasText: /^[1-9]\.\d×$/ }).and(page.getByRole("button", { name: / · Tomorrow / })).first().click();
+  await expect(status).toHaveText(/^Called BTC (Up|Down) \$[\d,]+ at \d+\.\d×\.$/, { timeout: 10_000 });
 });
 
 test("a Tap balance the wallet can no longer open says why when selling back", async ({ page }) => {

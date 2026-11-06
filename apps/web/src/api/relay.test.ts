@@ -42,3 +42,13 @@ it("finalStatus keeps polling a settling trade, returns only a final status for 
     vi.useRealTimers();
   }
 });
+
+it("asks for an account's free calls and its standing at their own paths, and refuses a reply that isn't one", async () => {
+  const board = { round: "2026-11-05", today: [{ account_id: "a.near", rank: 1, points: 400, wins: 1, streak: 2 }], week: [], you: { today: null, week: null } };
+  const fetch = vi.fn(async (url: string) => new Response(JSON.stringify(url.includes("/leaderboard") ? board : [{ bad: true }])));
+  vi.stubGlobal("fetch", fetch);
+  const relay = httpRelay("http://relay.test");
+  await expect(relay.leaderboard("0xabc")).resolves.toEqual(board);
+  await expect(relay.calls("0xabc")).rejects.toBeInstanceOf(RelayError);
+  expect(fetch.mock.calls.map(([url]) => url)).toEqual(["http://relay.test/leaderboard/0xabc", "http://relay.test/calls/0xabc"]);
+});

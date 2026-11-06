@@ -1,7 +1,7 @@
-import { type ListedSeries, longPayout, termsOf } from "@endline/sdk";
+import { type ListedSeries, longPayout, type Series, termsOf } from "@endline/sdk";
 import { seriesTitle } from "./labels.ts";
 import { formatMultiple, formatPrice, formatUsd } from "./money.ts";
-import { formatUtc } from "./time.ts";
+import { formatUtc, formatUtcDay } from "./time.ts";
 
 export interface Card {
   title: string;
@@ -26,7 +26,7 @@ interface Total {
   costed: boolean;
 }
 
-const utcDay = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", timeZone: "UTC" });
+const finalAt = (series: Pick<Series, "expiry">, price: bigint, quoteDecimals: number) => `Final price ${formatPrice(price, quoteDecimals)} · ${formatUtcDay(series.expiry)} ${formatUtc(series.expiry)}`;
 
 export function bestWin(stakes: Stake[], price: bigint, quoteDecimals: number): Card | undefined {
   const bySeries = new Map<string, Total>();
@@ -42,6 +42,11 @@ export function bestWin(stakes: Stake[], price: bigint, quoteDecimals: number): 
   const result = `Won ${usd(best.payout)}`;
   const sold = best.received > 0n ? ` · sold ${usd(best.received)} back` : "";
   const detail = `Paid ${usd(best.paid, "up")}${sold} · ${formatMultiple(((best.payout + best.received) * 10n) / best.paid)}`;
-  const footer = `Final price ${formatPrice(price, quoteDecimals)} · ${utcDay.format(new Date(best.series.expiry * 1000))} ${formatUtc(best.series.expiry)}`;
-  return { title, result, detail, footer, text: `${title}: ${result} on Endline` };
+  return { title, result, detail, footer: finalAt(best.series, price, quoteDecimals), text: `${title}: ${result} on Endline` };
+}
+
+export function callCard(series: Omit<Series, "id">, multiple: bigint, points: number, price: bigint, quoteDecimals: number): Card {
+  const title = seriesTitle(series, quoteDecimals);
+  const result = `+${points} points`;
+  return { title, result, detail: `Free call at ${formatMultiple(multiple)}`, footer: finalAt(series, price, quoteDecimals), text: `${title}: ${result} on Endline` };
 }

@@ -1,6 +1,7 @@
 import { access, constants, mkdir } from "node:fs/promises";
 import { Auctions } from "./auction.ts";
 import { checkBid } from "./bid.ts";
+import { Calls } from "./calls.ts";
 import { Claims } from "./claims.ts";
 import { Collector } from "./collect.ts";
 import { loadConfig } from "./config.ts";
@@ -13,6 +14,7 @@ import { nearChain } from "./rpc.ts";
 import { createRelayServer } from "./server.ts";
 
 const CLAIMS_MS = 60_000;
+const SCORE_MS = 60_000;
 const FAUCET_TOKENS = 100n;
 
 const config = loadConfig(process.env);
@@ -47,6 +49,11 @@ if (config.FAUCET) {
 const submitClaims = () => void collector.submitClaims().catch(console.error).finally(() => setTimeout(submitClaims, CLAIMS_MS));
 submitClaims();
 
+const calls = new Calls(chain, relay.sessions, () => hub.marks.best(Date.now()), config.DATA_DIR);
+await calls.load();
+const scoreCalls = () => void calls.score().catch(console.error).finally(() => setTimeout(scoreCalls, SCORE_MS));
+scoreCalls();
+
 const oneClick = new OneClick(config.QUOTE_ASSET, config.ONECLICK_JWT);
 
-createRelayServer(relay, fills, hub, collector, oneClick, faucet, config.TRUST_PROXY, new Set(config.APP_ORIGINS)).listen(config.PORT, () => console.log(`relay listening on :${config.PORT}`));
+createRelayServer(relay, fills, hub, collector, oneClick, calls, faucet, config.TRUST_PROXY, new Set(config.APP_ORIGINS)).listen(config.PORT, () => console.log(`relay listening on :${config.PORT}`));

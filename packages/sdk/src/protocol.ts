@@ -119,6 +119,36 @@ export const Fill = z.object({
 });
 export type Fill = z.infer<typeof Fill>;
 
+export const CallRequest = z.object({ series_id: z.string().min(1).max(64), signer: Signer, session: SignedPayload });
+export type CallRequest = z.infer<typeof CallRequest>;
+
+export const Call = z.object({
+  series_id: z.string(),
+  account_id: z.string(),
+  terms: Series.omit({ id: true }),
+  ask: Amount,
+  at_ms: z.number().int(),
+  result: z.object({ price: Amount, points: z.number().int() }).optional(),
+});
+export type Call = z.infer<typeof Call>;
+
+export const Standing = z.object({
+  account_id: z.string(),
+  rank: z.number().int().min(1),
+  points: z.number().int(),
+  wins: z.number().int().min(0),
+  streak: z.number().int().min(0),
+});
+export type Standing = z.infer<typeof Standing>;
+
+export const Leaderboard = z.object({
+  round: z.string().nullable(),
+  today: z.array(Standing),
+  week: z.array(Standing),
+  you: z.object({ today: Standing.nullable(), week: Standing.nullable() }).optional(),
+});
+export type Leaderboard = z.infer<typeof Leaderboard>;
+
 // ask and bid: quote units per one terms.unit of option, before the MM's minimum premium
 export const Mark = z.object({
   series_id: z.string(),

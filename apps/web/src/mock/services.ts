@@ -1,4 +1,4 @@
-import { buyDiffs, type Fill, intentsAssetId, isListed, longPayout, MIN_RELAYED_PAYOUT_USD, payload, type Quote, readPayload, type Series, sellDiffs, type StatusUpdate, termsOf, tokenDiff, toSign } from "@endline/sdk";
+import { buyDiffs, type Call, callableAt, callPoints, type Fill, FREE_CALLS_PER_ROUND, intentsAssetId, isListed, longPayout, MIN_RELAYED_PAYOUT_USD, payload, type Quote, nextRound, readPayload, roundOf, type Series, sellDiffs, type Standing, type StatusUpdate, termsOf, tokenDiff, toSign } from "@endline/sdk";
 import { base58 } from "@scure/base";
 import type { Chain } from "../api/chain.ts";
 import type { Market } from "../api/market.ts";
@@ -16,6 +16,15 @@ const SIGN_MARGIN_MS = 3_000;
 const SETTLE_DELAY_MS = 1_200;
 const PROPOSE_AFTER_SEC = 120;
 const DISPUTE_SEC = 3_600;
+const FINAL_MARGIN_SEC = 60;
+const PLAYERS: [string, number, number, number][] = [
+  ["sun.near", 1_250, 4, 3],
+  ["kite.near", 980, 3, 1],
+  ["orbit.near", 640, 2, 2],
+  ["0x5a1fe0d2c36e3b6f4d2b1a9c8e7f6a5b4c3d2e1f", 410, 2, 0],
+  ["nova.near", 150, 1, 1],
+  ["pike.near", -100, 0, 0],
+];
 const DEPOSIT_STEP_MS = 4_000;
 const FAUCET_AMOUNT = 100_000_000n;
 
@@ -37,6 +46,7 @@ export function createMockServices(config: Config): Services {
   const issued = new Map<string, { quote: Quote; account: string; status: StatusUpdate }>();
   const deposits = new Map<string, { startedAt: number; amount: bigint; account: string; credited: boolean }>();
   const dripped = new Set<string>();
+  const called: Call[] = [];
   const option = (seriesId: string) => intentsAssetId(config.optionsId, seriesId);
   const markOf = (s: Series) => exampleMark(s, world.spot[s.underlying as Underlying], UNDERLYINGS[s.underlying as Underlying].vol, nowSec(), QUOTE_DECIMALS);
 
@@ -176,7 +186,60 @@ export function createMockServices(config: Config): Services {
       move(accountId, config.quoteAsset, FAUCET_AMOUNT);
       return txHash();
     },
+    async call({ series_id, signer }) {
+      await sleep(250);
+      const series = world.series.find((s) => s.id === series_id);
+      if (!series) throw new RelayError("unknown series", 404);
+      const callable = (s: Series) => quotable(s) && callableAt(s.expiry, nowSec());
+      if (!callable(series)) throw new RelayError("the final round has started: calls close when the averaging window opens", 409);
+      const round = roundOf(series.expiry);
+      if (round !== nextRound(world.series.filter(callable).map((s) => s.expiry))) throw new RelayError("free calls are open only for the next round", 409);
+      if ((wallet(signer.signer_id).get(config.quoteAsset) ?? 0n) < 10n ** BigInt(QUOTE_DECIMALS)) throw new RelayError("a free call needs at least $1 of USDC in this wallet's NEAR Intents balance (a Tap balance doesn't count): deposit first", 402);
+      const mine = called.filter((c) => c.account_id === signer.signer_id);
+      if (mine.some((c) => c.series_id === series_id)) throw new RelayError("you already called this cell", 409);
+      const mark = markOf(series);
+      if (!mark) throw new RelayError("no price for this cell right now", 503);
+      if (BigInt(mark.ask) >= BigInt(series.width)) throw new RelayError("this cell can't pay more than it costs", 409);
+      if (mine.filter((c) => roundOf(c.terms.expiry) === round).length >= FREE_CALLS_PER_ROUND) throw new RelayError(`you've used your ${FREE_CALLS_PER_ROUND} free calls for this round`, 429);
+      const { id, ...terms } = series;
+      const call = { series_id: id, account_id: signer.signer_id, terms, ask: mark.ask, at_ms: Date.now() };
+      called.push(call);
+      return call;
+    },
+    async calls(accountId) {
+      await score();
+      return called.filter((c) => c.account_id === accountId).sort((a, b) => b.at_ms - a.at_ms);
+    },
+    async leaderboard(accountId) {
+      await score();
+      const scored = called.filter((c) => c.result);
+      const round = scored.map((c) => roundOf(c.terms.expiry)).sort().at(-1) ?? roundOf(lastSettled());
+      const players = new Map(PLAYERS.map(([id, points, wins, streak]) => [id, { points, wins, streak }]));
+      for (const c of scored.filter((c) => roundOf(c.terms.expiry) === round)) {
+        const player = players.get(c.account_id) ?? { points: 0, wins: 0, streak: 0 };
+        player.points += c.result?.points ?? 0;
+        if ((c.result?.points ?? 0) > 0) player.wins += 1;
+        player.streak = player.wins > 0 ? Math.max(player.streak, 1) : 0;
+        players.set(c.account_id, player);
+      }
+      const standings: Standing[] = [...players]
+        .sort(([a, x], [b, y]) => y.points - x.points || y.wins - x.wins || (a < b ? -1 : 1))
+        .map(([account_id, p], i) => ({ account_id, rank: i + 1, ...p }));
+      const you = standings.find((s) => s.account_id === accountId) ?? null;
+      return { round, today: standings, week: standings, ...(accountId === undefined ? {} : { you: { today: you, week: you } }) };
+    },
   };
+
+  async function score() {
+    for (const call of called.filter((c) => !c.result && c.terms.expiry <= nowSec())) {
+      const settlement = await chain.settlement(call.terms.underlying, call.terms.expiry);
+      if (settlement && nowSec() >= settlement.finalAt + FINAL_MARGIN_SEC) call.result = { price: settlement.price.toString(), points: callPoints(termsOf(call.terms), BigInt(call.ask), settlement.price) };
+    }
+  }
+
+  function lastSettled() {
+    return Math.max(world.start, ...[...world.settlements.keys()].map((key) => Number(key.split(":")[1])));
+  }
 
   const chain: Chain = {
     contract: async () => ({

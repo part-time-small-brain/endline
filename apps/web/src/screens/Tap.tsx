@@ -1,3 +1,4 @@
+import { callableAt, callMultiple, FREE_CALLS_PER_ROUND, type ListedSeries, nextRound, roundOf, termsOf } from "@endline/sdk";
 import { useState } from "react";
 import { settlementKey } from "../app/data.tsx";
 import type { useTicket } from "../app/useTicket.ts";
@@ -6,22 +7,33 @@ import type { QuoteSelection } from "../components/QuoteSheet.tsx";
 import { Brackets } from "../components/Brackets.tsx";
 import { Button } from "../components/Button.tsx";
 import { Cell } from "../components/tap/Cell.tsx";
+import { FreeCalls } from "../components/tap/FreeCalls.tsx";
 import { RevealCell } from "../components/tap/RevealCell.tsx";
 import { RevealNote } from "../components/tap/RevealNote.tsx";
+import { TapMode } from "../components/tap/TapMode.tsx";
 import { TapSheet } from "../components/tap/TapSheet.tsx";
+import { useCalls } from "../hooks/useCalls.ts";
 import { useTaps } from "../hooks/useTaps.ts";
 import { PriceLine } from "../components/tap/PriceLine.tsx";
-import { AmountPicker } from "../components/trade/AmountPicker.tsx";
 import { AssetPicker } from "../components/trade/AssetPicker.tsx";
 import { MarketStats } from "../components/trade/MarketStats.tsx";
 import { buildGrid, type GridCell, rowOf } from "../lib/grid.ts";
 import { averageEstimate, closingOf, PHASE_TITLES } from "../lib/reveal.ts";
-import { maxLossOf } from "../lib/tap.ts";
 import { formatMultiple, formatPct, formatPrice, formatUsd, toNumber, toUnits } from "../lib/money.ts";
 import { seriesTitle } from "../lib/labels.ts";
 import { dayLabel, formatClock, formatUtc } from "../lib/time.ts";
 import { useWallet } from "../wallet/context.tsx";
 import { useTap, useTapPayer } from "../wallet/tapBalance.tsx";
+
+const FREE_KEY = "tap-free";
+
+function storedFree(): boolean {
+  try {
+    return localStorage.getItem(FREE_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
 
 interface Props {
   state: ReturnType<typeof useTicket>;
@@ -39,8 +51,17 @@ export function Tap({ state, nowSec, views, onConnect, onAddFunds, onQuote }: Pr
   const [sheet, setSheet] = useState(false);
   const { payer, error: unlockError } = useTapPayer();
   const taps = useTaps(tapBalance.accountId);
+  const calls = useCalls();
+  const [free, setFreeState] = useState(storedFree);
+  const setFree = (on: boolean) => {
+    setFreeState(on);
+    try {
+      localStorage.setItem(FREE_KEY, on ? "1" : "0");
+    } catch {}
+  };
   const onTap = async ({ series, ticket, multiple }: GridCell) => {
     if (!wallet) return onConnect();
+    if (free) return calls.call(series);
     if (tapBalance.accountId === undefined) {
       if (data.balance !== undefined && data.balance < ticket.cost) return onAddFunds();
       return onQuote({ wallet, series, side: "buy", size: ticket.size, budget });
@@ -55,18 +76,26 @@ export function Tap({ state, nowSec, views, onConnect, onAddFunds, onQuote }: Pr
   };
   const yours = views?.filter((v) => v.series.underlying === symbol) ?? [];
   const here = data.listing?.series.filter((s) => s.underlying === symbol) ?? [];
+  const callable = (s: ListedSeries) => s.quotable && callableAt(s.expiry, nowSec);
+  const callRound = nextRound((data.listing?.series ?? []).filter(callable).map((s) => s.expiry));
+  const callableHere = (s: ListedSeries) => callable(s) && roundOf(s.expiry) === callRound;
+  const left = FREE_CALLS_PER_ROUND - (data.calls ?? []).filter((c) => roundOf(c.terms.expiry) === callRound).length;
+  const calledHere = new Map((data.calls ?? []).filter((c) => c.terms.underlying === symbol).map((c) => [c.series_id, c]));
   const settlementOf = (expiry: number) => data.settlements[settlementKey({ underlying: symbol, expiry })] ?? null;
-  const closing = closingOf(here.map((s) => s.expiry), yours.map((v) => v.series.expiry), settlementOf, nowSec);
+  const closing = closingOf(here.map((s) => s.expiry), [...yours.map((v) => v.series.expiry), ...[...calledHere.values()].map((c) => c.terms.expiry)], settlementOf, nowSec);
   const stakes = closing ? yours.filter((v) => v.series.expiry === closing.expiry) : [];
+  const closingCalls = [...calledHere.values()].filter((c) => c.terms.expiry === closing?.expiry);
   const average = closing && spotNumber !== undefined ? averageEstimate(data.minutes?.[symbol] ?? [], closing.expiry, nowSec * 1000, spotNumber) : undefined;
   const closingPrice = closing?.settlement?.price ?? (average === undefined ? undefined : toUnits(average, quoteDecimals));
   const active = yours.filter((v) => v.status === "active");
   const mine = active.filter((v) => v.tap);
   const kept = yours.filter((v) => v.status === "active" || v.series.expiry === closing?.expiry);
-  const held = new Set(kept.map((v) => v.series.id));
+  const owned = new Set(kept.map((v) => v.series.id));
+  const called = here.filter((s) => calledHere.has(s.id) && (s.expiry === closing?.expiry || callableAt(s.expiry, nowSec)));
+  const held = new Set([...owned, ...called.map((s) => s.id)]);
   const open = priced.filter((s) => s.underlying === symbol && s.expiry !== closing?.expiry && !held.has(s.id));
-  const rowsElsewhere = new Set([...open, ...kept.map((v) => v.series)].map((s) => s.strike));
-  const listed = [...open, ...here.filter((s) => s.expiry === closing?.expiry && !held.has(s.id) && rowsElsewhere.has(s.strike)), ...kept.map((v) => v.series)];
+  const rowsElsewhere = new Set([...open, ...kept.map((v) => v.series), ...called].map((s) => s.strike));
+  const listed = [...open, ...here.filter((s) => s.expiry === closing?.expiry && !held.has(s.id) && rowsElsewhere.has(s.strike)), ...kept.map((v) => v.series), ...called];
   const grid = spot === undefined ? undefined : buildGrid(listed, spot, budget, data.marks, held, (expiry) => (expiry === closing?.expiry ? (closingPrice ?? spot) : spot));
   const closingColumn = closing && grid ? grid.expiries.indexOf(closing.expiry) : -1;
   const staked = (seriesId: string) => stakes.filter((v) => v.series.id === seriesId).reduce((total, v) => total + v.amount, 0n);
@@ -77,11 +106,18 @@ export function Tap({ state, nowSec, views, onConnect, onAddFunds, onQuote }: Pr
     const up = cell.series.kind === "call";
     return `${up ? "Up" : "Down"} · ${symbol} ends ${up ? "above" : "below"} ${formatPrice(strike, quoteDecimals)}`;
   };
+  const freeMultiple = (cell: GridCell) => {
+    const ask = calledHere.get(cell.series.id)?.ask ?? data.marks?.[cell.series.id]?.ask;
+    return ask === undefined ? undefined : callMultiple(termsOf(cell.series), BigInt(ask));
+  };
+  const shownMultiple = (cell: GridCell) => (free ? freeMultiple(cell) : cell.multiple);
   const label = (cell: GridCell, strike: bigint, expiry: number, own: Holding | undefined) => {
-    const pays = cell.multiple === undefined ? "no price right now" : `pays up to ${formatMultiple(cell.multiple)}`;
+    const multiple = shownMultiple(cell);
+    const pays = multiple === undefined ? "no price right now" : `pays up to ${formatMultiple(multiple)}`;
     const worth = own?.value === undefined ? "" : ` · worth ${formatUsd(own.value, quoteDecimals)}`;
     const pnl = own?.pnl === undefined ? "" : own.pnl > 0n ? ` · up ${formatUsd(own.pnl, quoteDecimals)}` : own.pnl < 0n ? ` · down ${formatUsd(-own.pnl, quoteDecimals)}` : " · even";
-    return `${where(cell, strike)} · ${dayLabel(expiry, nowSec)} ${formatClock(expiry)} · ${pays}${worth}${pnl}${cell.winning ? " · winning now" : ""}${cell.held ? " · you hold this" : ""}`;
+    const yoursHere = owned.has(cell.series.id) ? " · you hold this" : calledHere.has(cell.series.id) ? " · you called this" : "";
+    return `${where(cell, strike)} · ${dayLabel(expiry, nowSec)} ${formatClock(expiry)} · ${pays}${worth}${pnl}${cell.winning ? " · winning now" : ""}${yoursHere}`;
   };
 
   return (
@@ -98,7 +134,9 @@ export function Tap({ state, nowSec, views, onConnect, onAddFunds, onQuote }: Pr
         {grid && rows > 0 && spot !== undefined && spotNumber !== undefined ? (
           <div className="relative [--axis:4.25rem] [--line:2.5rem] [--row:3.5rem] sm:[--axis:5rem] sm:[--line:30%] sm:[--row:4rem]">
             <table className="w-full table-fixed border-collapse">
-              <caption className="sr-only">Tap a cell to buy it. Up pays if {symbol} ends above the row's price, Down if it ends below.</caption>
+              <caption className="sr-only">
+                {free ? "Tap a cell of the next round to call it for free." : "Tap a cell to buy it."} Up pays if {symbol} ends above the row's price, Down if it ends below.
+              </caption>
               <colgroup>
                 <col className="w-[var(--axis)]" />
                 <col className="w-[var(--line)]" />
@@ -136,15 +174,24 @@ export function Tap({ state, nowSec, views, onConnect, onAddFunds, onQuote }: Pr
                       if (closing && expiry === closing.expiry) {
                         return (
                           <td key={cell?.series.id ?? expiry} className="h-[var(--row)] p-0.5">
-                            {cell?.held ? (
-                              <RevealCell series={cell.series} phase={closing.phase} price={closingPrice} amount={staked(cell.series.id)} where={where(cell, strike)} quoteDecimals={quoteDecimals} />
+                            {cell && (owned.has(cell.series.id) || calledHere.has(cell.series.id)) ? (
+                              <RevealCell
+                                series={cell.series}
+                                phase={closing.phase}
+                                price={closingPrice}
+                                amount={staked(cell.series.id)}
+                                call={owned.has(cell.series.id) ? undefined : calledHere.get(cell.series.id)}
+                                where={where(cell, strike)}
+                                quoteDecimals={quoteDecimals}
+                              />
                             ) : (
                               <span className="block size-full rounded-md border border-rule/40" aria-hidden="true" />
                             )}
                           </td>
                         );
                       }
-                      const own = cell?.held ? holding(active, cell.series.id) : undefined;
+                      const own = cell && owned.has(cell.series.id) ? holding(active, cell.series.id) : undefined;
+                      const multiple = cell && shownMultiple(cell);
                       return (
                         <td key={cell?.series.id ?? expiry} className="h-[var(--row)] p-0.5">
                           <Cell
@@ -152,7 +199,10 @@ export function Tap({ state, nowSec, views, onConnect, onAddFunds, onQuote }: Pr
                             label={cell ? label(cell, strike, expiry, own) : ""}
                             value={formatMoney(own?.value)}
                             change={own?.change}
-                            state={cell && taps.states[cell.series.id]}
+                            called={cell !== undefined && calledHere.has(cell.series.id) && !own}
+                            pays={multiple === undefined ? undefined : formatMultiple(multiple)}
+                            blocked={free && (cell === undefined || !callableHere(cell.series) || calledHere.has(cell.series.id) || calls.states[cell.series.id]?.status === "busy")}
+                            state={cell && (free ? calls.states : taps.states)[cell.series.id]}
                             onTap={onTap}
                           />
                         </td>
@@ -184,9 +234,9 @@ export function Tap({ state, nowSec, views, onConnect, onAddFunds, onQuote }: Pr
             {spot !== undefined && !loading ? "No prices right now" : empty}
           </p>
         )}
-        {closing && <RevealNote closing={closing} price={closingPrice} stakes={stakes} quoteDecimals={quoteDecimals} />}
-        <p role="status" className={`min-h-5 px-1 pt-2 text-sm ${unlockError || taps.notice?.failed ? "text-danger" : "text-ink-2"}`}>
-          {unlockError ?? taps.notice?.text}
+        {closing && <RevealNote closing={closing} price={closingPrice} stakes={stakes} calls={closingCalls} quoteDecimals={quoteDecimals} />}
+        <p role="status" className={`min-h-5 px-1 pt-2 text-sm ${(free ? calls.notice?.failed : unlockError || taps.notice?.failed) ? "text-danger" : "text-ink-2"}`}>
+          {free ? calls.notice?.text : (unlockError ?? taps.notice?.text)}
         </p>
       </section>
 
@@ -219,12 +269,8 @@ export function Tap({ state, nowSec, views, onConnect, onAddFunds, onQuote }: Pr
         </section>
       )}
 
-      <div className="flex flex-col gap-2 rounded-md border border-rule bg-surface p-4 sm:p-6">
-        <AmountPicker value={budget} quoteDecimals={quoteDecimals} onChange={setBudget} />
-        <p className="text-sm text-ink-2">
-          Each tap buys one option for about {formatUsd(budget, quoteDecimals).replace(/\.00$/, "")}. Max loss {formatUsd(maxLossOf(budget), quoteDecimals, "up")} a tap.
-        </p>
-      </div>
+      <TapMode free={free} left={left} budget={budget} quoteDecimals={quoteDecimals} onFree={setFree} onBudget={setBudget} />
+      {free && <FreeCalls calls={data.calls ?? []} accountId={wallet?.accountId} nowSec={nowSec} quoteDecimals={quoteDecimals} />}
       <p className="pb-6 text-center font-mono text-[10px] font-medium tracking-[0.14em] text-ink-3 uppercase">Signed in your browser · settled on NEAR Intents</p>
     </div>
   );

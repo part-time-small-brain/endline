@@ -7,7 +7,7 @@ import { HttpError } from "./relay.ts";
 import { type Chain, ranByNonce, Rejected } from "./rpc.ts";
 
 // block time can trail our clock, and an exercise before final_at burns the signer's nonce
-const FINAL_MARGIN_SEC = 60;
+export const FINAL_MARGIN_SEC = 60;
 const MAX_CLAIMS = 1_000;
 const MAX_DEADLINE_MS = 10 * 60_000;
 // intents rechecks the deadline on-chain, and near-api-js retries a send for up to ~85 s: a payload that expires first burns our gas

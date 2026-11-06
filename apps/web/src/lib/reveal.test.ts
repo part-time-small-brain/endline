@@ -1,7 +1,7 @@
 import type { ListedSeries } from "@endline/sdk";
 import { describe, expect, it } from "vitest";
 import type { PricePoint } from "../api/market.ts";
-import { averageEstimate, closingOf, phaseOf, revealSays, verdictOf } from "./reveal.ts";
+import { averageEstimate, callVerdict, closingOf, phaseOf, revealSays, verdictOf } from "./reveal.ts";
 
 const E = 1_800_028_800;
 const USD = 1_000_000n;
@@ -86,5 +86,14 @@ describe("closingOf", () => {
     expect(closingOf([next, E, E], [E], none, E + 60)).toEqual({ expiry: E, phase: "awaiting_price", settlement: null });
     expect(closingOf([E, next], [E, next], () => final, E + 600)).toEqual({ expiry: E, phase: "final", settlement: final });
     expect(closingOf([E, next], [E, next], none, E - 1_801)).toBeUndefined();
+  });
+});
+
+describe("free calls in the reveal", () => {
+  it("are a win only above their stake, and too close near the price to beat until the price is known", () => {
+    expect(callVerdict(series("call"), "close_only", 81_500n * USD, 25)).toBe("win");
+    expect(callVerdict(series("call"), "close_only", 81_500n * USD, -50)).toBe("lose");
+    expect(callVerdict(series("call"), "awaiting_price", 81_050n * USD, -88)).toBe("close");
+    expect(callVerdict(series("call"), "final", 81_050n * USD, -88)).toBe("lose");
   });
 });

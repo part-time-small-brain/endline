@@ -72,13 +72,13 @@ interface RelayDeps {
   mms: MarketMakers;
 }
 
-const listed = (series: Series, contract: ContractConfig) => isListed(series, contract.quote_decimals);
-const open = (series: Series, contract: ContractConfig) => Date.now() < (series.expiry - contract.timing.write_cutoff_sec) * 1000;
+export const listed = (series: Series, contract: ContractConfig) => isListed(series, contract.quote_decimals);
+export const open = (series: Series, contract: ContractConfig) => Date.now() < (series.expiry - contract.timing.write_cutoff_sec) * 1000;
 
 export class Relay {
   private issued = new Map<string, Issued>();
   private quoting: Hold[] = [];
-  private sessions: Sessions;
+  readonly sessions: Sessions;
   private signerQuotes = rateLimit(QUOTES_PER_SIGNER, QUOTE_WINDOW_MS);
 
   constructor(private deps: RelayDeps) {

@@ -27,6 +27,10 @@ It can't become final until the 1 h dispute window ends, and the owner can overr
 
 The app estimates the average from Deribit's index, minute by minute, filling the minutes still to come with today's price. The real final price is the median of 7 exchanges' averages ([Settlement](./settlement.mdx#the-final-price)), so the two can differ a little. Within 0.1% of the price to beat it says "too close to call".
 
+## What are free calls?
+
+Free calls in Tap move no money, but you need $1 of USDC in your balance to play (the Tap balance doesn't count); none of it is spent. You call up to 10 cells of the next round, one each: the next 08:00 UTC end, open until its final price starts being averaged 30 minutes before. A call stakes 100 points at the cell's multiple, up to 25×, and scores at the final price: at or past the cap a 5× call pays back 500, so +400; between the price to beat and the cap it pays back part of that and can still lose points; short of the price to beat it's −100. A call wins only if it scores above 0, and a streak is the number of rounds in a row with a win. Points only, no prizes. The leaderboard shows NEAR Intents account ids, which are public. A NEAR account needs its one-time Enable first, as for buying.
+
 ## Can I sell before the end?
 
 Yes, with Sell back, until 30 minutes before the end, at a price of at least $1.

@@ -28,12 +28,12 @@ test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem("trade-mode", "pro"));
 });
 
-async function live(page: Page, marks: () => unknown[] | undefined | "hang", index = () => 80_650) {
+async function live(page: Page, marks: () => unknown[] | undefined | "hang", index = () => 80_650, series = listed) {
   await page.route("**/rpc", (route) => {
     const value = view[route.request().postDataJSON().params.method_name];
     route.fulfill({ json: { jsonrpc: "2.0", id: "web", ...(value === undefined ? { error: { message: "unknown" } } : { result: { result: [...Buffer.from(JSON.stringify(value))] } }) } });
   });
-  await page.route("**/series", (route) => route.fulfill({ json: { quote_asset: "nep141:usdc.demo.testnet", quote_decimals: 6, series: listed } }));
+  await page.route("**/series", (route) => route.fulfill({ json: { quote_asset: "nep141:usdc.demo.testnet", quote_decimals: 6, series } }));
   await page.route("**/marks", (route) => {
     const answer = marks();
     if (answer !== "hang") route.fulfill({ json: answer ?? { error: "no market makers" } });
@@ -810,6 +810,149 @@ test.describe("Tap", () => {
     await expect(page.getByRole("table").getByRole("group", { name: /· result · lost · you hold this$/ })).toBeVisible();
     await expect(page.getByText("Final price $80,000.", { exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: "Share" })).toHaveCount(0);
+  });
+
+  async function freeCalls(page: Page, series = listed, calls: unknown[] = []) {
+    const account = "0x1111111111111111111111111111111111111111";
+    const relay = { calls, posted: [] as { series_id: string; signer: unknown }[], hold: Promise.resolve() };
+    const board = {
+      round: "2026-11-04",
+      today: [
+        { account_id: "sun.near", rank: 1, points: 1_250, wins: 4, streak: 3 },
+        { account_id: "kite.near", rank: 2, points: 980, wins: 3, streak: 1 },
+      ],
+      week: [{ account_id: "sun.near", rank: 1, points: 3_100, wins: 9, streak: 3 }],
+      you: { today: { account_id: account, rank: 7, points: 150, wins: 1, streak: 2 }, week: null },
+    };
+    await page.addInitScript(() => {
+      localStorage.setItem("tap-free", "1");
+      const w = window as unknown as { ethereum: object; signs: number; refuseCalls?: { status: number; error: string } };
+      w.signs = 0;
+      const fetch = window.fetch.bind(window);
+      window.fetch = (input, init) => (String(input).endsWith("/calls") && w.refuseCalls ? Promise.resolve(new Response(JSON.stringify({ error: w.refuseCalls.error }), { status: w.refuseCalls.status })) : fetch(input, init));
+      w.ethereum = {
+        async request({ method }: { method: string }) {
+          if (method === "eth_requestAccounts") return ["0x1111111111111111111111111111111111111111"];
+          if (method !== "personal_sign") throw new Error(method);
+          w.signs++;
+          return `0x${"11".repeat(64)}1b`;
+        },
+      };
+    });
+    await page.route("**/calls", async (route) => {
+      const body = route.request().postDataJSON() as { series_id: string; signer: unknown };
+      relay.posted.push(body);
+      await relay.hold;
+      const { id, option_asset, quotable, ...terms } = series.find((s) => s.id === body.series_id)!;
+      const call = { series_id: id, account_id: account, terms, ask: String(400 * USD), at_ms: NOW_MS };
+      relay.calls.unshift(call);
+      await route.fulfill({ json: call });
+    });
+    await page.route("**/calls/*", (route) => route.fulfill({ json: relay.calls }));
+    await page.route("**/leaderboard/*", (route) => route.fulfill({ json: board }));
+    await page.route("**/fills/*", (route) => route.fulfill({ json: [] }));
+    await live(page, () => [
+      { series_id: "BTC-5NOV26-81000_83000-C", ask: String(400 * USD), vol: 0.4 },
+      { series_id: "BTC-5NOV26-82000_84000-C", ask: String(18_721), vol: 0.4 },
+      { series_id: "BTC-6NOV26-82000_84000-C", ask: String(400 * USD), vol: 0.4 },
+    ], undefined, series);
+    await page.route("**/rpc", (route) => {
+      const params = route.request().postDataJSON().params;
+      const args = JSON.parse(Buffer.from(params.args_base64, "base64").toString());
+      const value = params.method_name === "current_salt" ? "00000000" : params.method_name === "mt_batch_balance_of" ? args.token_ids.map(() => "0") : view[params.method_name];
+      route.fulfill({ json: { jsonrpc: "2.0", id: "web", ...(value === undefined ? { error: { message: "unknown" } } : { result: { result: [...Buffer.from(JSON.stringify(value))] } }) } });
+    });
+    await page.getByRole("button", { name: "Connect", exact: true }).click();
+    await page.getByRole("button", { name: /Ethereum wallet/ }).click();
+    const signs = () => page.evaluate(() => (window as unknown as { signs: number }).signs);
+    return { relay, board, signs };
+  }
+
+  test("a free call records the cell, counts down the round, refuses what the relay refuses, shows the board and keeps the sign-in across a reload", async ({ page }) => {
+    const { relay, signs } = await freeCalls(page);
+    const grid = page.getByRole("table");
+    await expect(page.getByRole("radio", { name: /^Free call/ })).toHaveAttribute("aria-checked", "true");
+    await expect(grid).toHaveAccessibleName(/^Tap a cell of the next round to call it for free\. /);
+    await expect(grid.getByRole("button", { name: /^Up · BTC ends above \$82,000 · Tomorrow .* · pays up to 25\.0×$/ })).toBeVisible();
+    await expect(grid.getByRole("button", { name: /^Up · BTC ends above \$82,000 · Fri 6 / })).toBeDisabled();
+    await grid.getByRole("button", { name: /^Up · BTC ends above \$81,000 · Tomorrow / }).click();
+    await expect(page.getByRole("status").filter({ hasText: "Called BTC Up $81,000 at 5.0×." })).toBeVisible();
+    expect(relay.posted).toEqual([expect.objectContaining({ series_id: "BTC-5NOV26-81000_83000-C", signer: { standard: "erc191", signer_id: "0x1111111111111111111111111111111111111111" } })]);
+    expect(await signs()).toBe(1);
+    const called = grid.getByRole("button", { name: /^Up · BTC ends above \$81,000 · Tomorrow .* · pays up to 5\.0× · you called this$/ });
+    await expect(called).toHaveText("Called5.0×");
+    await expect(called).toBeDisabled();
+    await expect(page.getByRole("radio", { name: /^Free call/ })).toContainText("9 of 10 left this round");
+    const board = page.getByRole("region", { name: "Free calls" });
+    await expect(board.getByRole("list", { name: "Round 4 Nov" }).getByRole("listitem")).toHaveText([/^1\. sun\.near\s*\+1250\s*3-day streak$/, /^2\. kite\.near\s*\+980$/, /^7\. 0x1111…1111\s*\+150\s*2-day streak$/]);
+    await page.evaluate(() => Object.assign(window, { refuseCalls: { status: 429, error: "you've used your 10 free calls for this round" } }));
+    await grid.getByRole("button", { name: /^Up · BTC ends above \$82,000 · Tomorrow / }).click();
+    await expect(page.getByRole("status").filter({ hasText: "You've used your 10 free calls for this round." })).toBeVisible();
+    await page.reload();
+    await page.getByRole("button", { name: "Connect", exact: true }).click();
+    await page.getByRole("button", { name: /Ethereum wallet/ }).click();
+    await page.getByRole("table").getByRole("button", { name: /^Up · BTC ends above \$82,000 · Tomorrow / }).click();
+    await expect(page.getByRole("status").filter({ hasText: /^Called BTC Up \$82,000 at 5\.0×\.$/ })).toBeVisible();
+    expect(await signs()).toBe(0);
+    await page.getByRole("radio", { name: /^Buy/ }).click();
+    await expect(page.getByRole("table").getByRole("button", { name: /^Up · BTC ends above \$82,000 · Tomorrow .* · pays up to 106831\.9× · you called this$/ })).toBeEnabled();
+  });
+
+  test("a call still in flight when the wallet changes reports nothing to the next wallet, which signs in afresh", async ({ page }) => {
+    const { relay, signs } = await freeCalls(page);
+    let release = () => {};
+    relay.hold = new Promise((resolve) => (release = resolve));
+    const grid = page.getByRole("table");
+    await grid.getByRole("button", { name: /^Up · BTC ends above \$81,000 · Tomorrow / }).click();
+    await expect(grid.locator("[aria-busy=true]")).toHaveCount(1);
+    await page.getByRole("button", { name: /^Account / }).click();
+    await page.getByRole("button", { name: "Disconnect" }).click();
+    await page.getByRole("button", { name: "Connect", exact: true }).click();
+    await page.getByRole("button", { name: /Ethereum wallet/ }).click();
+    await expect(grid.locator("[aria-busy=true]")).toHaveCount(0);
+    release();
+    await expect(grid.getByRole("button", { name: /^Up · BTC ends above \$81,000 · Tomorrow .* · you called this$/ })).toBeVisible();
+    await expect(page.getByRole("status").filter({ hasText: /^Called / })).toHaveCount(0);
+    await page.evaluate(() => Object.assign(window, { refuseCalls: { status: 401, error: "session refused: deadline out of range" } }));
+    await grid.getByRole("button", { name: /^Up · BTC ends above \$82,000 · Tomorrow / }).click();
+    await expect(page.getByRole("status").filter({ hasText: "Your wallet couldn't sign in. Tap again to sign in again." })).toBeVisible();
+    expect(await signs()).toBe(2);
+    await page.evaluate(() => Object.assign(window, { refuseCalls: undefined }));
+    await grid.getByRole("button", { name: /^Up · BTC ends above \$82,000 · Tomorrow / }).click();
+    await expect(page.getByRole("status").filter({ hasText: "Called BTC Up $82,000 at 5.0×." })).toBeVisible();
+    expect(await signs()).toBe(3);
+  });
+
+  test("a call on an end that's over drops off the grid even while its UTC day is still the next round", async ({ page }) => {
+    const short = { ...listed.find((s) => s.id === "BTC-5NOV26-81000_83000-C")!, id: "BTC-5NOV26T0400-81000_83000-C", expiry: Date.UTC(2026, 10, 5, 4) / 1000 };
+    const { option_asset, quotable, ...terms } = short;
+    await freeCalls(page, [...listed, short], [{ series_id: short.id, account_id: "0x1111111111111111111111111111111111111111", terms, ask: String(400 * USD), at_ms: NOW_MS }]);
+    const grid = page.getByRole("table");
+    await expect(grid.getByRole("button", { name: /you called this$/ })).toHaveCount(1);
+    await page.clock.fastForward(Date.UTC(2026, 10, 5, 7, 5) - NOW_MS);
+    await expect(grid.getByRole("button", { name: /^Up · BTC ends above \$82,000 · Today .* · pays up to 25\.0×$/ })).toBeEnabled();
+    await expect(grid.getByRole("button", { name: /you called this$/ })).toHaveCount(0);
+    await expect(grid.getByRole("group")).toHaveCount(0);
+  });
+
+  test("a free call that won shows its points in the result and shares a points card", async ({ page }) => {
+    const { relay } = await freeCalls(page);
+    await page.getByRole("table").getByRole("button", { name: /^Up · BTC ends above \$81,000 · Tomorrow / }).click();
+    await expect(page.getByRole("status").filter({ hasText: /^Called / })).toBeVisible();
+    expect(relay.calls).toHaveLength(1);
+    const expiry = Date.UTC(2026, 10, 5, 8) / 1000;
+    view.get_settlement = { price: String(83_000 * USD), final_at: expiry + 3_900 };
+    try {
+      await page.clock.fastForward((expiry + 3_900) * 1000 - (await page.evaluate(() => Date.now())));
+      await expect(page.getByRole("table").getByRole("group", { name: /^Up · BTC ends above \$81,000 · result · free call · \+400 pts$/ })).toBeVisible();
+      await expect(page.getByText(/Your BTC free calls: \+400 points\.$/)).toBeVisible();
+      await page.evaluate(() => Object.assign(navigator, { canShare: undefined }));
+      const download = page.waitForEvent("download");
+      await page.getByRole("button", { name: "Share" }).click();
+      expect((await download).suggestedFilename()).toBe("endline-win.png");
+    } finally {
+      delete view.get_settlement;
+    }
   });
 
   test("drops every cell once the relay's marks fail", async ({ page }) => {

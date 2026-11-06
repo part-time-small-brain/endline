@@ -49,6 +49,19 @@ export function verdictOf(series: ListedSeries, phase: Phase, price: bigint): Ve
   return winningAt(series, price) ? "win" : "lose";
 }
 
+export function callVerdict(series: ListedSeries, phase: Phase, price: bigint, points: number): Verdict {
+  if (verdictOf(series, phase, price) === "close") return "close";
+  return points > 0 ? "win" : "lose";
+}
+
+export function pointsSays(phase: Phase, verdict: Verdict, points: string): string {
+  if (verdict === "close") return "too close to call";
+  if (phase === "close_only") return `on track for ${points}`;
+  if (phase === "awaiting_price") return `looks like ${points}`;
+  if (phase === "proposed") return `${points} if the proposed price stands`;
+  return points;
+}
+
 export function revealSays(phase: Phase, verdict: Verdict, usd: string): string {
   if (verdict === "close") return "too close to call";
   const pays = verdict === "win";
