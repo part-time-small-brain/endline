@@ -59,10 +59,12 @@ export async function ranTx(chain: Chain, signed: SignedPayload, error: unknown,
   for (;;) {
     try {
       const past = (await chain.finalTimeMs()) > final;
-      const statuses = await Promise.all(txHashes.map((txHash) => chain.txStatus(txHash)));
-      const ran = txHashes.find((_, i) => statuses[i] === "succeeded");
+      const statuses = await Promise.allSettled(txHashes.map((txHash) => chain.txStatus(txHash)));
+      const ran = txHashes.find((_, i) => statuses[i]?.status === "fulfilled" && statuses[i].value === "succeeded");
       if (ran !== undefined) return ran;
-      if (past || statuses.every((status) => status === "failed")) return undefined;
+      const unread = statuses.find((status) => status.status === "rejected");
+      if (unread) throw unread.reason;
+      if (past || statuses.every((status) => status.status === "fulfilled" && status.value === "failed")) return undefined;
     } catch (readError) {
       if (!logged) console.error("can't read the relayer's transactions yet, still settling", label, readError);
       logged = true;
@@ -168,11 +170,11 @@ export function nearChain(config: Config): NearChain {
       }
     },
     txStatus: async (txHash) => {
-      const outcome = await provider.viewTransactionStatus({ txHash, accountId: config.RELAYER_ACCOUNT_ID, waitUntil: "FINAL" }).catch((error: unknown) => {
+      const outcome = await provider.viewTransactionStatus({ txHash, accountId: config.RELAYER_ACCOUNT_ID, waitUntil: "NONE" }).catch((error: unknown) => {
         if (error instanceof UnknownTransactionError) return undefined;
         throw error;
       });
-      if (typeof outcome?.status !== "object") return "unknown";
+      if (outcome?.final_execution_status !== "FINAL" || typeof outcome.status !== "object") return "unknown";
       return "Failure" in outcome.status ? "failed" : "succeeded";
     },
     finalTimeMs: async () => Number(BigInt((await provider.viewBlock({ finality: "final" })).header.timestamp_nanosec) / 1_000_000n),

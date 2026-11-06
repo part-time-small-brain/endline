@@ -9,7 +9,7 @@ import { type Chain, ranTx, Rejected } from "./rpc.ts";
 // block time can trail our clock, and an exercise before final_at burns the signer's nonce
 export const FINAL_MARGIN_SEC = 60;
 const MAX_CLAIMS = 1_000;
-const MAX_CLAIMS_PER_ACCOUNT = 20;
+const MAX_CLAIMS_PER_ACCOUNT = 100;
 const MAX_DEADLINE_MS = 10 * 60_000;
 // intents rechecks the deadline on-chain, and near-api-js retries a send for up to ~85 s: a payload that expires first burns our gas
 const MIN_DEADLINE_MS = 2 * 60_000;
@@ -113,10 +113,11 @@ export class Collector {
     const stored = this.claims.all().filter((claim) => !isDeepStrictEqual(claim, signed));
     const open = [...this.claiming, ...stored.flatMap((claim) => readExercise(claim, this.config) ?? [])];
     if (open.length >= MAX_CLAIMS) throw new HttpError(503, "the claim queue is full");
-    if (open.filter((other) => other.signerId === exercise.signerId).length >= MAX_CLAIMS_PER_ACCOUNT) throw new HttpError(409, "an account can have at most 20 open claims");
+    if (open.filter((other) => other.signerId === exercise.signerId).length >= MAX_CLAIMS_PER_ACCOUNT) throw new HttpError(409, `an account can have at most ${MAX_CLAIMS_PER_ACCOUNT} open claims`);
     this.claiming.push(exercise);
     let saved: Promise<void>;
     try {
+      await this.simulate(signed);
       const legs = await this.legs(exercise);
       const maxTotal = legs.reduce((sum, { series, amount }) => sum + maxPayout(termsOf(series), amount), 0n);
       if (maxTotal < (await this.minPayout())) throw new HttpError(400, "auto-collect needs a max payout of at least $1");
@@ -129,7 +130,6 @@ export class Collector {
         if (mine.length >= buys) throw new HttpError(409, "one auto-collect per buy");
         if (claimed > (await this.chain.balanceOf(exercise.signerId, asset))) throw new HttpError(409, "open claims exceed the options held");
       }
-      await this.simulate(signed);
       saved = this.claims.add(signed);
     } finally {
       this.claiming.splice(this.claiming.indexOf(exercise), 1);

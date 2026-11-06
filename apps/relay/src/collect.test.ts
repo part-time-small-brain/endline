@@ -503,10 +503,10 @@ describe("auto-collect claims", () => {
   });
 
   it("caps open claims per signer, so one account can't fill the queue, also under concurrent posts", async () => {
-    const { collector, claims } = setup({ byAccount: (account: string) => Array.from({ length: 50 }, () => fill(account, "buy", 10n ** 17n)) });
-    const results = await Promise.allSettled(Array.from({ length: 25 }, () => collector.claim(claimed([exercise]))));
-    expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(20);
-    expect(claims.all()).toHaveLength(20);
+    const { collector, claims } = setup({ byAccount: (account: string) => Array.from({ length: 150 }, () => fill(account, "buy", 10n ** 17n)) });
+    const results = await Promise.allSettled(Array.from({ length: 110 }, () => collector.claim(claimed([exercise]))));
+    expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(100);
+    expect(claims.all()).toHaveLength(100);
     expect(await httpStatus(collector.claim(claimed([exercise])))).toBe(409);
     await expect(collector.claim(claimed([exercise], { signer: "bob.test" }))).resolves.toBeUndefined();
   });

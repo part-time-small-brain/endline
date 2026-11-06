@@ -29,7 +29,7 @@ export class Fills {
   }
 
   byAccount(accountId: string): Fill[] {
-    return [...(this.accounts.get(accountId) ?? [])];
+    return this.accounts.get(accountId) ?? [];
   }
 
   private remember(fill: Fill): void {

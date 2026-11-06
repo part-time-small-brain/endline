@@ -15,7 +15,7 @@ const MAX_BODY_BYTES = 64 * 1024;
 const LIMITED = new Set(["POST /quote", "POST /execute", "POST /transfer", "POST /claims", "POST /calls", "POST /faucet", "POST /deposit-quote"]);
 const APP_ONLY = new Set(["/faucet", "/deposit-quote"]);
 const MAX_REQUESTS_PER_MINUTE = 30;
-const MAX_FILL_READS_PER_MINUTE = 60;
+const MAX_FILL_READS_PER_MINUTE = 600;
 const FaucetRequest = z.object({ account_id: AccountId });
 const SITE_IPV6_GROUPS = 3;
 

@@ -4,7 +4,8 @@ import { Account, baseEncode, JsonRpcProvider, KeyPair } from "near-api-js";
 import { InvalidNonceError, TransactionTimeoutError, UnknownTransactionError } from "near-api-js/rpc-errors";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { loadConfig } from "./config.ts";
-import { nearChain, Refunded, Unsettled } from "./rpc.ts";
+import { type Chain, nearChain, ranTx, Refunded, Unsettled } from "./rpc.ts";
+import { session } from "./test-fakes.ts";
 
 const config = loadConfig({
   NEAR_RPC_URL: "https://rpc.example",
@@ -66,15 +67,47 @@ describe("txStatus", () => {
   it("reads the relayer's transaction at final, and only a transaction the node never saw is unknown", async () => {
     const view = vi.spyOn(JsonRpcProvider.prototype, "viewTransactionStatus");
     const chain = nearChain(config);
-    view.mockResolvedValueOnce({ status: { SuccessValue: "" } } as never);
+    view.mockResolvedValueOnce({ final_execution_status: "FINAL", status: { SuccessValue: "" } } as never);
     expect(await chain.txStatus("h")).toBe("succeeded");
-    expect(view).toHaveBeenCalledWith({ txHash: "h", accountId: "relayer.test", waitUntil: "FINAL" });
-    view.mockResolvedValueOnce({ status: { Failure: {} } } as never);
+    expect(view).toHaveBeenCalledWith({ txHash: "h", accountId: "relayer.test", waitUntil: "NONE" });
+    view.mockResolvedValueOnce({ final_execution_status: "FINAL", status: { Failure: {} } } as never);
     expect(await chain.txStatus("h")).toBe("failed");
+    view.mockResolvedValueOnce({ final_execution_status: "EXECUTED_OPTIMISTIC", status: { SuccessValue: "" } } as never);
+    expect(await chain.txStatus("h")).toBe("unknown");
     view.mockRejectedValueOnce(new UnknownTransactionError("h"));
     expect(await chain.txStatus("h")).toBe("unknown");
     view.mockRejectedValueOnce(new TransactionTimeoutError());
     await expect(chain.txStatus("h")).rejects.toBeInstanceOf(TransactionTimeoutError);
+  });
+});
+
+describe("ranTx", () => {
+  const expired = session("alice.test", { deadlineMs: Date.now() - 60_000 });
+  const chainWith = (txStatus: Chain["txStatus"]) => ({ txStatus, finalTimeMs: async () => Date.now() }) as unknown as Chain;
+
+  it("returns a transaction that ran even while another one can't be read", async () => {
+    const chain = chainWith(async (txHash) => {
+      if (txHash === "a") throw new Error("rpc down");
+      return "succeeded";
+    });
+    expect(await ranTx(chain, expired, new Unsettled(["a", "b"], new Error("timeout")), "t")).toBe("b");
+  });
+
+  it("never decides failed on a read error, even past the deadline", async () => {
+    vi.useFakeTimers();
+    let reads = 0;
+    const chain = chainWith(async () => {
+      reads += 1;
+      if (reads === 1) throw new Error("rpc down");
+      return "unknown";
+    });
+    const outcome = ranTx(chain, expired, new Unsettled(["a"], new Error("timeout")), "t");
+    await vi.advanceTimersByTimeAsync(0);
+    expect(reads).toBe(1);
+    await vi.advanceTimersByTimeAsync(3_000);
+    expect(await outcome).toBeUndefined();
+    expect(reads).toBe(2);
+    vi.useRealTimers();
   });
 });
 

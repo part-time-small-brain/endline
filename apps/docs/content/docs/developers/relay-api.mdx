@@ -25,7 +25,7 @@ The relay runs the RFQ auction, settles trades with `intents.near::execute_inten
 | `GET /leaderboard/:account_id` | The same plus `you: {today, week}` |
 | `POST /faucet` | Testnet only. `{account_id}` → `{tx_hash}`. Sends 100 test USDC into that account's intents balance (NEAR account or lowercase `0x` address). CORS only for the relay's `APP_ORIGINS` (the Endline app), `content-type: application/json`. Once per account and once per IP (IPv6: per /48) per 24 h |
 
-`POST /quote`, `/execute`, `/transfer`, `/claims`, `/calls`, `/faucet` and `/deposit-quote` share one rate limit: 30 requests per minute per client IP (IPv6: per /64). `GET /fills` has its own: 60 per minute per client IP. On top, each signer gets 4 quotes per 25 s, counted once their session and balance check out (quotes refused for funds don't count), and a quote that settles into a trade gives its slot back within that 25 s window, and a buyer needs $1 before any market maker is asked.
+`POST /quote`, `/execute`, `/transfer`, `/claims`, `/calls`, `/faucet` and `/deposit-quote` share one rate limit: 30 requests per minute per client IP (IPv6: per /64). `GET /fills` has its own: 600 per minute per client IP. On top, each signer gets 4 quotes per 25 s, counted once their session and balance check out (quotes refused for funds don't count), and a quote that settles into a trade gives its slot back within that 25 s window, and a buyer needs $1 before any market maker is asked.
 
 ## A trade
 
@@ -59,7 +59,7 @@ Both accept only an exercise exactly as the SDK's `exerciseOptions` builds and `
 | Route | Rules |
 |---|---|
 | `/execute` | Expires between 2 and 10 minutes from now. Needs a final price (`now ≥ final_at + 60 s`) and a total payout of at least $1. Simulated, then executed |
-| `/claims` | Only for options you bought through the relay (net of sells), one open claim per buy of that series, with a max payout of at least $1. Your open claims on a token can't exceed that or your balance of it; 20 open claims per account, 1,000 in total. Simulated, then stored. Every minute the relay re-simulates each claim, drops ones the verifier refuses (sold, collected, expired, nonce used) or that pay under $1, and submits the rest once final |
+| `/claims` | Only for options you bought through the relay (net of sells), one open claim per buy of that series, with a max payout of at least $1. Your open claims on a token can't exceed that or your balance of it; 100 open claims per account, 1,000 in total. Simulated, then stored. Every minute the relay re-simulates each claim, drops ones the verifier refuses (sold, collected, expired, nonce used) or that pay under $1, and submits the rest once final |
 
 ## Transfer
 
@@ -76,7 +76,7 @@ Body: `{error}`.
 | `402` | Your balance doesn't cover the quote (a buy needs at least $1 of USDC before any market maker is asked), or a free call's caller holds under $1. Deposit first |
 | `403` | Faucet off (mainnet) |
 | `404` | Unknown or forgotten series or quote |
-| `409` | Past the write cutoff, a width no market maker lists at that strike, already published, price not final, payload already submitted or another from the same signer still being sent, claims above the options held, above what you bought through the relay or over 20 open per account, or a free call that's too late, not on the next round, repeated, or on a cell priced at its full payout |
+| `409` | Past the write cutoff, a width no market maker lists at that strike, already published, price not final, payload already submitted or another from the same signer still being sent, claims above the options held, above what you bought through the relay or over 100 open per account, or a free call that's too late, not on the next round, repeated, or on a cell priced at its full payout |
 | `410` | Quote expired |
 | `413` | Body over 64 KB |
 | `415` | Faucet request not `application/json` |

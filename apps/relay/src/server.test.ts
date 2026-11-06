@@ -120,7 +120,7 @@ describe("http", () => {
     const url = `http://127.0.0.1:${(limited.address() as AddressInfo).port}`;
     const read = async () => (await fetch(`${url}/fills/alice.test`)).status;
     try {
-      for (let i = 0; i < 60; i++) expect(await read()).toBe(200);
+      for (let i = 0; i < 600; i++) expect(await read()).toBe(200);
       expect(await read()).toBe(429);
       expect((await fetch(`${url}/quote`, { method: "POST", body: "{" })).status).toBe(400);
     } finally {

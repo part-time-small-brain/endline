@@ -87,8 +87,8 @@ describe("relay", () => {
     const [mmLeg] = executed[0] ?? [];
     expect(Date.parse(readPayload(mmLeg!).deadline) - SIGN_MARGIN_MS).toBe(q.sign_by_ms);
     expect(statuses).toEqual([update]);
-    expect(await fills.byAccount(USER)).toMatchObject([{ quote_id: q.quote_id, premium: "15000000", tx_hash: "tx1" }]);
-    expect(await fills.byAccount("bob.test")).toEqual([]);
+    expect(fills.byAccount(USER)).toMatchObject([{ quote_id: q.quote_id, premium: "15000000", tx_hash: "tx1" }]);
+    expect(fills.byAccount("bob.test")).toEqual([]);
   });
 
   it("lists open series and those expired within the claim window, nothing older", async () => {
@@ -175,7 +175,7 @@ describe("relay", () => {
     expect(update).toMatchObject({ status: "failed", reason: "invalid signature" });
     expect(statuses).toEqual([update]);
     expect(executed).toHaveLength(0);
-    expect(await fills.byAccount(USER)).toEqual([]);
+    expect(fills.byAccount(USER)).toEqual([]);
     expect(await httpStatus(relay.publish({ quote_id: q.quote_id, signed: sign(q) }))).toBe(409);
   });
 
@@ -193,7 +193,7 @@ describe("relay", () => {
     expect(update).toEqual({ quote_id: q.quote_id, status: "settled", tx_hash: "tx1" });
     expect(executed).toHaveLength(1);
     expect(statuses).toEqual([update]);
-    expect(await fills.byAccount(USER)).toEqual([expect.objectContaining({ quote_id: q.quote_id, tx_hash: "tx1" })]);
+    expect(fills.byAccount(USER)).toEqual([expect.objectContaining({ quote_id: q.quote_id, tx_hash: "tx1" })]);
   });
 
   it("fails a trade whose own transaction failed, even though the user burned the nonce with another payload", async () => {
@@ -210,7 +210,7 @@ describe("relay", () => {
     expect(update).toMatchObject({ quote_id: q.quote_id, status: "failed", reason: "nonce already used" });
     expect(executed).toEqual([[burn]]);
     expect(statuses).toEqual([update]);
-    expect(await fills.byAccount(USER)).toEqual([]);
+    expect(fills.byAccount(USER)).toEqual([]);
   });
 
   it("fails a send of unknown outcome only once a final block is past the deadline with its transaction still unknown, never on a read error", async () => {
@@ -232,7 +232,7 @@ describe("relay", () => {
     await vi.advanceTimersByTimeAsync(6_000);
     expect(update).toMatchObject({ quote_id: q.quote_id, status: "failed", reason: "Request timeout" });
     expect(statuses).toEqual([update]);
-    expect(await fills.byAccount(USER)).toEqual([]);
+    expect(fills.byAccount(USER)).toEqual([]);
   });
 
   it("refuses unknown quote ids and unknown series", async () => {
