@@ -11,9 +11,9 @@ async function openTap(page: Page) {
   await expect(cells(page).first()).toBeVisible();
 }
 
-async function connect(page: Page, wallet: RegExp) {
+async function connect(page: Page) {
   await page.getByRole("button", { name: "Connect", exact: true }).click();
-  await page.getByRole("dialog").getByRole("button", { name: wallet }).click();
+  await page.getByRole("dialog").getByRole("button", { name: /Demo wallet/ }).click();
 }
 
 test("Tap persists across reload and puts every Up cell above the spot line and every Down cell below it", async ({ page }) => {
@@ -54,8 +54,12 @@ test("a tap asks for a wallet first, then confirms exactly that cell at the chos
   await expect(page.getByRole("button", { name: "Set up", exact: true })).toHaveCount(0);
   await grid(page).getByRole("button", { name: stable(label) }).click();
   const sheet = page.getByRole("dialog");
-  await expect(sheet.getByRole("button", { name: /^Buy for \$/ })).toBeVisible({ timeout: 10_000 });
+  const buy = sheet.getByRole("button", { name: /^Buy for \$/ });
+  await expect(buy).toBeVisible({ timeout: 10_000 });
   await expect(sheet).toContainText(`BTC ${side} ${price}`);
+  const paid = Number((await buy.textContent())?.replace(/[^\d.]/g, ""));
+  expect(paid).toBeGreaterThan(9);
+  expect(paid).toBeLessThan(11);
 });
 
 test("Tap keeps the stake when switching assets", async ({ page }) => {
@@ -82,7 +86,7 @@ test("Tap fits phones down to 320 px without sideways scrolling", async ({ page,
 
 test("a bought cell rides into its column's final round, read-only, with the average so far", async ({ page }) => {
   await openTap(page);
-  await connect(page, /Demo wallet/);
+  await connect(page);
   await page.getByRole("radio", { name: "$10", exact: true }).click();
   const first = (await grid(page).getByRole("columnheader").filter({ hasNotText: /final round|price to beat/i }).first().innerText()).split("\n")[0]!;
   const cell = cells(page).filter({ hasText: /^[1-9]\.\d×$/ }).and(page.getByRole("button", { name: new RegExp(` · ${first} `, "i") })).first();
@@ -106,7 +110,7 @@ test("a bought cell rides into its column's final round, read-only, with the ave
 
 test("free calls with the demo wallet: call a cell of the next round, see it called and counted, and the board", async ({ page }) => {
   await openTap(page);
-  await connect(page, /Demo wallet/);
+  await connect(page);
   await page.getByRole("radio", { name: /^Free call/ }).click();
   await expect(page.getByRole("radio", { name: /^Free call/ })).toContainText("10 of 10 left this round");
   await cells(page).filter({ hasText: /^[1-9]\.\d×$/ }).and(page.getByRole("button", { name: / · Tomorrow / })).first().click();

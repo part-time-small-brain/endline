@@ -66,9 +66,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const ended = useMemo(() => {
     const nowSec = Date.now() / 1000;
     const touched = new Set((fills.data ?? []).map((f) => f.series_id));
-    const held = (s: ListedSeries) => (balances.data?.[optionAsset(s.id)] ?? 0n) > 0n;
     const keys = (listing?.series ?? [])
-      .filter((s) => s.expiry <= nowSec && (touched.has(s.id) || held(s)))
+      .filter((s) => s.expiry <= nowSec && (touched.has(s.id) || (balances.data?.[optionAsset(s.id)] ?? 0n) > 0n))
       .map(settlementKey);
     const called = (calls.data ?? []).filter((c) => c.terms.expiry <= nowSec).map((c) => settlementKey(c.terms));
     return [...new Set([...keys, ...called])].sort();
@@ -93,9 +92,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
     balances.reload();
     fills.reload();
     settlements.reload();
-    marks.reload();
     calls.reload();
-  }, [balances.reload, fills.reload, settlements.reload, marks.reload, calls.reload]);
+  }, [balances.reload, fills.reload, settlements.reload, calls.reload]);
 
   const value: AppData = {
     listing,

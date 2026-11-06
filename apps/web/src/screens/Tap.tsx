@@ -79,9 +79,8 @@ export function Tap({ state, nowSec, views, onConnect, onAddFunds, onQuote }: Pr
   const listed = [...open, ...here.filter((s) => s.expiry === closing?.expiry && !held.has(s.id) && rowsElsewhere.has(s.strike)), ...kept.map((v) => v.series), ...called];
   const grid = spot === undefined ? undefined : buildGrid(listed, spot, budget, data.marks, held, (expiry) => (expiry === closing?.expiry ? (closingPrice ?? spot) : spot));
   const closingColumn = closing && grid ? grid.expiries.indexOf(closing.expiry) : -1;
-  const staked = (seriesId: string) => stakes.filter((v) => v.series.id === seriesId).reduce((total, v) => total + v.amount, 0n);
+  const staked = (seriesId: string) => stakes.find((v) => v.series.id === seriesId)?.amount ?? 0n;
   const rows = grid?.strikes.length ?? 0;
-  const formatMoney = (value: bigint | undefined) => (value === undefined ? undefined : formatUsd(value, quoteDecimals));
   const move = (strike: bigint) => (spotNumber ? formatPct(toNumber(strike, quoteDecimals) / spotNumber - 1) : "");
   const where = (cell: GridCell, strike: bigint) => {
     const up = cell.series.kind === "call";
@@ -178,7 +177,7 @@ export function Tap({ state, nowSec, views, onConnect, onAddFunds, onQuote }: Pr
                           <Cell
                             cell={cell}
                             label={cell ? label(cell, strike, expiry, own) : ""}
-                            value={formatMoney(own?.value)}
+                            value={own?.value === undefined ? undefined : formatUsd(own.value, quoteDecimals)}
                             change={own?.change}
                             called={cell !== undefined && calledHere.has(cell.series.id) && !own}
                             pays={multiple === undefined ? undefined : formatMultiple(multiple)}
@@ -216,9 +215,11 @@ export function Tap({ state, nowSec, views, onConnect, onAddFunds, onQuote }: Pr
           </p>
         )}
         {closing && <RevealNote closing={closing} price={closingPrice} stakes={stakes} calls={closingCalls} quoteDecimals={quoteDecimals} />}
-        <p role="status" className={`min-h-5 px-1 pt-2 text-sm ${free && calls.notice?.failed ? "text-danger" : "text-ink-2"}`}>
-          {free && calls.notice?.text}
-        </p>
+        {free && (
+          <p role="status" className={`min-h-5 px-1 pt-2 text-sm ${calls.notice?.failed ? "text-danger" : "text-ink-2"}`}>
+            {calls.notice?.text}
+          </p>
+        )}
       </section>
 
       <TapMode free={free} left={left} budget={budget} quoteDecimals={quoteDecimals} onFree={setFree} onBudget={setBudget} />

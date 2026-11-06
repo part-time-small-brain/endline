@@ -33,16 +33,6 @@ function useSignExercise() {
   );
 }
 
-export function useClaim() {
-  const { services } = useApp();
-  const signExercise = useSignExercise();
-  return useCallback(
-    async (wallet: Wallet, optionAsset: string, size: bigint, expiry: number) =>
-      services.relay.claim(await signExercise(wallet, { [optionAsset]: size }, (expiry + CLAIM_WINDOW_SEC) * 1000)),
-    [services, signExercise],
-  );
-}
-
 export function useCollect() {
   const { config, services } = useApp();
   const { wallet } = useWallet();
@@ -78,18 +68,19 @@ export function useCollect() {
 }
 
 export function useAutoCollect(wallet: Wallet, optionAsset: string, size: bigint, expiry: number) {
-  const claim = useClaim();
+  const { services } = useApp();
+  const signExercise = useSignExercise();
   const [state, setState] = useState<AutoCollectState>({ status: "off" });
 
   const enable = useCallback(async () => {
     setState({ status: "signing" });
     try {
-      await claim(wallet, optionAsset, size, expiry);
+      await services.relay.claim(await signExercise(wallet, { [optionAsset]: size }, (expiry + CLAIM_WINDOW_SEC) * 1000));
       setState({ status: "on" });
     } catch (error) {
       setState({ status: "off", error: error instanceof Error ? error.message : "Auto-collect failed" });
     }
-  }, [wallet, claim, optionAsset, size, expiry]);
+  }, [wallet, services, signExercise, optionAsset, size, expiry]);
 
   return { ...state, enable };
 }

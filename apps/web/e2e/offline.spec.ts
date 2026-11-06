@@ -874,6 +874,14 @@ test.describe("Tap", () => {
     expect(await signs()).toBe(3);
   });
 
+  test("a buy the balance can't cover opens Add funds, never a quote", async ({ page }) => {
+    await freeCalls(page);
+    await page.getByRole("radio", { name: /^Buy/ }).click();
+    await page.getByRole("table").getByRole("button", { name: /^Up · BTC ends above \$81,000 · Tomorrow / }).click();
+    await expect(page.getByRole("dialog", { name: "Add funds" })).toBeVisible();
+    await expect(page.getByRole("button", { name: /^Buy for \$/ })).toHaveCount(0);
+  });
+
   test("a call on an end that's over drops off the grid even while its UTC day is still the next round", async ({ page }) => {
     const short = { ...listed.find((s) => s.id === "BTC-5NOV26-81000_83000-C")!, id: "BTC-5NOV26T0400-81000_83000-C", expiry: Date.UTC(2026, 10, 5, 4) / 1000 };
     const { option_asset, quotable, ...terms } = short;
