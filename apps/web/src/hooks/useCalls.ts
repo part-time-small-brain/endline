@@ -1,5 +1,5 @@
 import { callMultiple, type ListedSeries, termsOf } from "@endline/sdk";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { RelayError } from "../api/relay.ts";
 import { useApp } from "../app/context.ts";
 import { useData } from "../app/data.tsx";
@@ -12,6 +12,7 @@ import type { TapState } from "./useTaps.ts";
 const SHOWN_MS = 3_000;
 
 function messageOf(error: unknown): string {
+  if (error instanceof RelayError && error.status === 401) return "Your wallet couldn't sign in. A NEAR wallet needs Enable first, the one-time step before your first buy.";
   const text = error instanceof RelayError && !error.message.startsWith("relay returned") ? error.message : "That call didn't go through. Try again.";
   return `${text.charAt(0).toUpperCase()}${text.slice(1).replace(/\.?$/, ".")}`;
 }
@@ -23,6 +24,13 @@ export function useCalls() {
   const [states, setStates] = useState<Record<string, TapState>>({});
   const [notice, setNotice] = useState<{ text: string; failed: boolean }>();
   const busy = useRef(new Set<string>());
+  const owner = useRef(wallet);
+  useEffect(() => {
+    owner.current = wallet;
+    busy.current.clear();
+    setStates({});
+    setNotice(undefined);
+  }, [wallet]);
 
   const call = useCallback(
     async (series: ListedSeries) => {
@@ -31,6 +39,7 @@ export function useCalls() {
       busy.current.add(id);
       setStates((current) => ({ ...current, [id]: { status: "busy" } }));
       const finish = (state: TapState, text: string) => {
+        if (owner.current !== wallet) return;
         busy.current.delete(id);
         setStates((current) => ({ ...current, [id]: state }));
         setNotice({ text, failed: state.status === "failed" });

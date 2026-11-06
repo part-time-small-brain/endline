@@ -211,6 +211,22 @@ test("the Tap key outlives a reload, and a disconnect drops it and every tap sti
   await expect(grid(page).locator("[aria-busy=true]")).toHaveCount(0, { timeout: 10_000 });
 });
 
+test("a Tap balance that won't open doesn't hide what a free call says", async ({ page }) => {
+  await stubEvm(page);
+  await openTap(page);
+  await setUpTapBalance(page, /Ethereum wallet/);
+  await page.getByRole("button", { name: /^Account / }).click();
+  await page.getByRole("button", { name: "Disconnect" }).click();
+  await signWith(page, "22");
+  await connect(page, /Ethereum wallet/);
+  await cells(page).filter({ hasText: /^[1-9]\.\d×$/ }).first().click();
+  const status = page.getByRole("region", { name: "Tap grid" }).getByRole("status");
+  await expect(status).toHaveText("This wallet signed differently than last time, so it can't open the same Tap balance.");
+  await page.getByRole("radio", { name: /^Free call/ }).click();
+  await cells(page).filter({ hasText: /^[1-9]\.\d×$/ }).and(page.getByRole("button", { name: / · Tomorrow / })).first().click();
+  await expect(status).toHaveText(/^Called BTC (Up|Down) \$[\d,]+ at \d+\.\d×\.$/, { timeout: 10_000 });
+});
+
 test("a Tap balance the wallet can no longer open says why when selling back", async ({ page }) => {
   await stubEvm(page);
   await openTap(page);

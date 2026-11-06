@@ -68,7 +68,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const fills = usePoll(account ? () => services.relay.fills(account) : null, 15_000, account);
   const tapBalances = usePoll(tapAccount && listing ? () => services.chain.balances(tapAccount, assets) : null, 10_000, `${tapAccount}:${assets.length}`);
   const tapFills = usePoll(tapAccount ? () => services.relay.fills(tapAccount) : null, 15_000, tapAccount);
-  const calls = usePoll(account ? () => services.relay.calls(account) : null, 15_000, account);
+  const calls = usePoll(account ? () => services.relay.calls(account) : null, 60_000, account);
 
   const ended = useMemo(() => {
     const nowSec = Date.now() / 1000;

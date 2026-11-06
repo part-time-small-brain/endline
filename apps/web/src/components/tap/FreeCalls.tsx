@@ -1,4 +1,4 @@
-import { type Call, callMultiple, FREE_CALLS_PER_ROUND, type Standing, termsOf } from "@endline/sdk";
+import { type Call, callMultiple, type Standing, termsOf } from "@endline/sdk";
 import { useApp } from "../../app/context.ts";
 import { usePoll } from "../../hooks/usePoll.ts";
 import { seriesTitle, shortAccount } from "../../lib/labels.ts";
@@ -9,7 +9,6 @@ const SHOWN = 10;
 
 interface Props {
   calls: Call[];
-  left: number;
   accountId: string | undefined;
   nowSec: number;
   quoteDecimals: number;
@@ -17,15 +16,13 @@ interface Props {
 
 const points = (value: number) => `${value > 0 ? "+" : ""}${value}`;
 
-export function FreeCalls({ calls, left, accountId, nowSec, quoteDecimals }: Props) {
+export function FreeCalls({ calls, accountId, nowSec, quoteDecimals }: Props) {
   const { services } = useApp();
   const board = usePoll(() => services.relay.leaderboard(accountId), 60_000, accountId ?? "");
   return (
     <section aria-label="Free calls" className="flex flex-col gap-4 rounded-md border border-rule bg-surface p-4 sm:p-6">
       <div className="flex flex-col gap-2">
-        <h2 className="flex items-center justify-between font-mono text-[10px] font-medium tracking-[0.14em] text-ink-3 uppercase">
-          Your free calls <span className="tracking-normal normal-case">{left} of {FREE_CALLS_PER_ROUND} left this round</span>
-        </h2>
+        <h2 className="font-mono text-[10px] font-medium tracking-[0.14em] text-ink-3 uppercase">Your free calls</h2>
         {calls.length === 0 && <p className="text-sm text-ink-2">Tap a cell in the next round to call it. No money moves.</p>}
         {calls.map((c) => (
           <p key={c.series_id} className="flex items-center justify-between gap-3 text-sm">
@@ -45,7 +42,7 @@ export function FreeCalls({ calls, left, accountId, nowSec, quoteDecimals }: Pro
           <Board title="7 days" rows={board.data.week} you={board.data.you?.week ?? null} />
         </div>
       )}
-      <p className="text-xs text-ink-3">Each call stakes 100 points at the cell's multiple, capped at 25×, scored at the final price. Points only, no prizes. Names are NEAR Intents account ids, so they're public.</p>
+      <p className="text-xs text-ink-3">Points only, no prizes. Names are NEAR Intents account ids, so they're public.</p>
     </section>
   );
 }

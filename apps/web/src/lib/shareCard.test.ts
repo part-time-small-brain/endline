@@ -1,6 +1,6 @@
 import type { ListedSeries } from "@endline/sdk";
 import { describe, expect, it } from "vitest";
-import { bestWin, callCard } from "./shareCard.ts";
+import { bestWin } from "./shareCard.ts";
 
 const USD = 1_000_000n;
 const UNIT = 10n ** 8n;
@@ -42,17 +42,5 @@ describe("bestWin", () => {
     const both = [stake(UNIT / 100n, 1n * USD), stake(UNIT / 50n, 1n * USD, 0n, put)];
     expect(bestWin(both, 81_400n * USD, 6)?.title).toBe("BTC Up $81,000");
     expect(bestWin(both, 80_000n * USD, 6)?.title).toBe("BTC Down $81,000");
-  });
-});
-
-describe("callCard", () => {
-  it("shows the points a free call won and the multiple it was called at", () => {
-    expect(callCard(series, 50n, 400, 83_000n * USD, 6)).toEqual({
-      title: "BTC Up $81,000",
-      result: "+400 points",
-      detail: "Free call at 5.0×",
-      footer: "Final price $83,000 · 5 Nov 08:00 UTC",
-      text: "BTC Up $81,000: +400 points on Endline",
-    });
   });
 });

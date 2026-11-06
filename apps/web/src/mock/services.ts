@@ -1,4 +1,4 @@
-import { buyDiffs, type Call, callPoints, type Fill, FREE_CALLS_PER_ROUND, intentsAssetId, isListed, longPayout, MIN_RELAYED_PAYOUT_USD, payload, type Quote, readPayload, roundOf, type Series, sellDiffs, type Standing, type StatusUpdate, termsOf, tokenDiff, toSign, TWAP_WINDOW_SEC } from "@endline/sdk";
+import { buyDiffs, type Call, callableAt, callPoints, type Fill, FREE_CALLS_PER_ROUND, intentsAssetId, isListed, longPayout, MIN_RELAYED_PAYOUT_USD, payload, type Quote, nextRound, readPayload, roundOf, type Series, sellDiffs, type Standing, type StatusUpdate, termsOf, tokenDiff, toSign } from "@endline/sdk";
 import { base58 } from "@scure/base";
 import type { Chain } from "../api/chain.ts";
 import type { Market } from "../api/market.ts";
@@ -190,10 +190,11 @@ export function createMockServices(config: Config): Services {
       await sleep(250);
       const series = world.series.find((s) => s.id === series_id);
       if (!series) throw new RelayError("unknown series", 404);
-      const callable = (s: Series) => quotable(s) && nowSec() < s.expiry - TWAP_WINDOW_SEC;
+      const callable = (s: Series) => quotable(s) && callableAt(s.expiry, nowSec());
       if (!callable(series)) throw new RelayError("the final round has started: calls close when the averaging window opens", 409);
       const round = roundOf(series.expiry);
-      if (round !== world.series.filter(callable).map((s) => roundOf(s.expiry)).sort()[0]) throw new RelayError("free calls are open only for the next round", 409);
+      if (round !== nextRound(world.series.filter(callable).map((s) => s.expiry))) throw new RelayError("free calls are open only for the next round", 409);
+      if ((wallet(signer.signer_id).get(config.quoteAsset) ?? 0n) < 10n ** BigInt(QUOTE_DECIMALS)) throw new RelayError("a free call needs at least $1 of USDC in your NEAR Intents balance: deposit first", 402);
       const mine = called.filter((c) => c.account_id === signer.signer_id);
       if (mine.some((c) => c.series_id === series_id)) throw new RelayError("you already called this cell", 409);
       const mark = markOf(series);
@@ -237,7 +238,7 @@ export function createMockServices(config: Config): Services {
   }
 
   function lastSettled() {
-    return Math.max(...[...world.settlements.keys()].map((key) => Number(key.split(":")[1])));
+    return Math.max(world.start, ...[...world.settlements.keys()].map((key) => Number(key.split(":")[1])));
   }
 
   const chain: Chain = {

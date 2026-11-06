@@ -27,7 +27,7 @@ export function TapMode({ free, left, budget, quoteDecimals, onFree, onBudget }:
         ]}
       />
       {free ? (
-        <p className="text-sm text-ink-2">Each tap calls a cell in the next round for free: 100 points at its multiple, up to {MAX_CALL_MULTIPLE}×, scored at the final price. No money moves.</p>
+        <p className="text-sm text-ink-2">Each tap calls a cell of the next round for free: it stakes 100 points at the cell's multiple, up to {MAX_CALL_MULTIPLE}×, and scores at the final price. No money moves; you need $1 in your balance to play.</p>
       ) : (
         <>
           <AmountPicker value={budget} quoteDecimals={quoteDecimals} onChange={onBudget} />

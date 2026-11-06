@@ -1,4 +1,4 @@
-import { callMultiple, FREE_CALLS_PER_ROUND, roundOf, termsOf, TWAP_WINDOW_SEC } from "@endline/sdk";
+import { callableAt, callMultiple, FREE_CALLS_PER_ROUND, type ListedSeries, nextRound as roundAfter, roundOf, termsOf } from "@endline/sdk";
 import { useState } from "react";
 import { settlementKey } from "../app/data.tsx";
 import type { useTicket } from "../app/useTicket.ts";
@@ -76,7 +76,9 @@ export function Tap({ state, nowSec, views, onConnect, onAddFunds, onQuote }: Pr
   };
   const yours = views?.filter((v) => v.series.underlying === symbol) ?? [];
   const here = data.listing?.series.filter((s) => s.underlying === symbol) ?? [];
-  const nextRound = (data.listing?.series ?? []).filter((s) => s.quotable && nowSec < s.expiry - TWAP_WINDOW_SEC).map((s) => roundOf(s.expiry)).sort()[0];
+  const callable = (s: ListedSeries) => s.quotable && callableAt(s.expiry, nowSec);
+  const nextRound = roundAfter((data.listing?.series ?? []).filter(callable).map((s) => s.expiry));
+  const callableHere = (s: ListedSeries) => callable(s) && roundOf(s.expiry) === nextRound;
   const left = FREE_CALLS_PER_ROUND - (data.calls ?? []).filter((c) => roundOf(c.terms.expiry) === nextRound).length;
   const calledHere = new Map((data.calls ?? []).filter((c) => c.terms.underlying === symbol).map((c) => [c.series_id, c]));
   const settlementOf = (expiry: number) => data.settlements[settlementKey({ underlying: symbol, expiry })] ?? null;
@@ -89,7 +91,7 @@ export function Tap({ state, nowSec, views, onConnect, onAddFunds, onQuote }: Pr
   const mine = active.filter((v) => v.tap);
   const kept = yours.filter((v) => v.status === "active" || v.series.expiry === closing?.expiry);
   const owned = new Set(kept.map((v) => v.series.id));
-  const called = here.filter((s) => calledHere.has(s.id) && (s.expiry === closing?.expiry || roundOf(s.expiry) === nextRound));
+  const called = here.filter((s) => calledHere.has(s.id) && (s.expiry === closing?.expiry || callableAt(s.expiry, nowSec)));
   const held = new Set([...owned, ...called.map((s) => s.id)]);
   const open = priced.filter((s) => s.underlying === symbol && s.expiry !== closing?.expiry && !held.has(s.id));
   const rowsElsewhere = new Set([...open, ...kept.map((v) => v.series), ...called].map((s) => s.strike));
@@ -108,7 +110,7 @@ export function Tap({ state, nowSec, views, onConnect, onAddFunds, onQuote }: Pr
     const ask = calledHere.get(cell.series.id)?.ask ?? data.marks?.[cell.series.id]?.ask;
     return ask === undefined ? undefined : callMultiple(termsOf(cell.series), BigInt(ask));
   };
-  const shownMultiple = (cell: GridCell) => (free || (calledHere.has(cell.series.id) && !owned.has(cell.series.id)) ? freeMultiple(cell) : cell.multiple);
+  const shownMultiple = (cell: GridCell) => (free ? freeMultiple(cell) : cell.multiple);
   const label = (cell: GridCell, strike: bigint, expiry: number, own: Holding | undefined) => {
     const multiple = shownMultiple(cell);
     const pays = multiple === undefined ? "no price right now" : `pays up to ${formatMultiple(multiple)}`;
@@ -132,7 +134,9 @@ export function Tap({ state, nowSec, views, onConnect, onAddFunds, onQuote }: Pr
         {grid && rows > 0 && spot !== undefined && spotNumber !== undefined ? (
           <div className="relative [--axis:4.25rem] [--line:2.5rem] [--row:3.5rem] sm:[--axis:5rem] sm:[--line:30%] sm:[--row:4rem]">
             <table className="w-full table-fixed border-collapse">
-              <caption className="sr-only">Tap a cell to buy it. Up pays if {symbol} ends above the row's price, Down if it ends below.</caption>
+              <caption className="sr-only">
+                {free ? "Tap a cell of the next round to call it for free." : "Tap a cell to buy it."} Up pays if {symbol} ends above the row's price, Down if it ends below.
+              </caption>
               <colgroup>
                 <col className="w-[var(--axis)]" />
                 <col className="w-[var(--line)]" />
@@ -197,7 +201,7 @@ export function Tap({ state, nowSec, views, onConnect, onAddFunds, onQuote }: Pr
                             change={own?.change}
                             called={cell !== undefined && calledHere.has(cell.series.id) && !own}
                             pays={multiple === undefined ? undefined : formatMultiple(multiple)}
-                            blocked={free && (roundOf(expiry) !== nextRound || (cell !== undefined && (calledHere.has(cell.series.id) || calls.states[cell.series.id]?.status === "busy")))}
+                            blocked={free && (cell === undefined || !callableHere(cell.series) || calledHere.has(cell.series.id) || calls.states[cell.series.id]?.status === "busy")}
                             state={cell && (free ? calls.states : taps.states)[cell.series.id]}
                             onTap={onTap}
                           />
@@ -231,8 +235,8 @@ export function Tap({ state, nowSec, views, onConnect, onAddFunds, onQuote }: Pr
           </p>
         )}
         {closing && <RevealNote closing={closing} price={closingPrice} stakes={stakes} calls={closingCalls} quoteDecimals={quoteDecimals} />}
-        <p role="status" className={`min-h-5 px-1 pt-2 text-sm ${unlockError || (free ? calls : taps).notice?.failed ? "text-danger" : "text-ink-2"}`}>
-          {unlockError ?? (free ? calls : taps).notice?.text}
+        <p role="status" className={`min-h-5 px-1 pt-2 text-sm ${(free ? calls.notice?.failed : unlockError || taps.notice?.failed) ? "text-danger" : "text-ink-2"}`}>
+          {free ? calls.notice?.text : (unlockError ?? taps.notice?.text)}
         </p>
       </section>
 
@@ -266,7 +270,7 @@ export function Tap({ state, nowSec, views, onConnect, onAddFunds, onQuote }: Pr
       )}
 
       <TapMode free={free} left={left} budget={budget} quoteDecimals={quoteDecimals} onFree={setFree} onBudget={setBudget} />
-      {free && <FreeCalls calls={data.calls ?? []} left={left} accountId={wallet?.accountId} nowSec={nowSec} quoteDecimals={quoteDecimals} />}
+      {free && <FreeCalls calls={data.calls ?? []} accountId={wallet?.accountId} nowSec={nowSec} quoteDecimals={quoteDecimals} />}
       <p className="pb-6 text-center font-mono text-[10px] font-medium tracking-[0.14em] text-ink-3 uppercase">Signed in your browser · settled on NEAR Intents</p>
     </div>
   );
