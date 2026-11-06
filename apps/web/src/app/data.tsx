@@ -1,6 +1,6 @@
 import { type Fill, intentsAssetId, type ListedSeries, type Mark, type SeriesListing, type Timing } from "@endline/sdk";
 import { createContext, type ReactNode, useCallback, useContext, useMemo } from "react";
-import type { MarketSnapshot, PricePoint } from "../api/market.ts";
+import { chartPoints, type MarketSnapshot, type PricePoint } from "../api/market.ts";
 import { usePoll } from "../hooks/usePoll.ts";
 import { verifiedListing } from "../lib/listing.ts";
 import type { SettlementView } from "../lib/status.ts";
@@ -17,6 +17,7 @@ export interface AppData {
   marks: Record<string, Mark> | undefined;
   marksError: string | undefined;
   history: Record<string, PricePoint[]> | undefined;
+  minutes: Record<string, PricePoint[]> | undefined;
   timing: Timing | undefined;
   balances: Record<string, bigint> | undefined;
   balance: bigint | undefined;
@@ -55,6 +56,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     underlyings.join(),
   );
 
+  const charts = useMemo(() => history.data && Object.fromEntries(Object.entries(history.data).map(([u, points]) => [u, chartPoints(points)])), [history.data]);
   const optionAsset = useCallback((seriesId: string) => intentsAssetId(config.optionsId, seriesId), [config.optionsId]);
   const assets = useMemo(
     () => [config.quoteAsset, ...(listing?.series.map((s) => optionAsset(s.id)) ?? [])],
@@ -107,7 +109,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
     marketError: market.error,
     marks: marks.error ? undefined : marksById,
     marksError: marks.error,
-    history: history.data,
+    history: charts,
+    minutes: history.data,
     timing: contract.data?.timing,
     balances: balances.data,
     balance: balances.data?.[config.quoteAsset],

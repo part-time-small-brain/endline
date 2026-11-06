@@ -5,9 +5,11 @@ import { useCollect } from "../hooks/useCollect.ts";
 import { capLabel, seriesTitle } from "../lib/labels.ts";
 import { formatPct, formatUsd, toNumber } from "../lib/money.ts";
 import type { PositionStatus } from "../lib/status.ts";
+import { bestWin } from "../lib/shareCard.ts";
 import { countdown, formatEnds, formatUtc } from "../lib/time.ts";
 import { Button } from "./Button.tsx";
 import { SettlementNote } from "./SettlementNote.tsx";
+import { ShareButton } from "./ShareButton.tsx";
 import { TxLink } from "./TxLink.tsx";
 
 const PILLS: Record<PositionStatus, { label: string; tone: string }> = {
@@ -34,6 +36,7 @@ export function PositionCard({ view, quoteDecimals, nowSec, onSellBack }: Props)
   const pnl = pnlOf(view);
   const ended = series.expiry <= nowSec;
   const pill = PILLS[view.status];
+  const card = (view.status === "collect" || view.status === "paid") && view.settlement ? bestWin([view], view.settlement.price, quoteDecimals) : undefined;
   const sellable = view.status === "active" && series.quotable;
   const valueLabel = view.status === "active" ? "Value now" : view.status === "paid" ? "Collected" : "Payout";
 
@@ -73,6 +76,7 @@ export function PositionCard({ view, quoteDecimals, nowSec, onSellBack }: Props)
       </dl>
 
       <SettlementNote view={view} quoteDecimals={quoteDecimals} nowSec={nowSec} />
+      {card && <ShareButton card={card} className="mt-3" />}
 
       {(view.status === "active" || view.status === "closed") && (
         <Button tone="ghost" size="lg" disabled={!sellable} onClick={() => onSellBack(view)}>

@@ -7,6 +7,7 @@ const SHORT_SUFFIX = "-SHORT";
 export const SECONDS_PER_DAY = 86_400;
 export const EXPIRY_TIME_OF_DAY = 8 * 3_600;
 export const CLAIM_WINDOW_SEC = 7 * SECONDS_PER_DAY;
+export const TWAP_WINDOW_SEC = 1_800;
 
 const DEFAULT_LEAD_SEC = 6 * 3_600;
 const STEP_OF_PRICE = 0.015;
@@ -26,6 +27,12 @@ interface SeriesParams {
 export function seriesId({ underlying, expiry, strike, width, quoteDecimals, kind }: SeriesParams): string {
   const prices = `${formatStrike(strike, quoteDecimals)}_${formatStrike(capPrice({ kind, strike, width }), quoteDecimals)}`;
   return `${underlying}-${formatExpiry(expiry)}-${prices}-${kind === "call" ? "C" : "P"}`;
+}
+
+// Deribit-style points are stamped at the end of their minute, so the window is (expiry - TWAP_WINDOW_SEC, expiry]
+export function twapPoints(points: [number, number][], expiry: number, untilMs = Infinity): number[] {
+  const end = Math.min(expiry * 1000, untilMs);
+  return points.filter(([ms]) => ms > (expiry - TWAP_WINDOW_SEC) * 1000 && ms <= end).map(([, price]) => price);
 }
 
 export function defaultExpiry(expiries: number[], nowSec: number): number | undefined {

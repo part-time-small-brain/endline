@@ -1,4 +1,4 @@
-import { type Mark, toSign, type QuoteRequest, type StatusUpdate } from "@endline/sdk";
+import { listedWidth, type Mark, seriesId, toSign, type QuoteRequest, type StatusUpdate } from "@endline/sdk";
 import type { Page, Route } from "@playwright/test";
 import { expect, handleOf, money, term, test } from "./fixtures.ts";
 
@@ -679,6 +679,137 @@ test.describe("Tap", () => {
     const unpriced = page.getByRole("table").getByRole("button", { name: /^Up · BTC ends above \$81,000 · Tomorrow .* · no price right now · you hold this$/ });
     await expect(unpriced).toBeDisabled();
     await expect(unpriced).toHaveCSS("opacity", "1");
+  });
+
+  async function heldThroughTheEnd(page: Page, { bothSides = false } = {}) {
+    const expiry = Date.UTC(2026, 10, 5, 8) / 1000;
+    const tokens = ["nep245:opt.demo.testnet:BTC-5NOV26-81000_83000-C", ...(bothSides ? ["nep245:opt.demo.testnet:BTC-5NOV26-81000_79000-P"] : [])];
+    const world = { index: 81_500, settlement: null as null | { price: string; final_at: number } };
+    await page.addInitScript(() => {
+      (window as unknown as { ethereum: object }).ethereum = {
+        async request({ method }: { method: string }) {
+          if (method === "eth_requestAccounts") return ["0x1111111111111111111111111111111111111111"];
+          throw new Error(method);
+        },
+      };
+    });
+    await page.route("**/fills/*", (route) =>
+      route.fulfill({ json: [{ quote_id: "q", series_id: "BTC-5NOV26-81000_83000-C", side: "buy", account_id: "0x1111111111111111111111111111111111111111", size: "2000000", premium: String(5 * USD), tx_hash: "tx", at_ms: NOW_MS - 3_600_000 }] }),
+    );
+    await live(
+      page,
+      () => [
+        { series_id: "BTC-5NOV26-81000_83000-C", ask: String(400 * USD), bid: String(380 * USD), vol: 0.4 },
+        { series_id: "BTC-6NOV26-82000_84000-C", ask: String(400 * USD), vol: 0.4 },
+      ],
+      () => world.index,
+    );
+    const junkStrike = 500_000n * BigInt(USD);
+    const junkWidth = listedWidth(junkStrike, 6);
+    const junk = { ...listed[0]!, id: seriesId({ underlying: "BTC", expiry, strike: junkStrike, width: junkWidth, quoteDecimals: 6, kind: "call" }), strike: String(junkStrike), width: String(junkWidth), kind: "call" as const };
+    await page.route("**/series", (route) => route.fulfill({ json: { quote_asset: "nep141:usdc.demo.testnet", quote_decimals: 6, series: [...listed, junk] } }));
+    await page.route("https://www.deribit.com/**", (route) =>
+      route.fulfill({
+        json: route.request().url().includes("chart")
+          ? { result: Array.from({ length: 1_500 }, (_, i) => [(expiry - 1_440 * 60 + (i + 1) * 60) * 1000, world.index]) }
+          : { result: { index_price: world.index } },
+      }),
+    );
+    await page.route("**/rpc", (route) => {
+      const params = route.request().postDataJSON().params;
+      const args = JSON.parse(Buffer.from(params.args_base64, "base64").toString());
+      const value = params.method_name === "mt_batch_balance_of" ? args.token_ids.map((id: string) => (tokens.includes(id) ? "2000000" : "0")) : params.method_name === "get_settlement" ? world.settlement : view[params.method_name];
+      route.fulfill({ json: { jsonrpc: "2.0", id: "web", ...(value === undefined ? { error: { message: "unknown" } } : { result: { result: [...Buffer.from(JSON.stringify(value))] } }) } });
+    });
+    await page.getByRole("button", { name: "Connect", exact: true }).click();
+    await page.getByRole("button", { name: /Ethereum wallet/ }).click();
+    await expect(page.getByRole("table").getByRole("button", { name: /^Up · BTC ends above \$81,000 · Tomorrow .* · you hold this$/ })).toBeVisible();
+    const until = async (sec: number) => page.clock.fastForward(sec * 1000 - (await page.evaluate(() => Date.now())));
+    return { expiry, world, until };
+  }
+
+  test("a held bet keeps its column through the final round, then shows the estimate, the proposed price, the result and a card to share", async ({ page }) => {
+    await page.addInitScript(() => Object.assign(navigator, { canShare: undefined }));
+    const { expiry, world, until } = await heldThroughTheEnd(page, { bothSides: true });
+    const group = (name: RegExp) => page.getByRole("table").getByRole("group", { name });
+    await until(expiry - 29 * 60);
+    await expect(group(/^Up · BTC ends above \$81,000 · final round · on track to pay about \$10\.00 · you hold this$/)).toBeVisible();
+    await expect(page.getByRole("columnheader", { name: /^Final round/ })).toBeVisible();
+    await expect(page.getByRole("table").getByRole("rowheader")).toHaveText([/^\$82,000/, /^\$81,000/]);
+    await expect(page.getByText("Final round · average so far ≈ $81,500. Estimate from Deribit's index; the final price is the median of 7 exchanges.")).toBeVisible();
+    await expect(page.getByRole("table").getByRole("button", { name: /^Up · BTC ends above \$81,000 · / })).toHaveCount(0);
+    await until(expiry + 60);
+    await expect(group(/· ended · looks like it pays about \$10\.00 · you hold this$/)).toBeVisible();
+    world.settlement = { price: String(81_400 * USD), final_at: expiry + 3_900 };
+    await page.clock.fastForward(15_000);
+    await expect(group(/· ended · pays \$8\.00 if the proposed price stands · you hold this$/)).toBeVisible();
+    await expect(page.getByText(/^Proposed final price \$81,400, final at /)).toBeVisible();
+    await until(expiry + 3_900);
+    await expect(group(/^Up · BTC ends above \$81,000 · result · pays \$8\.00 · you hold this$/)).toBeVisible();
+    await expect(page.getByText("Final price $81,400. You get $8.00 back.")).toBeVisible();
+    world.index = 80_000;
+    await page.clock.fastForward(5_000);
+    await expect(page.getByRole("radio", { name: /^BTC \$80,000/ })).toBeVisible();
+    await expect(group(/^Up · BTC ends above \$81,000 · result · pays \$8\.00 · you hold this$/)).toBeVisible();
+    const download = page.waitForEvent("download");
+    await page.getByRole("button", { name: "Share" }).click();
+    const file = await download;
+    expect(file.suggestedFilename()).toBe("endline-win.png");
+    const bytes = await (await import("node:fs/promises")).readFile(await file.path());
+    expect([...bytes.subarray(0, 4)]).toEqual([0x89, 0x50, 0x4e, 0x47]);
+    await until(expiry + 3 * 3_600);
+    await expect(page.getByRole("table").getByRole("button", { name: /^Up · BTC ends above \$82,000 · / })).toBeVisible();
+    await expect(page.getByRole("table").getByRole("group")).toHaveCount(0);
+    await expect(page.getByRole("columnheader", { name: /^(Final round|Ended|Result)/ })).toHaveCount(0);
+  });
+
+  test("a share uses the phone's share sheet with the card as a PNG when it can take files", async ({ page }) => {
+    await page.addInitScript(() => {
+      const w = window as unknown as { shared: { type: string; name: string; text: string }[] };
+      w.shared = [];
+      Object.assign(navigator, {
+        canShare: (data: { files?: File[] }) => Boolean(data.files?.length),
+        share: async (data: { files: File[]; text: string }) => void w.shared.push({ type: data.files[0]!.type, name: data.files[0]!.name, text: data.text }),
+      });
+    });
+    const { expiry, world, until } = await heldThroughTheEnd(page);
+    world.settlement = { price: String(81_400 * USD), final_at: expiry + 3_900 };
+    await until(expiry + 3_900);
+    await page.getByRole("button", { name: "Share" }).click();
+    await expect.poll(() => page.evaluate(() => (window as unknown as { shared: unknown[] }).shared)).toEqual([{ type: "image/png", name: "endline-win.png", text: "BTC Up $81,000: Won $8.00 on Endline" }]);
+  });
+
+  for (const [refusal, downloads] of [["NotAllowedError", 1], ["AbortError", 0]] as const) {
+    test(`a share sheet that throws ${refusal} ${downloads ? "falls back to a download" : "is left alone"}`, async ({ page }) => {
+      await page.addInitScript((name) => {
+        const w = window as unknown as { shares: number };
+        w.shares = 0;
+        Object.assign(navigator, { canShare: () => true, share: async () => (w.shares++, Promise.reject(new DOMException("no", name))) });
+      }, refusal);
+      const { expiry, world, until } = await heldThroughTheEnd(page);
+      world.settlement = { price: String(81_400 * USD), final_at: expiry + 3_900 };
+      await until(expiry + 3_900);
+      let downloaded = 0;
+      page.on("download", () => downloaded++);
+      const download = downloads ? page.waitForEvent("download") : undefined;
+      await page.getByRole("button", { name: "Share" }).click();
+      await expect.poll(() => page.evaluate(() => (window as unknown as { shares: number }).shares)).toBe(1);
+      await download;
+      await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => setTimeout(resolve))));
+      expect(downloaded).toBe(downloads);
+    });
+  }
+
+  test("a bet that ends short of its price to beat says so and offers nothing to share", async ({ page }) => {
+    const { expiry, world, until } = await heldThroughTheEnd(page);
+    world.index = 80_000;
+    await until(expiry - 10 * 60);
+    await expect(page.getByRole("table").getByRole("group", { name: /· final round · on track to pay nothing · you hold this$/ })).toBeVisible();
+    world.settlement = { price: String(80_000 * USD), final_at: expiry + 3_900 };
+    await until(expiry + 3_900);
+    await expect(page.getByRole("table").getByRole("group", { name: /· result · lost · you hold this$/ })).toBeVisible();
+    await expect(page.getByText("Final price $80,000.", { exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Share" })).toHaveCount(0);
   });
 
   test("drops every cell once the relay's marks fail", async ({ page }) => {
