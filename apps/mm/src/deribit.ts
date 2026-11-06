@@ -1,3 +1,4 @@
+import { twapPoints } from "@endline/sdk";
 import { z } from "zod";
 
 const API = "https://www.deribit.com/api/v2/public";
@@ -19,7 +20,6 @@ const MONTHS = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "
 const INSTRUMENT = /^([A-Z_]+)-(\d{1,2})([A-Z]{3})(\d{2})-(\d+(?:d\d+)?)-[CP]$/;
 const DELIVERY_HOUR_UTC = 8;
 const DAY_SEC = 86_400;
-const TWAP_WINDOW_SEC = 1_800;
 const MIN_POINTS = 25;
 
 export function parseInstrument(name: string): Instrument | undefined {
@@ -82,7 +82,7 @@ export function settlementReferences(): (index: string, expiry: number) => Promi
       return data.find((row) => row.date === day)?.delivery_price;
     }
     const points = IndexChart.parse(await once("get_index_chart_data", { index_name: index, range: "1d" }));
-    const window = points.filter(([ms]) => ms > (expiry - TWAP_WINDOW_SEC) * 1000 && ms <= expiry * 1000);
-    return window.length >= MIN_POINTS ? window.reduce((sum, [, price]) => sum + price, 0) / window.length : undefined;
+    const window = twapPoints(points, expiry);
+    return window.length >= MIN_POINTS ? window.reduce((sum, price) => sum + price, 0) / window.length : undefined;
   };
 }

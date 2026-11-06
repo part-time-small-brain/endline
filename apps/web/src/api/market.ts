@@ -6,6 +6,13 @@ export interface MarketSnapshot {
 
 export type PricePoint = [ms: number, price: number];
 
+const CHART_STEP_MS = 300_000;
+
+export function chartPoints(points: PricePoint[]): PricePoint[] {
+  const bucket = (ms: number) => Math.floor(ms / CHART_STEP_MS);
+  return points.filter(([ms], i) => i === 0 || i === points.length - 1 || bucket(ms) !== bucket(points[i - 1]![0]));
+}
+
 export interface Market {
   snapshot(underlyings: string[]): Promise<MarketSnapshot>;
   history(underlying: string): Promise<PricePoint[]>;
@@ -13,7 +20,6 @@ export interface Market {
 
 const Index = z.object({ result: z.object({ index_price: z.number().positive() }) });
 const IndexChart = z.object({ result: z.array(z.tuple([z.number(), z.number().positive()])) });
-const HISTORY_EVERY = 5;
 
 async function index(name: string): Promise<number> {
   const response = await fetch(`https://www.deribit.com/api/v2/public/get_index_price?index_name=${name}`);
@@ -33,8 +39,7 @@ export function deribitMarket(): Market {
     },
     async history(underlying) {
       const response = await fetch(`https://www.deribit.com/api/v2/public/get_index_chart_data?index_name=${underlying.toLowerCase()}_usd&range=1d`);
-      const points = IndexChart.parse(await response.json()).result;
-      return points.filter((_, i) => i % HISTORY_EVERY === 0 || i === points.length - 1);
+      return IndexChart.parse(await response.json()).result;
     },
   };
 }

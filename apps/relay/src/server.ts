@@ -1,6 +1,7 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
-import { AccountId, PublishRequest, QuoteRequest, SignedRequest } from "@endline/sdk";
+import { AccountId, CallRequest, PublishRequest, QuoteRequest, SignedRequest } from "@endline/sdk";
 import { z } from "zod";
+import type { Calls } from "./calls.ts";
 import type { Collector } from "./collect.ts";
 import type { Faucet } from "./faucet.ts";
 import type { Fills } from "./fills.ts";
@@ -11,7 +12,7 @@ import type { OneClick } from "./oneClick.ts";
 import { HttpError, type Relay } from "./relay.ts";
 
 const MAX_BODY_BYTES = 64 * 1024;
-const LIMITED = new Set(["POST /quote", "POST /execute", "POST /transfer", "POST /claims", "POST /faucet", "POST /deposit-quote"]);
+const LIMITED = new Set(["POST /quote", "POST /execute", "POST /transfer", "POST /claims", "POST /calls", "POST /faucet", "POST /deposit-quote"]);
 const APP_ONLY = new Set(["/faucet", "/deposit-quote"]);
 const MAX_REQUESTS_PER_MINUTE = 30;
 const FaucetRequest = z.object({ account_id: AccountId });
@@ -69,7 +70,7 @@ function send(response: ServerResponse, status: number, body: unknown, cors: obj
   response.end(JSON.stringify(body));
 }
 
-export function createRelayServer(relay: Relay, fills: Fills, hub: MmHub, collector: Collector, oneClick: OneClick, faucet?: Faucet, trustProxy = false, appOrigins: ReadonlySet<string> = new Set()): Server {
+export function createRelayServer(relay: Relay, fills: Fills, hub: MmHub, collector: Collector, oneClick: OneClick, calls: Calls, faucet?: Faucet, trustProxy = false, appOrigins: ReadonlySet<string> = new Set()): Server {
   const allow = rateLimit(MAX_REQUESTS_PER_MINUTE, 60_000);
   const route = async (request: IncomingMessage): Promise<[number, unknown]> => {
     const path = pathOf(request);
@@ -112,6 +113,16 @@ export function createRelayServer(relay: Relay, fills: Fills, hub: MmHub, collec
       case "GET /fills/:arg":
         if (!AccountId.safeParse(param).success) throw new HttpError(400, "invalid account id");
         return [200, await fills.byAccount(param)];
+      case "POST /calls":
+        return [200, await calls.add(await parseBody(request, CallRequest))];
+      case "GET /calls/:arg":
+        if (!AccountId.safeParse(param).success) throw new HttpError(400, "invalid account id");
+        return [200, calls.byAccount(param)];
+      case "GET /leaderboard":
+        return [200, calls.board()];
+      case "GET /leaderboard/:arg":
+        if (!AccountId.safeParse(param).success) throw new HttpError(400, "invalid account id");
+        return [200, calls.board(param)];
       default:
         throw new HttpError(404, "not found");
     }

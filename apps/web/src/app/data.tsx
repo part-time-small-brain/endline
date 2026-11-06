@@ -1,6 +1,6 @@
-import { type Fill, intentsAssetId, type ListedSeries, type Mark, type SeriesListing, type Timing } from "@endline/sdk";
+import { type Call, type Fill, intentsAssetId, type ListedSeries, type Mark, type SeriesListing, type Timing } from "@endline/sdk";
 import { createContext, type ReactNode, useCallback, useContext, useMemo } from "react";
-import type { MarketSnapshot, PricePoint } from "../api/market.ts";
+import { chartPoints, type MarketSnapshot, type PricePoint } from "../api/market.ts";
 import { usePoll } from "../hooks/usePoll.ts";
 import { verifiedListing } from "../lib/listing.ts";
 import type { SettlementView } from "../lib/status.ts";
@@ -17,6 +17,7 @@ export interface AppData {
   marks: Record<string, Mark> | undefined;
   marksError: string | undefined;
   history: Record<string, PricePoint[]> | undefined;
+  minutes: Record<string, PricePoint[]> | undefined;
   timing: Timing | undefined;
   balances: Record<string, bigint> | undefined;
   balance: bigint | undefined;
@@ -24,9 +25,11 @@ export interface AppData {
   tapBalances: Record<string, bigint> | undefined;
   tapBalance: bigint | undefined;
   tapFills: Fill[] | undefined;
+  calls: Call[] | undefined;
   settlements: Record<string, SettlementView | null>;
   optionAsset(seriesId: string): string;
   reload(): void;
+  reloadCalls(): void;
 }
 
 export const settlementKey = (s: Pick<ListedSeries, "underlying" | "expiry">) => `${s.underlying}:${s.expiry}`;
@@ -55,6 +58,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     underlyings.join(),
   );
 
+  const charts = useMemo(() => history.data && Object.fromEntries(Object.entries(history.data).map(([u, points]) => [u, chartPoints(points)])), [history.data]);
   const optionAsset = useCallback((seriesId: string) => intentsAssetId(config.optionsId, seriesId), [config.optionsId]);
   const assets = useMemo(
     () => [config.quoteAsset, ...(listing?.series.map((s) => optionAsset(s.id)) ?? [])],
@@ -64,6 +68,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const fills = usePoll(account ? () => services.relay.fills(account) : null, 15_000, account);
   const tapBalances = usePoll(tapAccount && listing ? () => services.chain.balances(tapAccount, assets) : null, 10_000, `${tapAccount}:${assets.length}`);
   const tapFills = usePoll(tapAccount ? () => services.relay.fills(tapAccount) : null, 15_000, tapAccount);
+  const calls = usePoll(account ? () => services.relay.calls(account) : null, 60_000, account);
 
   const ended = useMemo(() => {
     const nowSec = Date.now() / 1000;
@@ -72,8 +77,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
     const keys = (listing?.series ?? [])
       .filter((s) => s.expiry <= nowSec && (touched.has(s.id) || held(s)))
       .map(settlementKey);
-    return [...new Set(keys)].sort();
-  }, [listing, fills.data, balances.data, tapFills.data, tapBalances.data, optionAsset]);
+    const called = (calls.data ?? []).filter((c) => c.terms.expiry <= nowSec).map((c) => settlementKey(c.terms));
+    return [...new Set([...keys, ...called])].sort();
+  }, [listing, fills.data, balances.data, tapFills.data, tapBalances.data, calls.data, optionAsset]);
   const settlements = usePoll(
     ended.length
       ? async () => {
@@ -97,7 +103,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
     tapFills.reload();
     settlements.reload();
     marks.reload();
-  }, [balances.reload, fills.reload, tapBalances.reload, tapFills.reload, settlements.reload, marks.reload]);
+    calls.reload();
+  }, [balances.reload, fills.reload, tapBalances.reload, tapFills.reload, settlements.reload, marks.reload, calls.reload]);
 
   const value: AppData = {
     listing,
@@ -107,7 +114,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
     marketError: market.error,
     marks: marks.error ? undefined : marksById,
     marksError: marks.error,
-    history: history.data,
+    history: charts,
+    minutes: history.data,
     timing: contract.data?.timing,
     balances: balances.data,
     balance: balances.data?.[config.quoteAsset],
@@ -115,9 +123,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
     tapBalances: tapBalances.data,
     tapBalance: tapBalances.data?.[config.quoteAsset],
     tapFills: tapFills.data,
+    calls: calls.data,
     settlements: settlements.data ?? {},
     optionAsset,
     reload,
+    reloadCalls: calls.reload,
   };
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>;
 }

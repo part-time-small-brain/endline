@@ -1,4 +1,4 @@
-import { toSign, type QuoteRequest, type StatusUpdate } from "@endline/sdk";
+import { listedWidth, type Mark, seriesId, toSign, type QuoteRequest, type StatusUpdate } from "@endline/sdk";
 import type { Page, Route } from "@playwright/test";
 import { expect, handleOf, money, term, test } from "./fixtures.ts";
 
@@ -28,12 +28,12 @@ test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem("trade-mode", "pro"));
 });
 
-async function live(page: Page, marks: () => unknown[] | undefined | "hang", index = () => 80_650) {
+async function live(page: Page, marks: () => unknown[] | undefined | "hang", index = () => 80_650, series = listed) {
   await page.route("**/rpc", (route) => {
     const value = view[route.request().postDataJSON().params.method_name];
     route.fulfill({ json: { jsonrpc: "2.0", id: "web", ...(value === undefined ? { error: { message: "unknown" } } : { result: { result: [...Buffer.from(JSON.stringify(value))] } }) } });
   });
-  await page.route("**/series", (route) => route.fulfill({ json: { quote_asset: "nep141:usdc.demo.testnet", quote_decimals: 6, series: listed } }));
+  await page.route("**/series", (route) => route.fulfill({ json: { quote_asset: "nep141:usdc.demo.testnet", quote_decimals: 6, series } }));
   await page.route("**/marks", (route) => {
     const answer = marks();
     if (answer !== "hang") route.fulfill({ json: answer ?? { error: "no market makers" } });
@@ -575,6 +575,13 @@ test.describe("Tap", () => {
 
   test("a tap signs only while the firm quote still pays the multiple on the cell, and a refused one shows the new multiple at once", async ({ page }) => {
     const state = await withTapBalance(page);
+    await page.route("**/rpc", async (route) => {
+      const params = route.request().postDataJSON().params;
+      if (params.method_name !== "mt_batch_balance_of") return route.fallback();
+      const ids: string[] = JSON.parse(Buffer.from(params.args_base64, "base64").toString()).token_ids;
+      await route.fulfill({ json: { jsonrpc: "2.0", id: "web", result: { result: [...Buffer.from(JSON.stringify(ids.map((id) => (id.endsWith("-P") ? "0" : String(250 * USD)))))] } } });
+    });
+    await page.clock.fastForward(10_000);
     let ask = 400;
     await page.route("**/marks", (route) => route.fulfill({ json: [{ series_id: "BTC-5NOV26-81000_83000-C", ask: String(ask * USD), bid: String(380 * USD), vol: 0.4 }] }));
     const cell = page.getByRole("table").getByRole("button", { name: /^Up · BTC ends above \$81,000 · Tomorrow/ });
@@ -587,9 +594,15 @@ test.describe("Tap", () => {
     await expect(cell).toHaveAccessibleName(/· pays up to 4\.8×/);
     expect(state.published).toEqual([]);
     await page.clock.resume();
+    await page.route("https://www.deribit.com/**", (route) => (route.request().url().includes("chart") ? route.fallback() : route.fulfill({ json: { result: { index_price: 81_200 } } })));
+    await page.clock.fastForward(5_000);
+    await expect(cell).toHaveAccessibleName(/· winning now · you hold this$/);
     state.premium = 25;
     await cell.click();
     await expect(page.getByRole("status").filter({ hasText: "Bought BTC Up $81,000 for $25.00." })).toBeVisible();
+    await page.clock.pauseAt((await page.evaluate(() => Date.now())) + 100);
+    await expect.poll(() => cell.evaluate((el) => el.getAnimations().filter((a) => a instanceof CSSTransition).length)).toBe(0);
+    await expect(cell).toHaveCSS("background-color", "rgb(11, 38, 28)");
     expect(state.published).toEqual(["quote-2"]);
   });
 
@@ -617,6 +630,329 @@ test.describe("Tap", () => {
     await page.route("**/series", (route) => route.fulfill({ json: { quote_asset: "nep141:usdc.demo.testnet", quote_decimals: 6, series: closed } }));
     await page.clock.fastForward(15_000);
     await expect(mine.getByRole("button", { name: /^Sell \$/ })).toHaveCount(0);
+  });
+
+  test("a held cell shows what it's worth and its P&L, and glows and flashes each time spot crosses its price to beat", async ({ page }) => {
+    let index = 80_650;
+    let marks: Mark[] = [{ series_id: "BTC-5NOV26-81000_83000-C", ask: String(400 * USD), bid: String(380 * USD), vol: 0.4 }];
+    const token = "nep245:opt.demo.testnet:BTC-5NOV26-81000_83000-C";
+    await page.addInitScript(() => {
+      (window as unknown as { ethereum: object }).ethereum = {
+        async request({ method }: { method: string }) {
+          if (method === "eth_requestAccounts") return ["0x1111111111111111111111111111111111111111"];
+          throw new Error(method);
+        },
+      };
+    });
+    await page.route("**/fills/*", (route) =>
+      route.fulfill({ json: [{ quote_id: "q", series_id: "BTC-5NOV26-81000_83000-C", side: "buy", account_id: "0x1111111111111111111111111111111111111111", size: "2000000", premium: String(5 * USD), tx_hash: "tx", at_ms: NOW_MS - 3_600_000 }] }),
+    );
+    await live(page, () => marks, () => index);
+    await page.route("**/rpc", (route) => {
+      const params = route.request().postDataJSON().params;
+      const args = JSON.parse(Buffer.from(params.args_base64, "base64").toString());
+      const value = params.method_name === "mt_batch_balance_of" ? args.token_ids.map((id: string) => (id === token ? "2000000" : "0")) : view[params.method_name];
+      route.fulfill({ json: { jsonrpc: "2.0", id: "web", ...(value === undefined ? { error: { message: "unknown" } } : { result: { result: [...Buffer.from(JSON.stringify(value))] } }) } });
+    });
+    await page.getByRole("button", { name: "Connect", exact: true }).click();
+    await page.getByRole("button", { name: /Ethereum wallet/ }).click();
+    const cell = page.getByRole("table").getByRole("button", { name: /^Up · BTC ends above \$81,000 · Tomorrow/ });
+    const flashes = () => cell.evaluate((el) => el.getAnimations({ subtree: true }).filter((a) => (a as CSSAnimation).animationName === "fade").length);
+    await expect(cell).toHaveAccessibleName(/· pays up to 5\.0× · worth \$7\.60 · up \$2\.60 · you hold this$/);
+    await expect(cell).toHaveText("$7.60+52%5.0×");
+    expect(await flashes()).toBe(0);
+    index = 81_200;
+    await page.clock.fastForward(5_000);
+    await expect.poll(flashes, { intervals: [50] }).toBe(1);
+    await expect(cell).toHaveAccessibleName(/· up \$2\.60 · winning now · you hold this$/);
+    await expect.poll(flashes).toBe(0);
+    index = 80_650;
+    await page.clock.fastForward(5_000);
+    await expect.poll(flashes, { intervals: [50] }).toBe(1);
+    await expect(cell).toHaveAccessibleName(/· up \$2\.60 · you hold this$/);
+    marks = [{ series_id: "BTC-5NOV26-81000_83000-C", ask: String(400 * USD), vol: 0.4 }];
+    await page.clock.fastForward(5_000);
+    await expect(cell).toHaveText("$0.00-100%5.0×");
+    await expect(cell.getByText("-100%")).toHaveCSS("font-size", "16px");
+    marks = [];
+    await page.clock.fastForward(5_000);
+    const unpriced = page.getByRole("table").getByRole("button", { name: /^Up · BTC ends above \$81,000 · Tomorrow .* · no price right now · you hold this$/ });
+    await expect(unpriced).toBeDisabled();
+    await expect(unpriced).toHaveCSS("opacity", "1");
+  });
+
+  async function heldThroughTheEnd(page: Page, { bothSides = false } = {}) {
+    const expiry = Date.UTC(2026, 10, 5, 8) / 1000;
+    const tokens = ["nep245:opt.demo.testnet:BTC-5NOV26-81000_83000-C", ...(bothSides ? ["nep245:opt.demo.testnet:BTC-5NOV26-81000_79000-P"] : [])];
+    const world = { index: 81_500, settlement: null as null | { price: string; final_at: number } };
+    await page.addInitScript(() => {
+      (window as unknown as { ethereum: object }).ethereum = {
+        async request({ method }: { method: string }) {
+          if (method === "eth_requestAccounts") return ["0x1111111111111111111111111111111111111111"];
+          throw new Error(method);
+        },
+      };
+    });
+    await page.route("**/fills/*", (route) =>
+      route.fulfill({ json: [{ quote_id: "q", series_id: "BTC-5NOV26-81000_83000-C", side: "buy", account_id: "0x1111111111111111111111111111111111111111", size: "2000000", premium: String(5 * USD), tx_hash: "tx", at_ms: NOW_MS - 3_600_000 }] }),
+    );
+    await live(
+      page,
+      () => [
+        { series_id: "BTC-5NOV26-81000_83000-C", ask: String(400 * USD), bid: String(380 * USD), vol: 0.4 },
+        { series_id: "BTC-6NOV26-82000_84000-C", ask: String(400 * USD), vol: 0.4 },
+      ],
+      () => world.index,
+    );
+    const junkStrike = 500_000n * BigInt(USD);
+    const junkWidth = listedWidth(junkStrike, 6);
+    const junk = { ...listed[0]!, id: seriesId({ underlying: "BTC", expiry, strike: junkStrike, width: junkWidth, quoteDecimals: 6, kind: "call" }), strike: String(junkStrike), width: String(junkWidth), kind: "call" as const };
+    await page.route("**/series", (route) => route.fulfill({ json: { quote_asset: "nep141:usdc.demo.testnet", quote_decimals: 6, series: [...listed, junk] } }));
+    await page.route("https://www.deribit.com/**", (route) =>
+      route.fulfill({
+        json: route.request().url().includes("chart")
+          ? { result: Array.from({ length: 1_500 }, (_, i) => [(expiry - 1_440 * 60 + (i + 1) * 60) * 1000, world.index]) }
+          : { result: { index_price: world.index } },
+      }),
+    );
+    await page.route("**/rpc", (route) => {
+      const params = route.request().postDataJSON().params;
+      const args = JSON.parse(Buffer.from(params.args_base64, "base64").toString());
+      const value = params.method_name === "mt_batch_balance_of" ? args.token_ids.map((id: string) => (tokens.includes(id) ? "2000000" : "0")) : params.method_name === "get_settlement" ? world.settlement : view[params.method_name];
+      route.fulfill({ json: { jsonrpc: "2.0", id: "web", ...(value === undefined ? { error: { message: "unknown" } } : { result: { result: [...Buffer.from(JSON.stringify(value))] } }) } });
+    });
+    await page.getByRole("button", { name: "Connect", exact: true }).click();
+    await page.getByRole("button", { name: /Ethereum wallet/ }).click();
+    await expect(page.getByRole("table").getByRole("button", { name: /^Up · BTC ends above \$81,000 · Tomorrow .* · you hold this$/ })).toBeVisible();
+    const until = async (sec: number) => page.clock.fastForward(sec * 1000 - (await page.evaluate(() => Date.now())));
+    return { expiry, world, until };
+  }
+
+  test("a held bet keeps its column through the final round, then shows the estimate, the proposed price, the result and a card to share", async ({ page }) => {
+    await page.addInitScript(() => Object.assign(navigator, { canShare: undefined }));
+    const { expiry, world, until } = await heldThroughTheEnd(page, { bothSides: true });
+    const group = (name: RegExp) => page.getByRole("table").getByRole("group", { name });
+    await until(expiry - 29 * 60);
+    await expect(group(/^Up · BTC ends above \$81,000 · final round · on track to pay about \$10\.00 · you hold this$/)).toBeVisible();
+    await expect(page.getByRole("columnheader", { name: /^Final round/ })).toBeVisible();
+    await expect(page.getByRole("table").getByRole("rowheader")).toHaveText([/^\$82,000/, /^\$81,000/]);
+    await expect(page.getByText("Final round · average so far ≈ $81,500. Estimate from Deribit's index; the final price is the median of 7 exchanges.")).toBeVisible();
+    await expect(page.getByRole("table").getByRole("button", { name: /^Up · BTC ends above \$81,000 · / })).toHaveCount(0);
+    await until(expiry + 60);
+    await expect(group(/· ended · looks like it pays about \$10\.00 · you hold this$/)).toBeVisible();
+    world.settlement = { price: String(81_400 * USD), final_at: expiry + 3_900 };
+    await page.clock.fastForward(15_000);
+    await expect(group(/· ended · pays \$8\.00 if the proposed price stands · you hold this$/)).toBeVisible();
+    await expect(page.getByText(/^Proposed final price \$81,400, final at /)).toBeVisible();
+    await until(expiry + 3_900);
+    await expect(group(/^Up · BTC ends above \$81,000 · result · pays \$8\.00 · you hold this$/)).toBeVisible();
+    await expect(page.getByText("Final price $81,400. You get $8.00 back.")).toBeVisible();
+    world.index = 80_000;
+    await page.clock.fastForward(5_000);
+    await expect(page.getByRole("radio", { name: /^BTC \$80,000/ })).toBeVisible();
+    await expect(group(/^Up · BTC ends above \$81,000 · result · pays \$8\.00 · you hold this$/)).toBeVisible();
+    const download = page.waitForEvent("download");
+    await page.getByRole("button", { name: "Share" }).click();
+    const file = await download;
+    expect(file.suggestedFilename()).toBe("endline-win.png");
+    const bytes = await (await import("node:fs/promises")).readFile(await file.path());
+    expect([...bytes.subarray(0, 4)]).toEqual([0x89, 0x50, 0x4e, 0x47]);
+    await until(expiry + 3 * 3_600);
+    await expect(page.getByRole("table").getByRole("button", { name: /^Up · BTC ends above \$82,000 · / })).toBeVisible();
+    await expect(page.getByRole("table").getByRole("group")).toHaveCount(0);
+    await expect(page.getByRole("columnheader", { name: /^(Final round|Ended|Result)/ })).toHaveCount(0);
+  });
+
+  test("a share uses the phone's share sheet with the card as a PNG when it can take files", async ({ page }) => {
+    await page.addInitScript(() => {
+      const w = window as unknown as { shared: { type: string; name: string; text: string }[] };
+      w.shared = [];
+      Object.assign(navigator, {
+        canShare: (data: { files?: File[] }) => Boolean(data.files?.length),
+        share: async (data: { files: File[]; text: string }) => void w.shared.push({ type: data.files[0]!.type, name: data.files[0]!.name, text: data.text }),
+      });
+    });
+    const { expiry, world, until } = await heldThroughTheEnd(page);
+    world.settlement = { price: String(81_400 * USD), final_at: expiry + 3_900 };
+    await until(expiry + 3_900);
+    await page.getByRole("button", { name: "Share" }).click();
+    await expect.poll(() => page.evaluate(() => (window as unknown as { shared: unknown[] }).shared)).toEqual([{ type: "image/png", name: "endline-win.png", text: "BTC Up $81,000: Won $8.00 on Endline" }]);
+  });
+
+  for (const [refusal, downloads] of [["NotAllowedError", 1], ["AbortError", 0]] as const) {
+    test(`a share sheet that throws ${refusal} ${downloads ? "falls back to a download" : "is left alone"}`, async ({ page }) => {
+      await page.addInitScript((name) => {
+        const w = window as unknown as { shares: number };
+        w.shares = 0;
+        Object.assign(navigator, { canShare: () => true, share: async () => (w.shares++, Promise.reject(new DOMException("no", name))) });
+      }, refusal);
+      const { expiry, world, until } = await heldThroughTheEnd(page);
+      world.settlement = { price: String(81_400 * USD), final_at: expiry + 3_900 };
+      await until(expiry + 3_900);
+      let downloaded = 0;
+      page.on("download", () => downloaded++);
+      const download = downloads ? page.waitForEvent("download") : undefined;
+      await page.getByRole("button", { name: "Share" }).click();
+      await expect.poll(() => page.evaluate(() => (window as unknown as { shares: number }).shares)).toBe(1);
+      await download;
+      await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => setTimeout(resolve))));
+      expect(downloaded).toBe(downloads);
+    });
+  }
+
+  test("a bet that ends short of its price to beat says so and offers nothing to share", async ({ page }) => {
+    const { expiry, world, until } = await heldThroughTheEnd(page);
+    world.index = 80_000;
+    await until(expiry - 10 * 60);
+    await expect(page.getByRole("table").getByRole("group", { name: /· final round · on track to pay nothing · you hold this$/ })).toBeVisible();
+    world.settlement = { price: String(80_000 * USD), final_at: expiry + 3_900 };
+    await until(expiry + 3_900);
+    await expect(page.getByRole("table").getByRole("group", { name: /· result · lost · you hold this$/ })).toBeVisible();
+    await expect(page.getByText("Final price $80,000.", { exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Share" })).toHaveCount(0);
+  });
+
+  async function freeCalls(page: Page, series = listed, calls: unknown[] = []) {
+    const account = "0x1111111111111111111111111111111111111111";
+    const relay = { calls, posted: [] as { series_id: string; signer: unknown }[], hold: Promise.resolve() };
+    const board = {
+      round: "2026-11-04",
+      today: [
+        { account_id: "sun.near", rank: 1, points: 1_250, wins: 4, streak: 3 },
+        { account_id: "kite.near", rank: 2, points: 980, wins: 3, streak: 1 },
+      ],
+      week: [{ account_id: "sun.near", rank: 1, points: 3_100, wins: 9, streak: 3 }],
+      you: { today: { account_id: account, rank: 7, points: 150, wins: 1, streak: 2 }, week: null },
+    };
+    await page.addInitScript(() => {
+      localStorage.setItem("tap-free", "1");
+      const w = window as unknown as { ethereum: object; signs: number; refuseCalls?: { status: number; error: string } };
+      w.signs = 0;
+      const fetch = window.fetch.bind(window);
+      window.fetch = (input, init) => (String(input).endsWith("/calls") && w.refuseCalls ? Promise.resolve(new Response(JSON.stringify({ error: w.refuseCalls.error }), { status: w.refuseCalls.status })) : fetch(input, init));
+      w.ethereum = {
+        async request({ method }: { method: string }) {
+          if (method === "eth_requestAccounts") return ["0x1111111111111111111111111111111111111111"];
+          if (method !== "personal_sign") throw new Error(method);
+          w.signs++;
+          return `0x${"11".repeat(64)}1b`;
+        },
+      };
+    });
+    await page.route("**/calls", async (route) => {
+      const body = route.request().postDataJSON() as { series_id: string; signer: unknown };
+      relay.posted.push(body);
+      await relay.hold;
+      const { id, option_asset, quotable, ...terms } = series.find((s) => s.id === body.series_id)!;
+      const call = { series_id: id, account_id: account, terms, ask: String(400 * USD), at_ms: NOW_MS };
+      relay.calls.unshift(call);
+      await route.fulfill({ json: call });
+    });
+    await page.route("**/calls/*", (route) => route.fulfill({ json: relay.calls }));
+    await page.route("**/leaderboard/*", (route) => route.fulfill({ json: board }));
+    await page.route("**/fills/*", (route) => route.fulfill({ json: [] }));
+    await live(page, () => [
+      { series_id: "BTC-5NOV26-81000_83000-C", ask: String(400 * USD), vol: 0.4 },
+      { series_id: "BTC-5NOV26-82000_84000-C", ask: String(18_721), vol: 0.4 },
+      { series_id: "BTC-6NOV26-82000_84000-C", ask: String(400 * USD), vol: 0.4 },
+    ], undefined, series);
+    await page.route("**/rpc", (route) => {
+      const params = route.request().postDataJSON().params;
+      const args = JSON.parse(Buffer.from(params.args_base64, "base64").toString());
+      const value = params.method_name === "current_salt" ? "00000000" : params.method_name === "mt_batch_balance_of" ? args.token_ids.map(() => "0") : view[params.method_name];
+      route.fulfill({ json: { jsonrpc: "2.0", id: "web", ...(value === undefined ? { error: { message: "unknown" } } : { result: { result: [...Buffer.from(JSON.stringify(value))] } }) } });
+    });
+    await page.getByRole("button", { name: "Connect", exact: true }).click();
+    await page.getByRole("button", { name: /Ethereum wallet/ }).click();
+    const signs = () => page.evaluate(() => (window as unknown as { signs: number }).signs);
+    return { relay, board, signs };
+  }
+
+  test("a free call records the cell, counts down the round, refuses what the relay refuses, shows the board and keeps the sign-in across a reload", async ({ page }) => {
+    const { relay, signs } = await freeCalls(page);
+    const grid = page.getByRole("table");
+    await expect(page.getByRole("radio", { name: /^Free call/ })).toHaveAttribute("aria-checked", "true");
+    await expect(grid).toHaveAccessibleName(/^Tap a cell of the next round to call it for free\. /);
+    await expect(grid.getByRole("button", { name: /^Up · BTC ends above \$82,000 · Tomorrow .* · pays up to 25\.0×$/ })).toBeVisible();
+    await expect(grid.getByRole("button", { name: /^Up · BTC ends above \$82,000 · Fri 6 / })).toBeDisabled();
+    await grid.getByRole("button", { name: /^Up · BTC ends above \$81,000 · Tomorrow / }).click();
+    await expect(page.getByRole("status").filter({ hasText: "Called BTC Up $81,000 at 5.0×." })).toBeVisible();
+    expect(relay.posted).toEqual([expect.objectContaining({ series_id: "BTC-5NOV26-81000_83000-C", signer: { standard: "erc191", signer_id: "0x1111111111111111111111111111111111111111" } })]);
+    expect(await signs()).toBe(1);
+    const called = grid.getByRole("button", { name: /^Up · BTC ends above \$81,000 · Tomorrow .* · pays up to 5\.0× · you called this$/ });
+    await expect(called).toHaveText("Called5.0×");
+    await expect(called).toBeDisabled();
+    await expect(page.getByRole("radio", { name: /^Free call/ })).toContainText("9 of 10 left this round");
+    const board = page.getByRole("region", { name: "Free calls" });
+    await expect(board.getByRole("list", { name: "Round 4 Nov" }).getByRole("listitem")).toHaveText([/^1\. sun\.near\s*\+1250\s*3-day streak$/, /^2\. kite\.near\s*\+980$/, /^7\. 0x1111…1111\s*\+150\s*2-day streak$/]);
+    await page.evaluate(() => Object.assign(window, { refuseCalls: { status: 429, error: "you've used your 10 free calls for this round" } }));
+    await grid.getByRole("button", { name: /^Up · BTC ends above \$82,000 · Tomorrow / }).click();
+    await expect(page.getByRole("status").filter({ hasText: "You've used your 10 free calls for this round." })).toBeVisible();
+    await page.reload();
+    await page.getByRole("button", { name: "Connect", exact: true }).click();
+    await page.getByRole("button", { name: /Ethereum wallet/ }).click();
+    await page.getByRole("table").getByRole("button", { name: /^Up · BTC ends above \$82,000 · Tomorrow / }).click();
+    await expect(page.getByRole("status").filter({ hasText: /^Called BTC Up \$82,000 at 5\.0×\.$/ })).toBeVisible();
+    expect(await signs()).toBe(0);
+    await page.getByRole("radio", { name: /^Buy/ }).click();
+    await expect(page.getByRole("table").getByRole("button", { name: /^Up · BTC ends above \$82,000 · Tomorrow .* · pays up to 106831\.9× · you called this$/ })).toBeEnabled();
+  });
+
+  test("a call still in flight when the wallet changes reports nothing to the next wallet, which signs in afresh", async ({ page }) => {
+    const { relay, signs } = await freeCalls(page);
+    let release = () => {};
+    relay.hold = new Promise((resolve) => (release = resolve));
+    const grid = page.getByRole("table");
+    await grid.getByRole("button", { name: /^Up · BTC ends above \$81,000 · Tomorrow / }).click();
+    await expect(grid.locator("[aria-busy=true]")).toHaveCount(1);
+    await page.getByRole("button", { name: /^Account / }).click();
+    await page.getByRole("button", { name: "Disconnect" }).click();
+    await page.getByRole("button", { name: "Connect", exact: true }).click();
+    await page.getByRole("button", { name: /Ethereum wallet/ }).click();
+    await expect(grid.locator("[aria-busy=true]")).toHaveCount(0);
+    release();
+    await expect(grid.getByRole("button", { name: /^Up · BTC ends above \$81,000 · Tomorrow .* · you called this$/ })).toBeVisible();
+    await expect(page.getByRole("status").filter({ hasText: /^Called / })).toHaveCount(0);
+    await page.evaluate(() => Object.assign(window, { refuseCalls: { status: 401, error: "session refused: deadline out of range" } }));
+    await grid.getByRole("button", { name: /^Up · BTC ends above \$82,000 · Tomorrow / }).click();
+    await expect(page.getByRole("status").filter({ hasText: "Your wallet couldn't sign in. Tap again to sign in again." })).toBeVisible();
+    expect(await signs()).toBe(2);
+    await page.evaluate(() => Object.assign(window, { refuseCalls: undefined }));
+    await grid.getByRole("button", { name: /^Up · BTC ends above \$82,000 · Tomorrow / }).click();
+    await expect(page.getByRole("status").filter({ hasText: "Called BTC Up $82,000 at 5.0×." })).toBeVisible();
+    expect(await signs()).toBe(3);
+  });
+
+  test("a call on an end that's over drops off the grid even while its UTC day is still the next round", async ({ page }) => {
+    const short = { ...listed.find((s) => s.id === "BTC-5NOV26-81000_83000-C")!, id: "BTC-5NOV26T0400-81000_83000-C", expiry: Date.UTC(2026, 10, 5, 4) / 1000 };
+    const { option_asset, quotable, ...terms } = short;
+    await freeCalls(page, [...listed, short], [{ series_id: short.id, account_id: "0x1111111111111111111111111111111111111111", terms, ask: String(400 * USD), at_ms: NOW_MS }]);
+    const grid = page.getByRole("table");
+    await expect(grid.getByRole("button", { name: /you called this$/ })).toHaveCount(1);
+    await page.clock.fastForward(Date.UTC(2026, 10, 5, 7, 5) - NOW_MS);
+    await expect(grid.getByRole("button", { name: /^Up · BTC ends above \$82,000 · Today .* · pays up to 25\.0×$/ })).toBeEnabled();
+    await expect(grid.getByRole("button", { name: /you called this$/ })).toHaveCount(0);
+    await expect(grid.getByRole("group")).toHaveCount(0);
+  });
+
+  test("a free call that won shows its points in the result and shares a points card", async ({ page }) => {
+    const { relay } = await freeCalls(page);
+    await page.getByRole("table").getByRole("button", { name: /^Up · BTC ends above \$81,000 · Tomorrow / }).click();
+    await expect(page.getByRole("status").filter({ hasText: /^Called / })).toBeVisible();
+    expect(relay.calls).toHaveLength(1);
+    const expiry = Date.UTC(2026, 10, 5, 8) / 1000;
+    view.get_settlement = { price: String(83_000 * USD), final_at: expiry + 3_900 };
+    try {
+      await page.clock.fastForward((expiry + 3_900) * 1000 - (await page.evaluate(() => Date.now())));
+      await expect(page.getByRole("table").getByRole("group", { name: /^Up · BTC ends above \$81,000 · result · free call · \+400 pts$/ })).toBeVisible();
+      await expect(page.getByText(/Your BTC free calls: \+400 points\.$/)).toBeVisible();
+      await page.evaluate(() => Object.assign(navigator, { canShare: undefined }));
+      const download = page.waitForEvent("download");
+      await page.getByRole("button", { name: "Share" }).click();
+      expect((await download).suggestedFilename()).toBe("endline-win.png");
+    } finally {
+      delete view.get_settlement;
+    }
   });
 
   test("drops every cell once the relay's marks fail", async ({ page }) => {

@@ -6,6 +6,7 @@ const dayMonth = local({ day: "numeric", month: "short" });
 const dayOfMonth = local({ day: "numeric" });
 const clock = local({ hour: "numeric", minute: "2-digit" });
 const utcClock = new Intl.DateTimeFormat("en-GB", { timeZone: "UTC", hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+const utcDay = new Intl.DateTimeFormat("en-GB", { timeZone: "UTC", day: "numeric", month: "short" });
 
 const date = (sec: number) => new Date(sec * 1000);
 const localDay = (sec: number) => {
@@ -26,6 +27,10 @@ export function formatClock(sec: number): string {
 
 export function formatUtc(sec: number): string {
   return `${utcClock.format(date(sec))} UTC`;
+}
+
+export function formatUtcDay(sec: number): string {
+  return utcDay.format(date(sec));
 }
 
 export function dayLabel(sec: number, nowSec: number): string {

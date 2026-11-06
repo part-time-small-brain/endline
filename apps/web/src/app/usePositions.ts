@@ -48,6 +48,31 @@ function accountPositions({ listing, settlements, marks, timing, optionAsset }: 
     });
 }
 
+export function valueOf(view: PositionView): bigint | undefined {
+  return view.valueNow ?? (view.status === "active" || view.status === "settling" || view.status === "closed" ? undefined : view.payout);
+}
+
+export function pnlOf(view: PositionView): bigint | undefined {
+  const value = valueOf(view);
+  return value !== undefined && view.paid > 0n ? value + view.received - view.paid : undefined;
+}
+
+export interface Holding {
+  value: bigint | undefined;
+  pnl: bigint | undefined;
+  change: number | undefined;
+}
+
+export function holding(views: PositionView[], seriesId: string): Holding {
+  const own = views.filter((v) => v.series.id === seriesId);
+  const values = own.map(valueOf);
+  const pnls = own.map(pnlOf);
+  const value = values.some((v) => v !== undefined) ? values.reduce<bigint>((total, v) => total + (v ?? 0n), 0n) : undefined;
+  if (own.length === 0 || pnls.includes(undefined)) return { value, pnl: undefined, change: undefined };
+  const pnl = pnls.reduce<bigint>((total, v) => total + (v ?? 0n), 0n);
+  return { value, pnl, change: Number(pnl) / Number(own.reduce((total, v) => total + v.paid, 0n)) };
+}
+
 export function usePositions(nowSec: number): PositionView[] | undefined {
   const { listing, balances, fills, tapBalances, tapFills, settlements, marks, timing, optionAsset } = useData();
   return useMemo(() => positions({ listing, balances, fills, tapBalances, tapFills, settlements, marks, timing, optionAsset }, nowSec), [listing, balances, fills, tapBalances, tapFills, settlements, marks, timing, optionAsset, nowSec]);

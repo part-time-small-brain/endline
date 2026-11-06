@@ -40,7 +40,7 @@ export function useQuoteFlow({ wallet, seriesId, optionAsset, side, size }: Args
       session: await signedSession,
     };
     const quote = await services.relay.quote(quoteRequest).catch((error: unknown) => {
-      if (error instanceof RelayError && error.status === 401) forgetSession(wallet);
+      if (error instanceof RelayError && error.status === 401) forgetSession(wallet, config.intentsId);
       throw error;
     });
     const legs = checkTrade(readPayload(quote.payload), quote, {
@@ -58,7 +58,7 @@ export function useQuoteFlow({ wallet, seriesId, optionAsset, side, size }: Args
     if (["loading", "refreshing", "signing", "submitting", "unknown"].includes(currentPhase.current.name)) return;
     const current = ++generation.current;
     dispatch({ type: "request" });
-    let signedSession = cachedSession(wallet);
+    let signedSession = cachedSession(wallet, config.intentsId);
     if (!signedSession) {
       setSessionPrompt(true);
       signedSession = signSession(wallet, config.intentsId, services.chain.salt);
@@ -80,7 +80,7 @@ export function useQuoteFlow({ wallet, seriesId, optionAsset, side, size }: Args
   useEffect(() => dispatch({ type: "tick", now }), [dispatch, now]);
 
   useEffect(() => {
-    const signedSession = cachedSession(wallet);
+    const signedSession = cachedSession(wallet, config.intentsId);
     if (!shouldPrefetch(currentPhase.current, now) || !signedSession) return;
     dispatch({ type: "refresh" });
     const current = ++generation.current;
