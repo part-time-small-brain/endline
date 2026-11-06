@@ -25,6 +25,7 @@ export const test = base.extend({
     page.on("pageerror", (error) => errors.push(error.message));
     await page.addInitScript(seedRandom, SEED);
     await page.clock.install({ time: NOW });
+    await page.route(RPC, (route) => route.abort());
     await use(page);
     expect(errors).toEqual([]);
   },

@@ -3,6 +3,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { loadConfig } from "./config.ts";
+
+vi.mock("@endline/sdk/deployment", async (load) => {
+  const { readDeployment } = await load<typeof import("@endline/sdk/deployment")>();
+  return { readDeployment: (network: "mainnet" | "testnet") => ({ ...readDeployment("testnet"), network }) };
+});
 import { Faucet } from "./faucet.ts";
 import { Refunded } from "./rpc.ts";
 import { httpStatus } from "./test-fakes.ts";
@@ -28,7 +33,7 @@ describe("faucet", () => {
       DATA_DIR: "data",
     };
     expect(() => loadConfig({ ...env, NETWORK_ID: "mainnet", FAUCET: "true" })).toThrow("the faucet runs only on testnet");
-    expect(() => loadConfig({ ...env, NETWORK_ID: "mainnet", FAUCET: "false" })).toThrow("no deploy/mainnet.json");
+    expect(loadConfig({ ...env, NETWORK_ID: "mainnet", FAUCET: "false" }).FAUCET).toBe(false);
     expect(loadConfig({ ...env, NETWORK_ID: "testnet", FAUCET: "true" }).FAUCET).toBe(true);
     expect(loadConfig({ ...env, NETWORK_ID: "testnet" }).FAUCET).toBe(false);
   });

@@ -45,6 +45,7 @@ export function loadConfig(env: Record<string, unknown>): Config {
   const file = DEPLOYMENTS[`../../../deploy/${e.VITE_NETWORK}.json`];
   if (file === undefined) throw new Error(`no deploy/${e.VITE_NETWORK}.json: ${e.VITE_NETWORK} has no deployment yet`);
   const d = Deployment.parse(file);
+  if (d.network !== e.VITE_NETWORK) throw new Error(`deploy/${e.VITE_NETWORK}.json is for ${d.network}`);
   return {
     mock: false,
     relayUrl: e.VITE_RELAY_URL ?? window.location.origin,
