@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { useTheme } from "../../hooks/useTheme.ts";
 import { NO_PULL, pull } from "../../lib/dots.ts";
 
 const REACH = { x: 270, y: 150 };
@@ -17,6 +18,7 @@ interface Dot {
 export function HeroDots({ still }: { still: boolean }) {
   const ref = useRef<HTMLCanvasElement>(null);
   const lineRef = useRef<HTMLDivElement>(null);
+  const theme = useTheme();
 
   useEffect(() => {
     const canvas = ref.current;
@@ -114,7 +116,7 @@ export function HeroDots({ still }: { still: boolean }) {
       area.removeEventListener("pointermove", move);
       area.removeEventListener("pointerleave", leave);
     };
-  }, [still]);
+  }, [still, theme]);
 
   return (
     <>

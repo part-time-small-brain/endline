@@ -6,7 +6,7 @@ import { useData } from "../app/data.tsx";
 import { seriesTitle } from "../lib/labels.ts";
 import { formatMultiple } from "../lib/money.ts";
 import { useWallet } from "../wallet/context.tsx";
-import { cachedSession, forgetSession, signSession } from "../wallet/session.ts";
+import { cachedSession, forgetSession, SESSION_PROMPT, signSession } from "../wallet/session.ts";
 import type { Wallet } from "../wallet/wallet.ts";
 
 const SHOWN_MS = 3_000;
@@ -48,8 +48,12 @@ export function useCalls() {
         setTimeout(() => setStates((current) => (current[id] === state ? Object.fromEntries(Object.entries(current).filter(([key]) => key !== id)) : current)), SHOWN_MS);
       };
       try {
-        const session = await (cachedSession(wallet, config.intentsId) ?? signSession(wallet, config.intentsId, services.chain.salt));
-        const made = await services.relay.call({ series_id: id, signer: { standard: wallet.standard, signer_id: wallet.accountId }, session });
+        let session = cachedSession(wallet, config.intentsId);
+        if (!session) {
+          setNotice({ text: `${SESSION_PROMPT.title}. ${SESSION_PROMPT.body}`, failed: false });
+          session = signSession(wallet, config.intentsId, services.chain.salt);
+        }
+        const made = await services.relay.call({ series_id: id, signer: { standard: wallet.standard, signer_id: wallet.accountId }, session: await session });
         reloadCalls();
         finish({ status: "done" }, `Called ${seriesTitle(series, quoteDecimals)} at ${formatMultiple(callMultiple(termsOf(made.terms), BigInt(made.ask)))}.`);
       } catch (error) {

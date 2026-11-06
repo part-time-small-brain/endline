@@ -15,10 +15,12 @@ import { PriceLine } from "../components/tap/PriceLine.tsx";
 import { AssetPicker } from "../components/trade/AssetPicker.tsx";
 import { MarketStats } from "../components/trade/MarketStats.tsx";
 import { buildGrid, type GridCell, rowOf } from "../lib/grid.ts";
-import { averageEstimate, closingOf, PHASE_TITLES } from "../lib/reveal.ts";
+import { averageEstimate, PHASE_TITLES } from "../lib/reveal.ts";
+import { tapBoard } from "../lib/tapBoard.ts";
 import { formatMultiple, formatPct, formatPrice, formatUsd, toNumber, toUnits } from "../lib/money.ts";
 import { dayLabel, formatClock, formatUtc } from "../lib/time.ts";
 import { useWallet } from "../wallet/context.tsx";
+import { LABEL } from "../components/label.ts";
 
 const FREE_KEY = "tap-free";
 
@@ -56,27 +58,15 @@ export function Tap({ state, nowSec, views, onConnect, onAddFunds, onQuote }: Pr
     if (data.balance !== undefined && data.balance < ticket.cost) return onAddFunds();
     onQuote({ wallet, series, side: "buy", size: ticket.size, budget });
   };
-  const yours = views?.filter((v) => v.series.underlying === symbol) ?? [];
-  const here = data.listing?.series.filter((s) => s.underlying === symbol) ?? [];
   const callable = (s: ListedSeries) => s.quotable && callableAt(s.expiry, nowSec);
   const callRound = nextRound((data.listing?.series ?? []).filter(callable).map((s) => s.expiry));
   const callableHere = (s: ListedSeries) => callable(s) && roundOf(s.expiry) === callRound;
   const left = FREE_CALLS_PER_ROUND - (data.calls ?? []).filter((c) => roundOf(c.terms.expiry) === callRound).length;
-  const calledHere = new Map((data.calls ?? []).filter((c) => c.terms.underlying === symbol).map((c) => [c.series_id, c]));
   const settlementOf = (expiry: number) => data.settlements[settlementKey({ underlying: symbol, expiry })] ?? null;
-  const closing = closingOf(here.map((s) => s.expiry), [...yours.map((v) => v.series.expiry), ...[...calledHere.values()].map((c) => c.terms.expiry)], settlementOf, nowSec);
-  const stakes = closing ? yours.filter((v) => v.series.expiry === closing.expiry) : [];
-  const closingCalls = [...calledHere.values()].filter((c) => c.terms.expiry === closing?.expiry);
+  const { closing, stakes, closingCalls, calledHere, owned, held, listed } = tapBoard(symbol, data.listing?.series ?? [], priced, views ?? [], data.calls ?? [], settlementOf, nowSec);
   const average = closing && spotNumber !== undefined ? averageEstimate(data.minutes?.[symbol] ?? [], closing.expiry, nowSec * 1000, spotNumber) : undefined;
   const closingPrice = closing?.settlement?.price ?? (average === undefined ? undefined : toUnits(average, quoteDecimals));
-  const active = yours.filter((v) => v.status === "active");
-  const kept = yours.filter((v) => v.status === "active" || v.series.expiry === closing?.expiry);
-  const owned = new Set(kept.map((v) => v.series.id));
-  const called = here.filter((s) => calledHere.has(s.id) && (s.expiry === closing?.expiry || callableAt(s.expiry, nowSec)));
-  const held = new Set([...owned, ...called.map((s) => s.id)]);
-  const open = priced.filter((s) => s.underlying === symbol && s.expiry !== closing?.expiry && !held.has(s.id));
-  const rowsElsewhere = new Set([...open, ...kept.map((v) => v.series), ...called].map((s) => s.strike));
-  const listed = [...open, ...here.filter((s) => s.expiry === closing?.expiry && !held.has(s.id) && rowsElsewhere.has(s.strike)), ...kept.map((v) => v.series), ...called];
+  const active = views?.filter((v) => v.series.underlying === symbol && v.status === "active") ?? [];
   const grid = spot === undefined ? undefined : buildGrid(listed, spot, budget, data.marks, held, (expiry) => (expiry === closing?.expiry ? (closingPrice ?? spot) : spot));
   const closingColumn = closing && grid ? grid.expiries.indexOf(closing.expiry) : -1;
   const staked = (seriesId: string) => stakes.find((v) => v.series.id === seriesId)?.amount ?? 0n;
@@ -123,7 +113,7 @@ export function Tap({ state, nowSec, views, onConnect, onAddFunds, onQuote }: Pr
               </colgroup>
               <thead>
                 <tr className="h-10">
-                  <th scope="col" className="text-left font-mono text-[10px] font-medium tracking-[0.14em] text-ink-3 uppercase">
+                  <th scope="col" className={`text-left ${LABEL}`}>
                     Price to beat
                   </th>
                   <td aria-hidden="true" />
@@ -222,7 +212,7 @@ export function Tap({ state, nowSec, views, onConnect, onAddFunds, onQuote }: Pr
 
       <TapMode free={free} left={left} budget={budget} quoteDecimals={quoteDecimals} onFree={setFree} onBudget={setBudget} />
       {free && <FreeCalls calls={data.calls ?? []} accountId={wallet?.accountId} nowSec={nowSec} quoteDecimals={quoteDecimals} />}
-      <p className="pb-6 text-center font-mono text-[10px] font-medium tracking-[0.14em] text-ink-3 uppercase">Settled on NEAR Intents</p>
+      <p className={`pb-6 text-center ${LABEL}`}>Settled on NEAR Intents</p>
     </div>
   );
 }

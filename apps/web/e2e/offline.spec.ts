@@ -616,7 +616,14 @@ test.describe("Tap", () => {
     await expect(cell).toHaveAccessibleName(/· up \$2\.60 · winning now · you hold this$/);
     await expect.poll(flashes).toBe(0);
     await expect.poll(() => cell.evaluate((el) => el.getAnimations().filter((a) => a instanceof CSSTransition).length)).toBe(0);
-    await expect(cell).toHaveCSS("background-color", "rgb(11, 38, 28)");
+    const upField = await page.evaluate(() => {
+      const probe = document.body.appendChild(document.createElement("div"));
+      probe.className = "bg-up-field";
+      const color = getComputedStyle(probe).backgroundColor;
+      probe.remove();
+      return color;
+    });
+    await expect(cell).toHaveCSS("background-color", upField);
     index = 80_650;
     await page.clock.fastForward(5_000);
     await expect.poll(flashes, { intervals: [50] }).toBe(1);
