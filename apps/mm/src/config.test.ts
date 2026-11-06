@@ -5,7 +5,7 @@ const ENV = {
   MM_ACCOUNT_ID: "mm.near-options-dev.testnet",
   MM_PRIVATE_KEY: `ed25519:${"1".repeat(64)}`,
   NEAR_RPC_URL: "https://rpc.testnet.fastnear.com",
-  OPTIONS_ID: "opt3.near-options-dev.testnet",
+  OPTIONS_ID: "opt4.near-options-dev.testnet",
 };
 
 describe("config", () => {

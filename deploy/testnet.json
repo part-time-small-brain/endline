@@ -3,10 +3,10 @@
   "rpc_url": "https://rpc.testnet.fastnear.com",
   "owner": "near-options-dev.testnet",
   "intents_id": "intents.near-options-dev.testnet",
-  "options_id": "opt3.near-options-dev.testnet",
+  "options_id": "opt4.near-options-dev.testnet",
   "quote_asset": "nep141:usdc.near-options-dev.testnet",
   "accounts": {
-    "oracle": "near-options-dev.testnet",
+    "oracle": "oracle.near-options-dev.testnet",
     "relayer": "near-options-dev.testnet",
     "market_maker": "near-options-funder-1.testnet",
     "demo_user": "near-options-funder-2.testnet"
