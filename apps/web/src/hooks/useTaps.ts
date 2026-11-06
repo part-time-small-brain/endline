@@ -63,7 +63,7 @@ export function useTaps(owner: string | undefined) {
         if (error instanceof RelayError && error.status === 401) forgetSession(payer, config.intentsId);
         throw error;
       });
-      checkTrade(readPayload(quote.payload), quote, { signerId: payer.accountId, intentsId: config.intentsId, optionAsset: optionAsset(series.id), quoteAsset: config.quoteAsset, side: "buy", size: size.toString() });
+      checkTrade(readPayload(quote.payload), quote, { signerId: payer.accountId, intentsId: config.intentsId, optionAsset: optionAsset(series.id), quoteAsset: config.quoteAsset, side: "buy", size: size.toString() }, Date.now());
       const decision = decide(quote, series, multiple, stake, Date.now());
       if (decision !== "sign") throw new Error(REFUSED[decision]);
       const signed = await payer.sign(quote.payload);
