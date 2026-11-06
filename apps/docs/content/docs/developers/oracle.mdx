@@ -56,7 +56,7 @@ printf '{"index":"btc_usd","expiry":%s,"quote_decimals":6,"max_dev_bps":20}\n' "
   | wasmtime run -S http target/wasm32-wasip2/release/oracle.wasm
 ```
 
-The run uses the latest 08:00 UTC fixing at least one minute in the past. Logic is tested natively on recorded exchange responses in `oracle/tests/fixtures`.
+The run uses the latest 08:00 UTC fixing at least one minute in the past. From about 19:30 UTC it returns `no data`: Kraken serves only 12 h of 1-minute candles, and without its USDT/USD rate the USDT venues drop out, leaving 3. Logic is tested natively on recorded exchange responses in `oracle/tests/fixtures`.
 
 ## Contract integration
 
