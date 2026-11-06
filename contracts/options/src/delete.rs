@@ -6,7 +6,7 @@ use near_sdk::{env, near, require, AccountId, Gas, NearToken, Promise};
 
 use crate::events;
 use crate::payout::promise_failed;
-use crate::series::{short_id, Series, Side};
+use crate::series::{short_id, Series};
 use crate::{Contract, ContractExt};
 
 // auto-collect claims, the relay's series list and free-call scores all look back a week after the end
@@ -32,19 +32,21 @@ struct RefundFailed<'a> {
 
 #[near]
 impl Contract {
-    pub fn delete_series(&mut self, series_ids: Vec<String>) {
+    pub fn delete_series(&mut self, series_ids: Vec<String>) -> Vec<String> {
         require!(
             !series_ids.is_empty() && series_ids.len() <= MAX_DELETES,
             format!("delete 1 to {MAX_DELETES} series at a time")
         );
         let mut refunds: BTreeMap<AccountId, NearToken> = BTreeMap::new();
-        for id in &series_ids {
-            let series = self.series_or_panic(id).clone();
-            require!(self.deletable(&series), format!("{id} can't be deleted yet"));
+        let mut deleted = Vec::new();
+        for id in series_ids {
+            let Some(series) = self.series.get(&id).cloned().filter(|s| self.deletable(s)) else {
+                continue;
+            };
             let before = env::storage_usage();
-            self.series.remove(id);
+            self.series.remove(&id);
             self.series_by_expiry.remove(&(series.expiry, id.clone()));
-            for token in [id.clone(), short_id(id)] {
+            for token in [id.clone(), short_id(&id)] {
                 self.supply.remove(&token);
                 self.balances.remove(&(token, self.intents_id.clone()));
             }
@@ -63,12 +65,13 @@ impl Contract {
             events::options(
                 "series_deleted",
                 &Deleted {
-                    series_id: id,
+                    series_id: &id,
                     created_by: &series.created_by,
                     refund,
                     dust: series.collateral_locked,
                 },
             );
+            deleted.push(id);
         }
         for (account_id, amount) in refunds.into_iter().filter(|(_, amount)| !amount.is_zero()) {
             Promise::new(account_id.clone())
@@ -80,6 +83,7 @@ impl Contract {
                 )
                 .detach();
         }
+        deleted
     }
 
     pub fn deletable_series(&self, series_ids: Vec<String>) -> Vec<String> {
@@ -112,9 +116,13 @@ impl Contract {
         if long == 0 && short == 0 {
             return true;
         }
+        let terms = series.terms();
+        // each bound floors a total, so it also covers every holder's own rounded close
         self.final_price(&series.underlying, series.expiry)
             .is_some_and(|price| {
-                series.payout(Side::Long, long, price) == 0 && series.payout(Side::Short, short, price) == 0
+                terms.long_payout(long, price) == 0
+                    && terms.max_short_payout(short, price) == 0
+                    && terms.pair_refund(long.min(short)) == 0
             })
     }
 }

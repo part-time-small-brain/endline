@@ -34,13 +34,13 @@ pub trait MtReceiver {
 #[near]
 impl Contract {
     pub fn mt_balance_of(&self, account_id: AccountId, token_id: String) -> U128 {
-        U128(self.balance_of(&account_id, &token_id))
+        U128(self.live_balance_of(&account_id, &token_id))
     }
 
     pub fn mt_batch_balance_of(&self, account_id: AccountId, token_ids: Vec<String>) -> Vec<U128> {
         token_ids
             .iter()
-            .map(|id| U128(self.balance_of(&account_id, id)))
+            .map(|id| U128(self.live_balance_of(&account_id, id)))
             .collect()
     }
 
@@ -169,6 +169,14 @@ impl Contract {
             .get(&(token_id.to_string(), account_id.clone()))
             .copied()
             .unwrap_or(0)
+    }
+
+    fn live_balance_of(&self, account_id: &AccountId, token_id: &str) -> u128 {
+        if self.token_exists(token_id) {
+            self.balance_of(account_id, token_id)
+        } else {
+            0
+        }
     }
 
     pub(crate) fn token_exists(&self, token_id: &str) -> bool {
