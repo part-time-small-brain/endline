@@ -54,7 +54,7 @@ function borshString(text: string): Uint8Array {
   return Uint8Array.from([...u32(bytes.length), ...bytes]);
 }
 
-function nep413Hash({ message, nonce, recipient }: { message: string; nonce: string; recipient: string }): Uint8Array {
+export function nep413Hash({ message, nonce, recipient }: { message: string; nonce: string; recipient: string }): Uint8Array {
   return sha256(Uint8Array.from([...u32(NEP413_TAG), ...borshString(message), ...base64.decode(nonce), ...borshString(recipient), 0]));
 }
 

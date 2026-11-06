@@ -150,7 +150,7 @@ export class Chain extends ChainReader {
   constructor(private readonly config: Config) {
     super(config.rpcUrl, config.optionsId);
     this.account = new Account(config.accountId, this.provider, config.privateKey);
-    this.sign = nep413Signer(config.accountId, config.privateKey);
+    this.sign = nep413Signer(config.privateKey);
   }
 
   async intentsState(): Promise<IntentsState> {
