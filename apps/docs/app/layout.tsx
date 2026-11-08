@@ -5,7 +5,7 @@ import "./global.css";
 
 export const metadata: Metadata = {
   title: { template: "%s · Endline docs", default: "Endline docs" },
-  description: "Endline: BTC & ETH options on NEAR Intents.",
+  description: "Endline: BTC options on NEAR Intents.",
 };
 
 export default function Layout({ children }: { children: ReactNode }) {
