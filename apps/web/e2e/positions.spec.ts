@@ -33,6 +33,7 @@ test("a final payout waits one minute before Collect becomes available", async (
   await page.getByRole("link", { name: /Positions/ }).click();
   const card = page.getByRole("article").filter({ has: page.getByRole("heading", { name: "BTC Up $79,000" }) });
   await expect(card).toContainText("Proposed final price $81,420");
+  await expect(page.getByRole("article").filter({ has: page.getByRole("heading", { name: "BTC Down $80,000" }) })).toContainText("Waiting for the final price");
 
   await page.clock.fastForward(40 * 60_000);
   await expect(card).toContainText("Final price $81,420. Preparing your payout");
