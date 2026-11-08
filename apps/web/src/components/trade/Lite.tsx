@@ -167,7 +167,7 @@ export function Lite({ state, nowSec, action, stickyAction }: Props) {
                 </div>
               </Popover>
             ) : (
-              <span className={`${chip} border-transparent`}>
+              <span className="inline-flex items-center gap-[0.25em] align-middle font-semibold">
                 {Glyph && <Glyph size="0.78em" weight="bold" aria-hidden="true" className="shrink-0" />}
                 {symbol}
               </span>

@@ -75,12 +75,12 @@ export function createWorld() {
   const settlements = new Map<string, SettlementView>([
     [`BTC:${recent - 2 * SECONDS_PER_DAY}`, { price: 82_410n * USD, finalAt: recent - 2 * SECONDS_PER_DAY + 3_900 }],
     [`BTC:${recent - 3 * SECONDS_PER_DAY}`, { price: 81_020n * USD, finalAt: recent - 3 * SECONDS_PER_DAY + 3_900 }],
-    [`BTC:${recent}`, { price: 81_420n * USD, finalAt: now + 40 * 60 }],
+    [`BTC:${recent - SECONDS_PER_DAY}`, { price: 81_420n * USD, finalAt: now + 40 * 60 }],
   ]);
   const holdings: Holding[] = [
     { series: make("BTC", "call", 80_000, recent - 2 * SECONDS_PER_DAY), size: 2_000_000n, premium: 18_400_000n, boughtAgoSec: 4 * SECONDS_PER_DAY },
     { series: make("BTC", "put", 79_000, recent - 3 * SECONDS_PER_DAY), size: 3_000_000n, premium: 22_000_000n, boughtAgoSec: 5 * SECONDS_PER_DAY },
-    { series: make("BTC", "call", 79_000, recent), size: 2_000_000n, premium: 15_200_000n, boughtAgoSec: 2 * SECONDS_PER_DAY },
+    { series: make("BTC", "call", 79_000, recent - SECONDS_PER_DAY), size: 2_000_000n, premium: 15_200_000n, boughtAgoSec: 2 * SECONDS_PER_DAY },
     { series: make("BTC", "put", 80_000, recent), size: 1_500_000n, premium: 12_500_000n, boughtAgoSec: SECONDS_PER_DAY },
   ];
   series.push(...holdings.map((h) => h.series));

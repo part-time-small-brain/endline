@@ -71,6 +71,7 @@ Testnet ids are in `deploy/testnet.json`. RPC: `https://rpc.testnet.fastnear.com
 |---|---|
 | Contract | The owner calls `add_underlying(symbol, {index, decimals, min_write})`. `index` is the Deribit index name, e.g. `sol_usdc` |
 | Oracle WASM | Add one row to `MARKETS` in `oracle/src/sources.rs`, rebuild, host, `set_oracle_wasm` |
-| Market maker, relay, web | Nothing. They read assets and series from the contract |
+| Market maker, relay, web | Nothing. They read assets and series from the contract, and the app shows its asset picker once two are listed |
+| Copy | The README, the docs site, the landing hero and the page title name BTC: name the new asset there, and give it an icon and name in `apps/web` (`ASSET_ICONS`, `lib/labels.ts`) |
 
 Deribit must list options on the asset, since the market maker prices from Deribit's volatility, and at least 3 of the oracle's 7 exchanges must list a spot pair (4 for expiries other than 08:00 UTC).

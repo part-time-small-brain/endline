@@ -398,7 +398,7 @@ test("Lite keeps its action and editable values usable on narrow phones and tabl
   await expect(date).toHaveAttribute("aria-expanded", "false");
 });
 
-test("Lite baseline and six popovers fit the viewport and support Escape", async ({ page }) => {
+test("Lite baseline and every popover fit the viewport and support Escape", async ({ page }) => {
   await ready(page);
   const noOverflow = async () => {
     expect(await sideways(page)).toBeLessThanOrEqual(0);

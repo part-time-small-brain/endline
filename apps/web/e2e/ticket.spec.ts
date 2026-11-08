@@ -216,16 +216,14 @@ test("arrow keys move from the focused chip, and Direction picks the same way", 
   await expect(twentyFive).toBeFocused();
   await expect(twentyFive).toHaveAttribute("aria-checked", "true");
 
-  for (const [group, from, to] of [["Direction", /^Up/, /^Down/]] as const) {
-    const radios = page.getByRole("radiogroup", { name: group });
-    await radios.getByRole("radio", { name: from }).focus();
-    await page.keyboard.press("ArrowRight");
-    const next = radios.getByRole("radio", { name: to });
-    await expect(next).toBeFocused();
-    await expect(next).toHaveAttribute("aria-checked", "true");
-    await expect(next).toHaveAttribute("tabindex", "0");
-    await expect(radios.getByRole("radio", { name: from })).toHaveAttribute("tabindex", "-1");
-  }
+  const direction = page.getByRole("radiogroup", { name: "Direction" });
+  await direction.getByRole("radio", { name: /^Up/ }).focus();
+  await page.keyboard.press("ArrowRight");
+  const down = direction.getByRole("radio", { name: /^Down/ });
+  await expect(down).toBeFocused();
+  await expect(down).toHaveAttribute("aria-checked", "true");
+  await expect(down).toHaveAttribute("tabindex", "0");
+  await expect(direction.getByRole("radio", { name: /^Up/ })).toHaveAttribute("tabindex", "-1");
 });
 
 test("Add funds shows USDC and deposits, and no test USDC off testnet", async ({ page }) => {

@@ -65,11 +65,7 @@ if ! exists "$opt"; then
   call "$opt" add_oracle "{\"account_id\":\"$root\"}" '1 yoctoNEAR'
 fi
 listed="$(near contract call-function as-read-only "$opt" get_underlyings json-args '{}' "${net[@]}" now 2>&1)"
-for underlying in "BTC:btc_usd:8:1000"; do
-  IFS=: read -r symbol index decimals min_write <<<"$underlying"
-  grep -q "\"$symbol\"" <<<"$listed" && continue
-  call "$opt" add_underlying "{\"symbol\":\"$symbol\",\"underlying\":{\"index\":\"$index\",\"decimals\":$decimals,\"min_write\":\"$min_write\"}}" '1 yoctoNEAR'
-done
+grep -q '"BTC"' <<<"$listed" || call "$opt" add_underlying '{"symbol":"BTC","underlying":{"index":"btc_usd","decimals":8,"min_write":"1000"}}' '1 yoctoNEAR'
 if [ -n "${ORACLE_WASM_URL:-}" ] && [ -n "${ORACLE_WASM_SHA256:-}" ]; then
   call "$opt" set_oracle_wasm "{\"oracle_wasm\":{\"outlayer_id\":\"outlayer.testnet\",\"url\":\"$ORACLE_WASM_URL\",\"sha256\":\"$ORACLE_WASM_SHA256\"}}" '1 yoctoNEAR'
 fi

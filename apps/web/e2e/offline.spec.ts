@@ -457,6 +457,35 @@ test("offers only marked strikes, sizes at the mark's ask and takes the chance f
   await expect(page.getByText("No prices right now")).toBeVisible();
 });
 
+test("a second listed asset brings the asset picker back in every mode, and a switch keeps the stake", async ({ page }) => {
+  const expiry = Date.UTC(2026, 10, 5, 8) / 1000;
+  const sol = [150, 155].map((usd) => {
+    const strike = BigInt(usd * USD);
+    const width = listedWidth(strike, 6);
+    return { id: seriesId({ underlying: "SOL", expiry, strike, width, quoteDecimals: 6, kind: "call" }), underlying: "SOL", kind: "call" as const, strike: String(strike), width: String(width), expiry, underlying_decimals: 9, option_asset: `nep245:${testnet.options_id}:x`, quotable: true };
+  });
+  const btc = { series_id: "BTC-5NOV26-81000_83000-C", ask: String(400 * USD), bid: String(380 * USD), vol: 0.4 };
+  const underlyings = view.get_underlyings;
+  view.get_underlyings = [["BTC", { decimals: 8 }], ["SOL", { decimals: 9 }]];
+  try {
+    await live(page, () => [btc, ...sol.map((s) => ({ series_id: s.id, ask: String(BigInt(s.width) / 4n), vol: 0.8 }))], () => 80_650, [...listed, ...sol]);
+    const assets = page.getByRole("radiogroup", { name: "Asset" });
+    await expect(assets.getByRole("radio", { name: /^BTC / })).toBeVisible();
+    await expect(assets.getByRole("radio", { name: /^SOL / })).toBeVisible();
+    await page.getByRole("radio", { name: "$50", exact: true }).click();
+    await assets.getByRole("radio", { name: /^SOL/ }).click();
+    await expect(assets.getByRole("radio", { name: /^SOL/ })).toHaveAttribute("aria-checked", "true");
+    await expect(page.getByRole("radio", { name: "$50", exact: true })).toHaveAttribute("aria-checked", "true");
+    await expect(term(page, /^If SOL ends above /)).toBeVisible();
+    await page.getByRole("button", { name: "Tap", exact: true }).click();
+    await expect(assets.getByRole("radio")).toHaveCount(2);
+    await page.getByRole("button", { name: "Lite", exact: true }).click();
+    await expect(page.getByRole("button", { name: "Trade asset", exact: true })).toHaveAccessibleDescription("SOL");
+  } finally {
+    view.get_underlyings = underlyings;
+  }
+});
+
 test("offers only dates with prices it can sell at and opens on the first of them", async ({ page }) => {
   await live(page, () => [
     { series_id: "BTC-5NOV26-81000_83000-C", ask: String(2_000 * USD), vol: 0.4 },
@@ -708,7 +737,7 @@ test.describe("Tap", () => {
     await expect(page.getByText("Final price $81,400. You get $8.00 back.")).toBeVisible();
     world.index = 80_000;
     await page.clock.fastForward(5_000);
-    await expect(page.getByRole("radio", { name: /^BTC \$80,000/ })).toBeVisible();
+    await expect.poll(() => money(page.locator("main p").filter({ hasText: "Bitcoin" }).locator("xpath=following-sibling::p[1]"))).toBe(80_000);
     await expect(group(/^Up · BTC ends above \$81,000 · result · pays \$8\.00 · you hold this$/)).toBeVisible();
     const download = page.waitForEvent("download");
     await page.getByRole("button", { name: "Share" }).click();
