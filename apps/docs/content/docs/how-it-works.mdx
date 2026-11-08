@@ -17,7 +17,7 @@ description: Up and Down are fully backed European options with a capped payout.
 
 W, the width, is two steps of the strike's price grid, about 1.2–3% of the strike: $2,000 for BTC around $100,000. Pro shows the cap as "If BTC ends above $112,000"; Lite as "win up to" that capped gross payout (not profit) plus "Full payout if BTC ends above $112,000". Every position shows it as "Capped at $112,000".
 
-Size is how much BTC your option tracks: what you pay divided by the price of one whole-coin option.
+Size is how much of the asset your option tracks: what you pay divided by the price of one whole-coin option.
 
 ## Examples
 
@@ -66,4 +66,4 @@ Markets end daily at 08:00 UTC, with Deribit's daily options, shown in your time
 
 You can sell back at the current Sell back price until 30 minutes before the end. Then the position waits for the final price ([Settlement](./settlement.mdx)) and is paid out ([Collecting](./collecting.mdx)).
 
-Before the end, value depends on time left as well as price. If BTC rises slowly or too little, an Up can still lose value, and it pays $0 if the final price doesn't clear K.
+Before the end, value depends on time left as well as price. If the price rises slowly or too little, an Up can still lose value, and it pays $0 if the final price doesn't clear K.
