@@ -65,7 +65,7 @@ if ! exists "$opt"; then
   call "$opt" add_oracle "{\"account_id\":\"$root\"}" '1 yoctoNEAR'
 fi
 listed="$(near contract call-function as-read-only "$opt" get_underlyings json-args '{}' "${net[@]}" now 2>&1)"
-for underlying in "BTC:btc_usd:8:1000" "ETH:eth_usd:18:1000000000000000"; do
+for underlying in "BTC:btc_usd:8:1000"; do
   IFS=: read -r symbol index decimals min_write <<<"$underlying"
   grep -q "\"$symbol\"" <<<"$listed" && continue
   call "$opt" add_underlying "{\"symbol\":\"$symbol\",\"underlying\":{\"index\":\"$index\",\"decimals\":$decimals,\"min_write\":\"$min_write\"}}" '1 yoctoNEAR'

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-underlying="${1:?usage: scripts/demo-series.sh BTC|ETH <minutes-ahead> <strike-usd> <width-usd> call|put <usdc-units>; only the width the lister uses (2 strike steps, listedWidth in the SDK) gets quoted}"
+underlying="${1:?usage: scripts/demo-series.sh BTC <minutes-ahead> <strike-usd> <width-usd> call|put <usdc-units>; only the width the lister uses (2 strike steps, listedWidth in the SDK) gets quoted}"
 minutes="${2:?minutes ahead}"
 strike="${3:?strike in USD}"
 width="${4:?width in USD}"
