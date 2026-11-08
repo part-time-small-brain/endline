@@ -49,7 +49,7 @@ export function Hero({ nowSec }: { nowSec: number }) {
           <Rise>
             <p className="flex items-center gap-2.5 font-mono text-[0.6875rem] font-medium tracking-[0.14em] text-ink-3 uppercase">
               <span aria-hidden="true" className="h-0.5 w-6 bg-[linear-gradient(to_right,var(--up)_50%,var(--down)_50%)]" />
-              Options on BTC and ETH
+              Bitcoin options
             </p>
           </Rise>
           <h1 id="hero-title" className="mt-6 text-5xl leading-none font-semibold tracking-[-0.035em] xl:text-7xl">
@@ -75,7 +75,7 @@ export function Hero({ nowSec }: { nowSec: number }) {
           </h1>
           <Rise delay={0.3}>
             <p className="mt-12 max-w-[520px] text-base text-ink-2 lg:text-xl">
-              Choose whether Bitcoin or Ethereum ends above or below your price. The most you can lose is what you pay.
+              Choose whether Bitcoin ends above or below your price. The most you can lose is what you pay.
             </p>
           </Rise>
           <Rise delay={0.42}>

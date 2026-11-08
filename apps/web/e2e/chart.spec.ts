@@ -21,7 +21,6 @@ async function dragTo(page: Page, y: number, wiggles = 0) {
 }
 
 const side = (page: Page, name: "Up" | "Down") => page.getByRole("radiogroup", { name: "Direction" }).getByRole("radio", { name: new RegExp(`^${name}`) });
-const asset = (page: Page, name: string) => page.getByRole("radio", { name: new RegExp(`^${name}\\b`) });
 
 test("handle, line and y-axis agree at every strike, with no label collisions", async ({ page }) => {
   for (const name of ["Up", "Down"] as const) {
@@ -141,7 +140,7 @@ test("handle and line stay together mid-drag", async ({ page }) => {
   expect(Math.max(...gaps)).toBeLessThanOrEqual(2);
 });
 
-test("tooltip follows the pointer after the scale or asset changes", async ({ page }) => {
+test("tooltip follows the pointer after the scale changes", async ({ page }) => {
   const touch = test.info().project.use.hasTouch === true;
   const x = await futureX(page);
   const chart = await geometry(page);
@@ -155,13 +154,6 @@ test("tooltip follows the pointer after the scale or asset changes", async ({ pa
   await expectAtPointer();
   await handleOf(page).focus();
   await page.keyboard.press("End");
-  await expectAtPointer();
-  if (touch) await asset(page, "ETH").tap();
-  else {
-    await asset(page, "ETH").focus();
-    await page.keyboard.press("Space");
-  }
-  await expect(asset(page, "ETH")).toHaveAttribute("aria-checked", "true");
   await expectAtPointer();
 });
 
@@ -227,11 +219,11 @@ test("drag hint sits on the line next to the handle, once", async ({ page }) => 
   await expect(chartOf(page).getByText("Drag", { exact: true })).toHaveCount(0);
 });
 
-test("switching asset, side or date after a drag lands on the Balanced strike", async ({ page }) => {
+test("switching side or date after a drag lands on the Balanced strike", async ({ page }) => {
   const box = await chartOf(page).boundingBox();
   if (!box) throw new Error("no chart");
   const balanced = page.getByRole("radio", { name: /^Balanced/ });
-  const switches = [() => side(page, "Down").click(), () => asset(page, "ETH").click(), () => page.getByRole("radiogroup", { name: "Ends" }).getByRole("radio").nth(2).click()];
+  const switches = [() => side(page, "Down").click(), () => page.getByRole("radiogroup", { name: "Ends" }).getByRole("radio").nth(2).click()];
   for (const change of switches) {
     await dragTo(page, box.y + 10);
     await change();

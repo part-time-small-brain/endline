@@ -1,4 +1,4 @@
-import { CurrencyBtc, CurrencyEth } from "@phosphor-icons/react";
+import { CurrencyBtc } from "@phosphor-icons/react";
 import { pickWithArrows } from "../Chips.tsx";
 
 interface Props {
@@ -8,7 +8,7 @@ interface Props {
   onChange: (symbol: string) => void;
 }
 
-export const ASSET_ICONS: Record<string, typeof CurrencyBtc> = { BTC: CurrencyBtc, ETH: CurrencyEth };
+export const ASSET_ICONS: Record<string, typeof CurrencyBtc> = { BTC: CurrencyBtc };
 const usd = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
 
 export function AssetPicker({ symbols, spot, value, onChange }: Props) {

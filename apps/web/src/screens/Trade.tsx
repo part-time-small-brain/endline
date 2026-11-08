@@ -65,9 +65,11 @@ export function Trade({ mode, nowSec, views, onConnect, onAddFunds, onQuote }: P
         <div data-side={up ? "up" : "down"} className="grid min-h-0 flex-1 grid-cols-1 gap-4 px-4 lg:grid-cols-[minmax(0,1fr)_440px] lg:gap-6 lg:px-6 lg:pt-2 pb-32 lg:pb-6">
           <div className="flex min-h-0 min-w-0 flex-col gap-4">
             <div className="grid grid-cols-2 items-end gap-x-4 gap-y-3 lg:flex lg:gap-8">
-              <div className="col-span-2 lg:self-center">
-                <AssetPicker symbols={symbols} spot={data.market?.spot} value={symbol} onChange={setSymbol} />
-              </div>
+              {symbols.length > 1 && (
+                <div className="col-span-2 lg:self-center">
+                  <AssetPicker symbols={symbols} spot={data.market?.spot} value={symbol} onChange={setSymbol} />
+                </div>
+              )}
               <MarketStats symbol={symbol} spot={spot} change={first && spotNumber ? spotNumber / first[1] - 1 : undefined} expiry={expiry} nowSec={nowSec} quoteDecimals={quoteDecimals} />
             </div>
             <div className="h-[340px] shrink-0 overflow-hidden rounded-md border border-rule bg-surface lg:h-auto lg:min-h-0 lg:flex-1">

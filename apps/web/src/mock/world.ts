@@ -11,7 +11,6 @@ const USD = 10n ** BigInt(QUOTE_DECIMALS);
 
 export const UNDERLYINGS = {
   BTC: { decimals: 8, spot: 80_650, vol: 0.42, step: 1_000 },
-  ETH: { decimals: 18, spot: 3_120, vol: 0.55, step: 50 },
 } as const;
 export type Underlying = keyof typeof UNDERLYINGS;
 
@@ -76,12 +75,12 @@ export function createWorld() {
   const settlements = new Map<string, SettlementView>([
     [`BTC:${recent - 2 * SECONDS_PER_DAY}`, { price: 82_410n * USD, finalAt: recent - 2 * SECONDS_PER_DAY + 3_900 }],
     [`BTC:${recent - 3 * SECONDS_PER_DAY}`, { price: 81_020n * USD, finalAt: recent - 3 * SECONDS_PER_DAY + 3_900 }],
-    [`ETH:${recent}`, { price: 3_142n * USD, finalAt: now + 40 * 60 }],
+    [`BTC:${recent}`, { price: 81_420n * USD, finalAt: now + 40 * 60 }],
   ]);
   const holdings: Holding[] = [
     { series: make("BTC", "call", 80_000, recent - 2 * SECONDS_PER_DAY), size: 2_000_000n, premium: 18_400_000n, boughtAgoSec: 4 * SECONDS_PER_DAY },
     { series: make("BTC", "put", 79_000, recent - 3 * SECONDS_PER_DAY), size: 3_000_000n, premium: 22_000_000n, boughtAgoSec: 5 * SECONDS_PER_DAY },
-    { series: make("ETH", "call", 3_100, recent), size: 400_000_000_000_000_000n, premium: 15_200_000n, boughtAgoSec: 2 * SECONDS_PER_DAY },
+    { series: make("BTC", "call", 79_000, recent), size: 2_000_000n, premium: 15_200_000n, boughtAgoSec: 2 * SECONDS_PER_DAY },
     { series: make("BTC", "put", 80_000, recent), size: 1_500_000n, premium: 12_500_000n, boughtAgoSec: SECONDS_PER_DAY },
   ];
   series.push(...holdings.map((h) => h.series));
@@ -94,7 +93,7 @@ export function createWorld() {
       { series: unlisted, size: 1_000_000n, premium: 1_000_000n, boughtAgoSec: 3_600 },
     );
   }
-  const spot: Record<Underlying, number> = { BTC: UNDERLYINGS.BTC.spot, ETH: UNDERLYINGS.ETH.spot };
-  const history: Record<Underlying, PricePoint[]> = { BTC: walk(spot.BTC, UNDERLYINGS.BTC.vol, now), ETH: walk(spot.ETH, UNDERLYINGS.ETH.vol, now) };
+  const spot: Record<Underlying, number> = { BTC: UNDERLYINGS.BTC.spot };
+  const history: Record<Underlying, PricePoint[]> = { BTC: walk(spot.BTC, UNDERLYINGS.BTC.vol, now) };
   return { series, settlements, holdings, spot, history, start: now };
 }

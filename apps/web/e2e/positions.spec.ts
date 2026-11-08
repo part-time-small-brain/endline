@@ -31,11 +31,11 @@ test("a final payout waits one minute before Collect becomes available", async (
   await page.reload();
   await connectDemo(page);
   await page.getByRole("link", { name: /Positions/ }).click();
-  const card = page.getByRole("article").filter({ has: page.getByRole("heading", { name: "ETH Up $3,100" }) });
-  await expect(card).toContainText("Proposed final price $3,142");
+  const card = page.getByRole("article").filter({ has: page.getByRole("heading", { name: "BTC Up $79,000" }) });
+  await expect(card).toContainText("Proposed final price $81,420");
 
   await page.clock.fastForward(40 * 60_000);
-  await expect(card).toContainText("Final price $3,142. Preparing your payout");
+  await expect(card).toContainText("Final price $81,420. Preparing your payout");
   await expect(card).not.toContainText("Proposed");
   await expect(card).not.toContainText("final at");
   await expect(card.getByRole("button", { name: "Collect", exact: true })).toHaveCount(0);
