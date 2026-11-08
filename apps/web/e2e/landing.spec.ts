@@ -130,12 +130,9 @@ test("the 320px landing keeps risk copy and payout controls inside the viewport"
   expect(await controls.evaluate((element) => element.getBoundingClientRect().right - document.documentElement.clientWidth)).toBeLessThanOrEqual(0);
 });
 
-test("risk info lives in one footer line and the page reads as the product", async ({ page }) => {
-  expect(await page.locator("main").innerText()).not.toMatch(/testnet|mock|demo|planned|audit|example/i);
+test("the page reads as the product", async ({ page }) => {
+  expect(await page.locator("body").innerText()).not.toMatch(/testnet|mock|demo|planned|audit|example/i);
   await expect(page.locator("#safety").getByText("BTC, one recorded oracle run", { exact: true })).toBeVisible();
-  const footer = page.getByRole("contentinfo");
-  await expect(footer).toContainText("isn't audited");
-  await expect(footer.getByRole("link", { name: "Safety and risks" })).toHaveAttribute("href", "/docs/safety-and-risks");
 });
 
 test("the header matches the app header and scrolls away with the page", async ({ page }) => {

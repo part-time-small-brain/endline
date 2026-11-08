@@ -23,15 +23,6 @@ export function Footer() {
             </a>
           </nav>
         </div>
-        <div className="mt-6 flex flex-col gap-2 border-t border-rule pt-5 text-xs text-ink-2 sm:flex-row sm:justify-between">
-          <p>
-            You can lose what you pay. The contract isn't audited, and the owner controls the price oracle. Not financial advice.{" "}
-            <a href="/docs/safety-and-risks" className="font-semibold text-ink underline decoration-rule underline-offset-4 hover:decoration-ink">
-              Safety and risks
-            </a>
-          </p>
-          <p className="font-mono text-[0.625rem] tracking-[0.12em] uppercase">Built on NEAR Intents</p>
-        </div>
       </div>
     </footer>
   );

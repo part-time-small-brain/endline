@@ -91,7 +91,7 @@ export function Tap({ state, nowSec, views, onConnect, onAddFunds, onQuote }: Pr
   };
 
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-4 px-4 lg:px-6 lg:pt-2">
+    <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-4 px-4 pb-6 lg:px-6 lg:pt-2">
       <div className="grid grid-cols-2 items-end gap-x-4 gap-y-3 lg:flex lg:gap-8">
         {symbols.length > 1 && (
           <div className="col-span-2 lg:self-center">
@@ -214,7 +214,6 @@ export function Tap({ state, nowSec, views, onConnect, onAddFunds, onQuote }: Pr
 
       <TapMode free={free} left={left} budget={budget} quoteDecimals={quoteDecimals} onFree={setFree} onBudget={setBudget} />
       {free && <FreeCalls calls={data.calls ?? []} accountId={wallet?.accountId} nowSec={nowSec} quoteDecimals={quoteDecimals} />}
-      <p className={`pb-6 text-center ${LABEL}`}>Settled on NEAR Intents</p>
     </div>
   );
 }

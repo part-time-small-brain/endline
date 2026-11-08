@@ -283,7 +283,6 @@ export function Lite({ state, nowSec, action, stickyAction }: Props) {
             </span>
           </div>
           <div className="mt-3 w-full *:w-full">{action}</div>
-          <p className="mt-2.5 text-center font-mono text-[0.625rem] tracking-[0.12em] text-ink-3 uppercase">Settles on NEAR Intents</p>
         </div>
       </section>
     </div>
