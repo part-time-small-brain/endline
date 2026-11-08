@@ -319,12 +319,17 @@ fn rejects_unknown_index_and_decimals_floats_cannot_represent() {
         index: "doge_usd".into(),
         ..btc(EXPIRY)
     };
+    let eth = Request {
+        index: "eth_usd".into(),
+        ..btc(EXPIRY)
+    };
     let ten_decimals = Request {
         quote_decimals: 10,
         ..btc(EXPIRY)
     };
     let http = Recorded::without(&[]);
     assert_eq!(fix(&doge, AFTER, &http).source, "unknown index");
+    assert_eq!(fix(&eth, AFTER, &http).source, "unknown index");
     assert_eq!(fix(&ten_decimals, AFTER, &http).source, "unsupported decimals");
 }
 

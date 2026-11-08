@@ -38,7 +38,7 @@ test("Lite buys through the same confirm sheet", async ({ page }) => {
   await expect(page.getByLabel("Trade sentence")).toBeVisible();
 });
 
-const CHIP_LABELS = ["End date", "Trade asset", "Trade direction", "Price to beat", "Trade amount"] as const;
+const CHIP_LABELS = ["End date", "Trade direction", "Price to beat", "Trade amount"] as const;
 
 async function ready(page: Page) {
   await page.goto("/app");
@@ -58,7 +58,7 @@ async function fitsHorizontally(page: Page, panel: Locator) {
   expect.soft(bounds!.x + bounds!.width).toBeLessThanOrEqual(page.viewportSize()!.width);
 }
 
-test("all five sentence edits update the ticket without exposing trading jargon", async ({ page }) => {
+test("every sentence edit updates the ticket without exposing trading jargon", async ({ page }) => {
   await ready(page);
   const payout = page.getByLabel("Maximum payout");
   let previous = await payout.innerText();
@@ -76,13 +76,6 @@ test("all five sentence edits update the ticket without exposing trading jargon"
   await expect(later).toHaveAttribute("aria-checked", "true");
   await expect(page.getByRole("button", { name: "End date", exact: true })).toContainText(day);
   await fitsHorizontally(page, dates);
-  await changedPayout();
-
-  const assets = await openPopover(page, "Trade asset");
-  const eth = assets.getByRole("radio", { name: /^ETH/ });
-  await eth.click();
-  await expect(eth).toHaveAttribute("aria-checked", "true");
-  await expect(page.getByRole("button", { name: "Trade asset", exact: true })).toHaveText("ETH");
   await changedPayout();
 
   const directions = await openPopover(page, "Trade direction");
@@ -111,7 +104,7 @@ test("all five sentence edits update the ticket without exposing trading jargon"
   await page.keyboard.press("Escape");
 
   const sentence = page.getByLabel("Trade sentence");
-  await expect(sentence).toContainText("ETH ends below", { useInnerText: true });
+  await expect(sentence).toContainText("BTC ends below", { useInnerText: true });
   await expect(sentence).toContainText(/I put\s+\$50\s*, I win up to/, { useInnerText: true });
   await expect(page.getByLabel("Trade ticket")).not.toContainText(/nep(?:141|245):|[A-Z]+-\d{2}[A-Z]{3}\d{2}-|RFQ|breakeven|collateral|token_diff|strike|premium|slippage/i, { useInnerText: true });
   await expect(sentence).not.toContainText(/\b(call|put option|series|contract|balanced|bolder|safer)\b/i, { useInnerText: true });
@@ -119,7 +112,6 @@ test("all five sentence edits update the ticket without exposing trading jargon"
 
 test("mode switches preserve selection and budget, and Lite remains editable after Pro", async ({ page }) => {
   await ready(page);
-  await (await openPopover(page, "Trade asset")).getByRole("radio", { name: /^ETH/ }).click();
   await (await openPopover(page, "Trade direction")).getByRole("radio", { name: /^Down/ }).click();
   await (await openPopover(page, "End date")).getByRole("radio").last().click();
   await (await openPopover(page, "Price to beat")).getByRole("radio").first().click();
@@ -128,10 +120,9 @@ test("mode switches preserve selection and budget, and Lite remains editable aft
   const before = await selection(page);
 
   await page.getByRole("button", { name: "Pro", exact: true }).click();
-  await expect(page.getByRole("radio", { name: /^ETH/ })).toHaveAttribute("aria-checked", "true");
   await expect(page.getByRole("radio", { name: /^Down/ })).toHaveAttribute("aria-checked", "true");
   await expect(page.getByRole("radio", { name: "$50", exact: true })).toHaveAttribute("aria-checked", "true");
-  expect(Number(await page.getByRole("slider", { name: "Price to beat" }).getAttribute("aria-valuenow"))).toBe(dollars(before[3] ?? "")[0]);
+  expect(Number(await page.getByRole("slider", { name: "Price to beat" }).getAttribute("aria-valuenow"))).toBe(dollars(before[CHIP_LABELS.indexOf("Price to beat")] ?? "")[0]);
   await expect(page.getByRole("button", { name: "Buy Down · $50", exact: true })).toBeEnabled();
 
   await page.getByRole("button", { name: "Lite", exact: true }).click();
@@ -219,15 +210,11 @@ test("Up and Down show full payout at the cap on the winning side", async ({ pag
 test("sentence controls expose selected values without announcing every price poll", async ({ page }) => {
   await ready(page);
   await expect(page.getByRole("button", { name: "End date", exact: true })).toHaveAccessibleDescription(/Tomorrow/);
-  await expect(page.getByRole("button", { name: "Trade asset", exact: true })).toHaveAccessibleDescription("BTC");
   await expect(page.getByRole("button", { name: "Trade direction", exact: true })).toHaveAccessibleDescription("Up, ends above");
   await expect(page.getByRole("button", { name: "Price to beat", exact: true })).toHaveAccessibleDescription(/\$81,000/);
   await expect(page.getByRole("button", { name: "Trade amount", exact: true })).toHaveAccessibleDescription("$25");
   await expect(page.getByRole("button", { name: "About estimated chance", exact: true })).toHaveAccessibleDescription(/% estimated chance/);
   await expect(page.getByLabel("Maximum payout")).toHaveAttribute("aria-live", "off");
-  await (await openPopover(page, "Trade asset")).getByRole("radio", { name: /^ETH/ }).click();
-  await page.keyboard.press("Escape");
-  await expect(page.getByRole("button", { name: "Trade asset", exact: true })).toHaveAccessibleDescription("ETH");
 });
 
 test("Lite falls back and toggles when browser storage is blocked", async ({ page }) => {
@@ -391,7 +378,6 @@ test("Lite keeps its action and editable values usable on narrow phones and tabl
   }
   await page.setViewportSize({ width: 320, height: 740 });
   await (await openPopover(page, "End date")).getByRole("radio").last().click();
-  await (await openPopover(page, "Trade asset")).getByRole("radio", { name: /^ETH/ }).click();
   await (await openPopover(page, "Trade direction")).getByRole("radio", { name: /^Down/ }).click();
   const amounts = await openPopover(page, "Trade amount");
   await amounts.getByRole("radio", { name: "Other", exact: true }).click();
@@ -412,7 +398,7 @@ test("Lite keeps its action and editable values usable on narrow phones and tabl
   await expect(date).toHaveAttribute("aria-expanded", "false");
 });
 
-test("Lite baseline and six popovers fit the viewport and support Escape", async ({ page }) => {
+test("Lite baseline and every popover fit the viewport and support Escape", async ({ page }) => {
   await ready(page);
   const noOverflow = async () => {
     expect(await sideways(page)).toBeLessThanOrEqual(0);

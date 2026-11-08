@@ -1,6 +1,6 @@
 # Endline
 
-Pick where BTC and ETH end. Fund from any chain, max loss is what you pay. Each position is a European, cash-settled option with a capped payout, fully backed in USDC, that lives and trades inside NEAR Intents. Live on NEAR testnet; mainnet (with deposits from any chain via 1Click) is built but not deployed yet.
+Pick where BTC ends. Fund from any chain, max loss is what you pay. Each position is a European, cash-settled option with a capped payout, fully backed in USDC, that lives and trades inside NEAR Intents. Live on NEAR testnet; mainnet (with deposits from any chain via 1Click) is built but not deployed yet.
 
 ## The problem
 
@@ -23,14 +23,14 @@ Tracks: `defi`.
 
 Live app: https://app.endline.trade (landing: https://endline.trade, docs: https://docs.endline.trade).
 
-1. Open the app. Lite starts with one editable sentence: end time, BTC or ETH, above or below, price to beat, amount and capped payout. Max loss and estimated chance stay visible. Lite / Pro / Tap in the header opens the chart ticket or the tap grid: rows of prices to beat, columns of end dates, tap a cell to buy it.
+1. Open the app. Lite starts with one editable sentence: end time, above or below, price to beat, amount and capped payout. Max loss and estimated chance stay visible. Lite / Pro / Tap in the header opens the chart ticket or the tap grid: rows of prices to beat, columns of end dates, tap a cell to buy it.
 2. Click Connect and pick a wallet.
    - Ethereum wallet (e.g. MetaMask): nothing else to set up.
    - NEAR wallet: any from the testnet list (e.g. Meteor, Intear, Nightly, or NEAR CLI if you have `near` with a testnet account). A "One-time setup" card then asks you to click Enable: one transaction that lets the wallet sign trades on NEAR Intents, so the account needs a little testnet NEAR.
 
    The header shows your balance.
 3. Click Add funds → "Get 100 test USDC". The balance goes up by $100 within seconds. Once per account and IP per 24 h.
-4. Tap the sentence slots: Tomorrow, BTC, above, a price to beat and $25. Check the full-payout threshold and Max loss, then click "Buy Up · $25". The first time, your wallet asks for one signature that proves the wallet is yours for 24 h (no funds move). The confirm sheet then shows the firm price, the exact swap you'll sign and a countdown. Click "Buy for $X" and sign. You see "You're in" and can turn on auto-collect (one more signature).
+4. Tap the sentence slots: Tomorrow, above, a price to beat and $25. Check the full-payout threshold and Max loss, then click "Buy Up · $25". The first time, your wallet asks for one signature that proves the wallet is yours for 24 h (no funds move). The confirm sheet then shows the firm price, the exact swap you'll sign and a countdown. Click "Buy for $X" and sign. You see "You're in" and can turn on auto-collect (one more signature).
 5. Open Positions. The position shows Paid, Value now and P&L. Click "Sell back", then "Sell back for $X", and sign: the USDC lands in your balance.
 6. Settlement: "Today" means the option ends on your current local calendar day; the list shows its end time (quoting stops 60 s before the end). About 10 minutes after the end the price is proposed (median of 7 exchanges) and it is final 2 minutes later. A win of $1 or more with auto-collect is paid into your balance 1 to 2 minutes after final; otherwise the position shows Collect.
 

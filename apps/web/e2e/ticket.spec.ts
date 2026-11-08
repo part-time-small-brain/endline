@@ -130,22 +130,6 @@ test("ticket shows the cap two steps past the line on the winning side, paying m
   }
 });
 
-test("the picked asset stands out from its group", async ({ page }) => {
-  const luminance = (rgb: string) => {
-    const [r, g, b] = (rgb.match(/[\d.]+/g) ?? []).slice(0, 3).map((v) => {
-      const c = Number(v) / 255;
-      return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
-    });
-    return 0.2126 * (r ?? 0) + 0.7152 * (g ?? 0) + 0.0722 * (b ?? 0);
-  };
-  await page.addStyleTag({ content: "*, *::before, *::after { transition: none !important; }" });
-  const group = page.getByRole("radiogroup", { name: "Asset" }).first();
-  const picked = group.getByRole("radio", { checked: true });
-  const [chip, track] = await Promise.all([picked.evaluate((el) => getComputedStyle(el).backgroundColor), group.evaluate((el) => getComputedStyle(el).backgroundColor)]);
-  const [a, b] = [luminance(chip), luminance(track)];
-  expect((Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05)).toBeGreaterThan(1.2);
-});
-
 test("utility classes win over base styles", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Ends" })).toHaveCSS("font-family", /^"Geist Mono/);
   await page.getByRole("radio", { name: "Other" }).click();
@@ -165,7 +149,7 @@ test("buy, see it in positions, sell it back", async ({ page }) => {
   expect(paid).toBeLessThanOrEqual(before);
   if (paid > 25) await expect(page.getByRole("dialog")).toContainText("Above the $25.00 you picked");
   const terms = await page.getByRole("dialog").innerText();
-  const title = /(BTC|ETH) (Up|Down) \$[\d,]+/.exec(terms)?.[0] ?? "no title";
+  const title = /BTC (Up|Down) \$[\d,]+/.exec(terms)?.[0] ?? "no title";
   const ends = /Ends .+? UTC/.exec(terms)?.[0] ?? "no end";
   await confirm.click();
   await expect(page.getByText("You're in")).toBeVisible({ timeout: 10_000 });
@@ -224,7 +208,7 @@ test("a pay link fills the amount field with the same budget, or falls back to $
   }
 });
 
-test("arrow keys move from the focused chip, and Asset and Direction pick the same way", async ({ page }) => {
+test("arrow keys move from the focused chip, and Direction picks the same way", async ({ page }) => {
   const pay = page.getByRole("radiogroup", { name: "You pay" });
   await pay.getByRole("radio", { name: "$10", exact: true }).focus();
   await page.keyboard.press("ArrowRight");
@@ -232,16 +216,14 @@ test("arrow keys move from the focused chip, and Asset and Direction pick the sa
   await expect(twentyFive).toBeFocused();
   await expect(twentyFive).toHaveAttribute("aria-checked", "true");
 
-  for (const [group, from, to] of [["Direction", /^Up/, /^Down/], ["Asset", /^BTC/, /^ETH/]] as const) {
-    const radios = page.getByRole("radiogroup", { name: group });
-    await radios.getByRole("radio", { name: from }).focus();
-    await page.keyboard.press("ArrowRight");
-    const next = radios.getByRole("radio", { name: to });
-    await expect(next).toBeFocused();
-    await expect(next).toHaveAttribute("aria-checked", "true");
-    await expect(next).toHaveAttribute("tabindex", "0");
-    await expect(radios.getByRole("radio", { name: from })).toHaveAttribute("tabindex", "-1");
-  }
+  const direction = page.getByRole("radiogroup", { name: "Direction" });
+  await direction.getByRole("radio", { name: /^Up/ }).focus();
+  await page.keyboard.press("ArrowRight");
+  const down = direction.getByRole("radio", { name: /^Down/ });
+  await expect(down).toBeFocused();
+  await expect(down).toHaveAttribute("aria-checked", "true");
+  await expect(down).toHaveAttribute("tabindex", "0");
+  await expect(direction.getByRole("radio", { name: /^Up/ })).toHaveAttribute("tabindex", "-1");
 });
 
 test("Add funds shows USDC and deposits, and no test USDC off testnet", async ({ page }) => {

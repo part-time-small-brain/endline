@@ -21,28 +21,16 @@ pub struct Market {
     bybit: &'static str,
 }
 
-const MARKETS: [Market; 2] = [
-    Market {
-        deribit_index: "btc_usd",
-        coinbase: "BTC-USD",
-        kraken: ("XBTUSD", "XXBTZUSD"),
-        bitstamp: "btcusd",
-        bitfinex: "tBTCUSD",
-        binance: "BTCUSDT",
-        okx: "BTC-USDT",
-        bybit: "BTCUSDT",
-    },
-    Market {
-        deribit_index: "eth_usd",
-        coinbase: "ETH-USD",
-        kraken: ("ETHUSD", "XETHZUSD"),
-        bitstamp: "ethusd",
-        bitfinex: "tETHUSD",
-        binance: "ETHUSDT",
-        okx: "ETH-USDT",
-        bybit: "ETHUSDT",
-    },
-];
+const MARKETS: [Market; 1] = [Market {
+    deribit_index: "btc_usd",
+    coinbase: "BTC-USD",
+    kraken: ("XBTUSD", "XXBTZUSD"),
+    bitstamp: "btcusd",
+    bitfinex: "tBTCUSD",
+    binance: "BTCUSDT",
+    okx: "BTC-USDT",
+    bybit: "BTCUSDT",
+}];
 
 enum Rows {
     Array {

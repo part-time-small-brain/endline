@@ -15,9 +15,9 @@ description: Up and Down are fully backed European options with a capped payout.
 | Max profit | size × W, minus what you paid | size × W, minus what you paid |
 | Breakeven | K + paid ÷ size | K − paid ÷ size |
 
-W, the width, is two steps of the strike's price grid, about 1.2–3% of the strike: $2,000 for BTC around $100,000 and $40 for ETH around $2,400. Pro shows the cap as "If BTC ends above $112,000"; Lite as "win up to" that capped gross payout (not profit) plus "Full payout if BTC ends above $112,000". Every position shows it as "Capped at $112,000".
+W, the width, is two steps of the strike's price grid, about 1.2–3% of the strike: $2,000 for BTC around $100,000. Pro shows the cap as "If BTC ends above $112,000"; Lite as "win up to" that capped gross payout (not profit) plus "Full payout if BTC ends above $112,000". Every position shows it as "Capped at $112,000".
 
-Size is how much BTC or ETH your option tracks: what you pay divided by the price of one whole-coin option.
+Size is how much BTC your option tracks: what you pay divided by the price of one whole-coin option.
 
 ## Examples
 
@@ -36,17 +36,17 @@ BTC Up: you pay $20.00, K is $110,000, the cap is $112,000 and one whole-BTC opt
 
 At $115,000 the BTC Up pays 0.02 × min(115,000 − 110,000, 2,000) = $40.00 in USDC, rounded down to the smallest USDC unit.
 
-ETH Down: you pay $15.00, K is $2,400, the cap is $2,360 and one whole-ETH option costs $25, so size is 0.6 ETH.
+BTC Down: you pay $25.00, K is $100,000, the cap is $98,000 and one whole-BTC option costs $1,250, so size is 0.02 BTC.
 
-| Final ETH | Payout | Profit |
+| Final BTC | Payout | Profit |
 |---|---|---|
-| $2,500 | $0.00 | −$15.00 |
-| $2,400 | $0.00 | −$15.00 |
-| $2,375 | $15.00 | $0.00 (breakeven) |
-| $2,360 | $24.00 | +$9.00 (the cap) |
-| $2,000 | $24.00 | +$9.00 |
+| $101,000 | $0.00 | −$25.00 |
+| $100,000 | $0.00 | −$25.00 |
+| $98,750 | $25.00 | $0.00 (breakeven) |
+| $98,000 | $40.00 | +$15.00 (the cap) |
+| $95,000 | $40.00 | +$15.00 |
 
-It can pay at most 0.6 × $40 = $24. That $24 in USDC was locked in the contract before you bought.
+It can pay at most 0.02 × $2,000 = $40. That $40 in USDC was locked in the contract before you bought.
 
 ## Fully collateralized
 

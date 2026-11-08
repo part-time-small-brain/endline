@@ -135,36 +135,43 @@ export function Lite({ state, nowSec, action, stickyAction }: Props) {
               </Popover>
               ,
             </span>{" "}
-            <Popover
-              fit
-              label="Trade asset"
-              description={symbol}
-              button={<>{Glyph && <Glyph size="0.78em" weight="bold" aria-hidden="true" className="shrink-0" />}{symbol}<Caret /></>}
-              buttonClassName={`${slot} before:content-['Asset']`}
-              panelClassName={panel}
-            >
-              <div className={heading}>Asset</div>
-              <div role="radiogroup" aria-label="Asset" onKeyDown={pickWithArrows}>
-                {symbols.map((s) => {
-                  const Icon = ASSET_ICONS[s];
-                  const price = data.market?.spot[s];
-                  return (
-                    <button key={s} type="button" role="radio" aria-checked={s === symbol} tabIndex={s === symbol ? 0 : -1} onClick={() => setSymbol(s)} className={`${row} ${picked(s === symbol)}`}>
-                      <span className="flex items-center gap-3">
-                        <span className="grid size-8 shrink-0 place-items-center rounded-md border border-ink/20 text-ink" aria-hidden="true">
-                          {Icon ? <Icon size={18} weight="bold" /> : s.slice(0, 1)}
+            {symbols.length > 1 ? (
+              <Popover
+                fit
+                label="Trade asset"
+                description={symbol}
+                button={<>{Glyph && <Glyph size="0.78em" weight="bold" aria-hidden="true" className="shrink-0" />}{symbol}<Caret /></>}
+                buttonClassName={`${slot} before:content-['Asset']`}
+                panelClassName={panel}
+              >
+                <div className={heading}>Asset</div>
+                <div role="radiogroup" aria-label="Asset" onKeyDown={pickWithArrows}>
+                  {symbols.map((s) => {
+                    const Icon = ASSET_ICONS[s];
+                    const price = data.market?.spot[s];
+                    return (
+                      <button key={s} type="button" role="radio" aria-checked={s === symbol} tabIndex={s === symbol ? 0 : -1} onClick={() => setSymbol(s)} className={`${row} ${picked(s === symbol)}`}>
+                        <span className="flex items-center gap-3">
+                          <span className="grid size-8 shrink-0 place-items-center rounded-md border border-ink/20 text-ink" aria-hidden="true">
+                            {Icon ? <Icon size={18} weight="bold" /> : s.slice(0, 1)}
+                          </span>
+                          <span>
+                            <span className="block font-semibold">{s}</span>
+                            <span className="block text-xs text-ink-3">{assetName(s)}</span>
+                          </span>
                         </span>
-                        <span>
-                          <span className="block font-semibold">{s}</span>
-                          <span className="block text-xs text-ink-3">{assetName(s)}</span>
-                        </span>
-                      </span>
-                      <span className="shrink-0 text-right font-mono">{price ? formatPrice(toUnits(price, quoteDecimals), quoteDecimals) : "…"}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </Popover>{" "}
+                        <span className="shrink-0 text-right font-mono">{price ? formatPrice(toUnits(price, quoteDecimals), quoteDecimals) : "…"}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </Popover>
+            ) : (
+              <span className="inline-flex items-center gap-[0.25em] align-middle font-semibold">
+                {Glyph && <Glyph size="0.78em" weight="bold" aria-hidden="true" className="shrink-0" />}
+                {symbol}
+              </span>
+            )}{" "}
             ends{" "}
             <Popover
               fit

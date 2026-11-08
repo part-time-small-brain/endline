@@ -77,9 +77,8 @@ $view $opt get_config json-args '{}' $net now
 near account list-keys $opt $net now
 near account delete-keys $opt public-keys <every key listed above, comma-separated> $send
 
-# 4. Underlyings, oracle account and oracle WASM (owner, 1 yocto). The oracle and WASM are live 24 h later
+# 4. Underlying, oracle account and oracle WASM (owner, 1 yocto). The oracle and WASM are live 24 h later
 $call $opt add_underlying json-args '{"symbol":"BTC","underlying":{"index":"btc_usd","decimals":8,"min_write":"1000"}}' prepaid-gas '30 Tgas' attached-deposit '1 yoctoNEAR' sign-as $root $send
-$call $opt add_underlying json-args '{"symbol":"ETH","underlying":{"index":"eth_usd","decimals":18,"min_write":"1000000000000000"}}' prepaid-gas '30 Tgas' attached-deposit '1 yoctoNEAR' sign-as $root $send
 $call $opt add_oracle json-args '{"account_id":"$oracle"}' prepaid-gas '30 Tgas' attached-deposit '1 yoctoNEAR' sign-as $root $send
 $call $opt set_oracle_wasm json-args '{"oracle_wasm":{"outlayer_id":"outlayer.near","url":"$url","sha256":"$sha"}}' prepaid-gas '30 Tgas' attached-deposit '1 yoctoNEAR' sign-as $root $send
 

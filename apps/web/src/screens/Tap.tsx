@@ -93,9 +93,11 @@ export function Tap({ state, nowSec, views, onConnect, onAddFunds, onQuote }: Pr
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-4 px-4 lg:px-6 lg:pt-2">
       <div className="grid grid-cols-2 items-end gap-x-4 gap-y-3 lg:flex lg:gap-8">
-        <div className="col-span-2 lg:self-center">
-          <AssetPicker symbols={symbols} spot={data.market?.spot} value={symbol} onChange={setSymbol} />
-        </div>
+        {symbols.length > 1 && (
+          <div className="col-span-2 lg:self-center">
+            <AssetPicker symbols={symbols} spot={data.market?.spot} value={symbol} onChange={setSymbol} />
+          </div>
+        )}
         <MarketStats symbol={symbol} spot={spot} change={first && spotNumber ? spotNumber / first[1] - 1 : undefined} expiry={grid?.expiries.find((e) => e > nowSec)} nowSec={nowSec} quoteDecimals={quoteDecimals} />
       </div>
 

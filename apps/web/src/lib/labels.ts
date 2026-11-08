@@ -11,6 +11,6 @@ export function capLabel(series: ListedSeries, quoteDecimals: number): string {
 
 export const shortAccount = (account: string) => (account.length > 16 ? `${account.slice(0, 6)}…${account.slice(-4)}` : account);
 
-const NAMES: Record<string, string> = { BTC: "Bitcoin", ETH: "Ethereum" };
+const NAMES: Record<string, string> = { BTC: "Bitcoin" };
 
 export const assetName = (symbol: string) => NAMES[symbol] ?? symbol;

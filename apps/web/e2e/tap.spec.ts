@@ -62,13 +62,16 @@ test("a tap asks for a wallet first, then confirms exactly that cell at the chos
   expect(paid).toBeLessThan(11);
 });
 
-test("Tap keeps the stake when switching assets", async ({ page }) => {
+test("with BTC the only asset, no mode offers an asset picker and Lite names it in plain text", async ({ page }) => {
   await openTap(page);
-  await page.getByRole("radio", { name: "$50", exact: true }).click();
-  await page.getByRole("radiogroup", { name: "Asset" }).getByRole("radio", { name: /^ETH/ }).click();
-  await expect(cells(page).first()).toHaveAccessibleName(/ETH ends/);
-  await expect(page.getByRole("radio", { name: "$50", exact: true })).toHaveAttribute("aria-checked", "true");
-  await expect(page.getByText(/at about \$50; you confirm it/)).toBeVisible();
+  await expect(cells(page).first()).toHaveAccessibleName(/^(Up|Down) · BTC ends /);
+  await expect(page.getByRole("radiogroup", { name: "Asset" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Pro", exact: true }).click();
+  await expect(page.getByRole("slider", { name: "Price to beat" })).toBeVisible();
+  await expect(page.getByRole("radiogroup", { name: "Asset" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Lite", exact: true }).click();
+  await expect(page.getByLabel("Trade sentence")).toContainText("BTC ends above", { useInnerText: true });
+  await expect(page.getByRole("button", { name: "Trade asset", exact: true })).toHaveCount(0);
 });
 
 test("Tap fits phones down to 320 px without sideways scrolling", async ({ page, isMobile }) => {

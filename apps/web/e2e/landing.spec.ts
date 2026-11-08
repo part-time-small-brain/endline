@@ -67,20 +67,17 @@ test("the split line sits under the headline words, clear of the title and the c
 });
 
 test("the hero ticket opens the same trade in the app", async ({ page }) => {
-  await (await openPopover(page, "Trade asset")).getByRole("radio", { name: /^ETH/ }).click();
   await (await openPopover(page, "Trade direction")).getByRole("radio", { name: /^Down/ }).click();
   await (await openPopover(page, "Trade amount")).getByRole("radio", { name: "$100", exact: true }).click();
   await (await openPopover(page, "Price to beat")).getByRole("radio", { checked: false }).first().click();
   const strike = await money(page.getByRole("button", { name: "Price to beat", exact: true }));
-  await hero(page).getByRole("link", { name: "Try ETH Down for $100" }).click();
+  await hero(page).getByRole("link", { name: "Try BTC Down for $100" }).click();
   await expect(page).toHaveURL(/\/app\?/);
   await expect(page.getByRole("button", { name: "Lite", exact: true })).toHaveAttribute("aria-pressed", "true");
-  await expect(page.getByRole("button", { name: "Trade asset", exact: true })).toHaveText("ETH");
   await expect(page.getByRole("button", { name: "Trade direction", exact: true })).toContainText("below");
   await expect(page.getByRole("button", { name: "Trade amount", exact: true })).toHaveText("$100");
   await expect.poll(() => money(page.getByRole("button", { name: "Price to beat", exact: true }))).toBe(strike);
   await page.getByRole("button", { name: "Pro", exact: true }).click();
-  await expect(page.getByRole("radio", { name: /^ETH\b/ })).toHaveAttribute("aria-checked", "true");
   await expect(page.getByRole("radiogroup", { name: "Direction" }).getByRole("radio", { name: /^Down/ })).toHaveAttribute("aria-checked", "true");
   await expect(page.getByRole("radio", { name: "$100", exact: true })).toHaveAttribute("aria-checked", "true");
   await expect(handleOf(page)).toHaveAttribute("aria-valuenow", String(strike));
@@ -126,7 +123,7 @@ test("the 320px landing keeps risk copy and payout controls inside the viewport"
   await page.reload();
   await ready(page);
   await expect.poll(() => sideways(page)).toBeLessThanOrEqual(0);
-  const risk = hero(page).getByText("Choose whether Bitcoin or Ethereum ends above or below your price. The most you can lose is what you pay.");
+  const risk = hero(page).getByText("Choose whether Bitcoin ends above or below your price. The most you can lose is what you pay.");
   expect(await risk.evaluate((element) => element.getBoundingClientRect().right - document.documentElement.clientWidth)).toBeLessThanOrEqual(0);
   const controls = page.locator("#floor").getByRole("radiogroup", { name: "Your side" });
   await controls.scrollIntoViewIfNeeded();
