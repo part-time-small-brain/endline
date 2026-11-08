@@ -4,7 +4,7 @@ Rules for every human and AI agent working in this repo. Short on purpose. Read 
 
 ## What this is
 
-Endline: cross-chain crypto options settled through NEAR Intents. European, cash-settled BTC calls and puts with a capped payout, fully collateralized in USDC. Option series are NEP-245 tokens that trade inside `intents.near` via `token_diff`. Start with `apps/docs/content/docs/index.mdx`, then `apps/docs/content/docs/developers/architecture.mdx`.
+Endline: cross-chain crypto options settled through NEAR Intents. European, cash-settled calls and puts with a capped payout, fully collateralized in USDC. Option series are NEP-245 tokens that trade inside `intents.near` via `token_diff`. Start with `apps/docs/content/docs/index.mdx`, then `apps/docs/content/docs/developers/architecture.mdx`.
 
 ## Layout
 

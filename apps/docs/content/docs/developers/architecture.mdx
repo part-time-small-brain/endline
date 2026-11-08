@@ -16,7 +16,7 @@ Users fund a USDC balance in `intents.near` from any chain, buy with one signatu
 | Relay | `apps/relay` (TypeScript) | RFQ auction, submits matched trades, relays gasless collects | Us |
 | Market maker | `apps/mm` (TypeScript) | Writes options, quotes, takes the other side, hedges | Us. Anyone can run another |
 | Oracle WASM | `oracle/` (Rust, wasm32-wasip2) | Median of 7 exchanges' 30-min averages, checked against Deribit | OutLayer TEE (mainnet), our proposer (testnet) |
-| Market lister | `apps/mm` `list` | Keeps the next 4 daily expiries (plus a 4-hourly one on testnet) listed with BTC calls and puts around spot, each capped two strike steps out, writes inventory, burns unsold pairs after the write cutoff, redeems shorts and exercises its winning longs once final, and deletes its own series a week after their end once they owe nothing | Us, with the market maker's key |
+| Market lister | `apps/mm` `list` | Keeps the next 4 daily expiries (plus a 4-hourly one on testnet) listed with calls and puts around spot for every underlying on the contract, each capped two strike steps out, writes inventory, burns unsold pairs after the write cutoff, redeems shorts and exercises its winning longs once final, and deletes its own series a week after their end once they owe nothing | Us, with the market maker's key |
 | Testnet proposer | `apps/mm` `propose` | Runs the pinned oracle WASM in wasmtime and proposes its price as the manual oracle | Us, testnet only |
 | Mainnet settler | `apps/mm` `settle` | From 5 min after expiry, calls `request_settlement` every 10 min until a price is proposed or the oracle window closes | Us, with the relayer's key, mainnet only |
 | Settlement monitor | `apps/mm` `monitor` | Checks every proposed price against Deribit, flags missing prices, watches the contract's NEAR reserve and pending oracle and owner changes | Us, read-only |
@@ -73,6 +73,6 @@ Testnet ids are in `deploy/testnet.json`. RPC: `https://rpc.testnet.fastnear.com
 | Oracle WASM | Add one row to `MARKETS` in `oracle/src/sources.rs`, rebuild, host, `set_oracle_wasm` |
 | Deploy scripts | Add its `add_underlying` line to `scripts/deploy-testnet.sh` and `scripts/mainnet-plan.sh` |
 | Market maker, relay, web | Nothing. They read assets and series from the contract, and the app shows its asset picker once two are listed |
-| Copy | `AGENTS.md`, the README, the docs site, the landing hero and the page title name BTC: name the new asset there, and give it an icon and name in `apps/web` (`ASSET_ICONS`, `lib/labels.ts`) |
+| Copy | Give it an icon and name in `apps/web` (`ASSET_ICONS`, `lib/labels.ts`). Taglines, titles and the landing name no asset; worked examples stay BTC |
 
 Deribit must list options on the asset, since the market maker prices from Deribit's volatility, and at least 3 of the oracle's 7 exchanges must list a spot pair (4 for expiries other than 08:00 UTC).
