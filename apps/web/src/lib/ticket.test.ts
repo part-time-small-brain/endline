@@ -1,6 +1,6 @@
 import { longPayout } from "@endline/sdk";
 import { describe, expect, it } from "vitest";
-import { goodCase, payoutMultiple, type Ticket, ticket } from "./ticket.ts";
+import { capNote, goodCase, payoutMultiple, type Ticket, ticket } from "./ticket.ts";
 
 const BTC = 10n ** 8n;
 const USD = 10n ** 6n;
@@ -103,5 +103,16 @@ describe("payoutMultiple", () => {
     }
     expect(payoutMultiple(ticketOf("call", 81_000n * USD, 2_000n * USD, 0n, 0n))).toBeUndefined();
     expect(payoutMultiple(ticketOf("call", 81_000n * USD, 2_000n * USD, BTC, 0n))).toBeUndefined();
+  });
+});
+
+describe("capNote", () => {
+  const series = { id: "BTC-X", underlying: "BTC", kind: "call" as const, strike: (81_000n * USD).toString(), width: (2_000n * USD).toString(), expiry: 1_800_000_000, underlying_decimals: 8 };
+  const capped = (budget: bigint, ask: bigint) => capNote(ticket(series, budget, { series_id: series.id, ask: ask.toString(), max_size: BTC.toString(), vol: 0.4 }), budget, 6);
+
+  it("says why a capped ticket costs less than the stake, and stays quiet when it doesn't or the cost reads as the stake", () => {
+    expect(capped(100n * USD, 40n * USD)).toBe("One trade pays out at most $2,000, so this costs $40.");
+    expect(capped(25n * USD, 40n * USD)).toBeUndefined();
+    expect(capped(100n * USD, 100n * USD - 1n)).toBeUndefined();
   });
 });

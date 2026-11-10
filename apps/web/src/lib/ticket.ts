@@ -1,4 +1,5 @@
 import { capPrice, type Mark, maxPayout, type Series, type Terms, termsOf } from "@endline/sdk";
+import { formatUsd } from "./money.ts";
 import { breakeven, costOf, sizeForBudget } from "./payoff.ts";
 
 export interface Ticket {
@@ -33,4 +34,10 @@ export function goodCase(t: Ticket): GoodCase | null {
 
 export function payoutMultiple(t: Ticket): bigint | undefined {
   return t.size > 0n && t.cost > 0n ? (maxPayout(t.terms, t.size) * 10n) / t.cost : undefined;
+}
+
+export function capNote(t: Ticket, budget: bigint, quoteDecimals: number): string | undefined {
+  const usd = (value: bigint, rounding: "up" | "down") => formatUsd(value, quoteDecimals, rounding).replace(/\.00$/, "");
+  const cost = usd(t.cost, "up");
+  return t.capped && cost !== usd(budget, "down") ? `One trade pays out at most ${usd(maxPayout(t.terms, t.size), "down")}, so this costs ${cost}.` : undefined;
 }

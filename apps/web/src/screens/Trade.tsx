@@ -115,7 +115,7 @@ export function Trade({ mode, nowSec, views, onConnect, onAddFunds, onQuote }: P
                     onChange={(index) => setSeries(strikes[index]?.id)}
                   />
                   <AmountPicker value={budget} quoteDecimals={quoteDecimals} onChange={setBudget} />
-                  <Summary up={up} ticket={current} quoteDecimals={quoteDecimals} symbol={symbol} goodCase={goodCase(current)} />
+                  <Summary up={up} ticket={current} budget={budget} quoteDecimals={quoteDecimals} symbol={symbol} goodCase={goodCase(current)} />
                 </>
               )}
               <div className="fixed inset-x-0 bottom-0 z-30 bg-page/90 px-4 pt-3 pb-[max(1.5rem,env(safe-area-inset-bottom))] backdrop-blur-lg lg:static lg:bg-transparent lg:p-0 lg:backdrop-blur-none">
