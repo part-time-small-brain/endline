@@ -74,17 +74,17 @@ describe("reserveAlert", () => {
   const TWO_NEAR = 2n * 10n ** 24n;
 
   it("alerts one yocto below 2 NEAR over the storage cost, not at it", () => {
-    expect(reserveAlert(CONTRACT.optionsId, STORAGE_YOCTO + TWO_NEAR, STORAGE_BYTES)).toBeUndefined();
-    expect(reserveAlert(CONTRACT.optionsId, STORAGE_YOCTO + TWO_NEAR - 1n, STORAGE_BYTES)?.key).toBe(`reserve ${CONTRACT.optionsId}`);
+    expect(reserveAlert("Relayer", CONTRACT.optionsId, STORAGE_YOCTO + TWO_NEAR, STORAGE_BYTES)).toBeUndefined();
+    expect(reserveAlert("Relayer", CONTRACT.optionsId, STORAGE_YOCTO + TWO_NEAR - 1n, STORAGE_BYTES)?.key).toBe(`reserve ${CONTRACT.optionsId}`);
   });
 
   it("keys each account separately, so a low relayer doesn't hide a low intents contract", () => {
-    const keys = ["intents.testnet", "relayer.testnet"].map((id) => reserveAlert(id, TWO_NEAR - 1n, 0)?.key);
+    const keys = ["intents.testnet", "relayer.testnet"].map((id) => reserveAlert("Relayer", id, TWO_NEAR - 1n, 0)?.key);
     expect(keys).toEqual(["reserve intents.testnet", "reserve relayer.testnet"]);
   });
 
   it("reports a balance below the storage cost as negative", () => {
-    expect(reserveAlert(CONTRACT.optionsId, STORAGE_YOCTO / 2n, STORAGE_BYTES)?.text).toContain("-0.500 NEAR above storage");
+    expect(reserveAlert("Relayer", CONTRACT.optionsId, STORAGE_YOCTO / 2n, STORAGE_BYTES)?.text).toContain("-0.500 NEAR above storage");
   });
 });
 

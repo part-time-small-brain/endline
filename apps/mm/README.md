@@ -46,7 +46,7 @@ Read from the process environment.
 | `MAX_SERIES_USD` | Max net short/long payout per series, default `5000`. The lister stocks at most this much per series |
 | `MAX_DELTA_USD` | Max net delta per underlying after a fill, default `50000`. Near expiry a full `MAX_TRADE_USD` trade near the money is up to `MAX_TRADE_USD × spot / width` of delta (~$80k for BTC) and gets refused; demo-size trades fit |
 | `MAX_VEGA_USD` | Max net vega per vol point, default `200` |
-| `ALERT_WEBHOOK_URL` | Optional. Monitor only: POSTs each `ALERT`/`RESOLVED`/`FINAL` line as `{"text","content"}`: Slack and Discord incoming webhooks, or Telegram as `https://api.telegram.org/bot<token>/sendMessage?chat_id=<chat id>` |
+| `ALERT_WEBHOOK_URL` | Optional. Monitor only: POSTs each alert, resolution and final notice as `{"text","content"}`: Slack and Discord incoming webhooks, or Telegram as `https://api.telegram.org/bot<token>/sendMessage?chat_id=<chat id>` |
 | `HEALTH_URL` | Optional. Monitor only: the relay's `/health`, directly or through the web origin, checked every minute (`uptime`, `quotes` alerts) |
 | `RELAYER_ACCOUNT_ID` | Monitor only, optional: the relay's gas payer, whose NEAR it watches |
 | `SETTLER_ACCOUNT_ID` | Settler only: its own account, holding only the NEAR it attaches (1 NEAR lasts months at one request per expiry) |
@@ -111,7 +111,7 @@ Burn, redeem and exercise cover series that expired up to 7 days ago, so the MM'
 
 ## Settlement monitor
 
-`monitor` checks every minute (`--once`: one check, then exit) and logs `ALERT …` lines, each posted to `ALERT_WEBHOOK_URL` if set. An alert is sent once. When its condition clears, `RESOLVED <key>` is sent, and only after that can the alert fire again. A `settle` alert still open when its price goes final sends `FINAL <key>` instead: check the final price, it can no longer be overridden. A failed post is retried (and logged again) each minute while its condition lasts; an alert that clears before any post got through is dropped. State is in memory: `--once` never retries or resolves, and a restart re-sends every active alert. A failed RPC read skips the whole check, uptime included.
+`monitor` checks every minute (`--once`: one check, then exit) and logs one line per event: `ALERT [<network>] <title>: <details>`, `RESOLVED [<network>] <title>, after <duration>` or `FINAL …`. Each is posted to `ALERT_WEBHOOK_URL` if set, as two lines: 🔴, ✅ or ⚠️, the network and the title, then the details or how long it lasted. On Telegram a resolution replies to its alert, so each incident reads as one thread. An alert is sent once. When its condition clears it is resolved, and only after that can it fire again. A `settle` alert still open when its price goes final sends `FINAL` instead: check the final price, it can no longer be overridden. A failed post is retried (and logged again) each minute while its condition lasts; an alert that clears before any post got through is dropped. State is in memory: `--once` never retries or resolves, and a restart re-sends every active alert. A failed RPC read skips the whole check, uptime included.
 
 | Alert | When | Prints |
 |---|---|---|
