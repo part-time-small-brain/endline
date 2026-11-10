@@ -22,7 +22,7 @@ class SettlerChain extends ChainReader {
 
   constructor(config: SettlerConfig) {
     super(config.rpcUrl, config.optionsId);
-    this.account = new Account(config.relayerId, this.provider, config.relayerPrivateKey as KeyPairString);
+    this.account = new Account(config.accountId, this.provider, config.privateKey as KeyPairString);
   }
 
   async request(underlying: string, expiry: number): Promise<void> {

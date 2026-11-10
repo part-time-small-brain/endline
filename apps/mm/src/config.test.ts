@@ -59,6 +59,6 @@ describe("config", () => {
     expect(() => loadConfig({ ...ENV, NETWORK_ID: "mainnet" })).toThrow("no deploy/mainnet.json");
     expect(() => loadMonitorConfig({ NETWORK_ID: "mainnet" })).toThrow("no deploy/mainnet.json");
     expect(() => loadProposerConfig({ NETWORK_ID: "mainnet", ORACLE_ACCOUNT_ID: "oracle.near", ORACLE_PRIVATE_KEY: KEY })).toThrow("no deploy/mainnet.json");
-    expect(() => loadSettlerConfig({ RELAYER_ACCOUNT_ID: "relayer.near", RELAYER_PRIVATE_KEY: KEY })).toThrow("no deploy/mainnet.json");
+    expect(() => loadSettlerConfig({ SETTLER_ACCOUNT_ID: "settler.near", SETTLER_PRIVATE_KEY: KEY })).toThrow("no deploy/mainnet.json");
   });
 });

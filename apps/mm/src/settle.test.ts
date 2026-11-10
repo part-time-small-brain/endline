@@ -33,7 +33,7 @@ vi.mock("./chain.ts", () => ({
 const series = (underlying: string, expiry: number, kind: "call" | "put" = "call") =>
   ({ id: `${underlying}-${expiry}-${kind}`, underlying, kind, strike: "1", expiry, underlying_decimals: 8, width: "1" }) as Series;
 const btc = { underlying: "BTC", expiry: EXPIRY };
-const config = { rpcUrl: "http://rpc", optionsId: "opt.near", relayerId: "relayer.near", relayerPrivateKey: "ed25519:x" };
+const config = { rpcUrl: "http://rpc", optionsId: "opt.near", accountId: "settler.near", privateKey: "ed25519:x" };
 
 afterEach(() => {
   vi.restoreAllMocks();

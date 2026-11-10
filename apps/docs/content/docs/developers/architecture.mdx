@@ -65,6 +65,21 @@ The official NEAR Intents quote bus needs a partner key and KYC for market maker
 
 Testnet ids are in `deploy/testnet.json`. RPC: `https://rpc.testnet.fastnear.com`.
 
+## Keys on mainnet
+
+One account per role (`scripts/mainnet-plan.sh` creates them). Only three keys go on the server.
+
+| Key | Kept | Can do | If it leaks |
+|---|---|---|---|
+| Owner | Offline | Pause writes, override a price inside the dispute window, change oracles (live a day later) | Wrong prices until someone notices. Never user collateral |
+| Relayer function-call key | Server | `execute_intents` on `intents.near`, gas paid by the relayer | The relayer's NEAR, as gas |
+| Relayer full-access key | Offline | Anything on the relayer account | Nothing on the server to leak |
+| MM key | Server | Signs the MM's intents and pays its gas | The MM's whole intents balance: keep only working capital there, topped up from a wallet that never touches the server |
+| Settler key | Server | `request_settlement`, which attaches 0.01 NEAR, so it can't be a function-call key | The settler's NEAR (about 1) |
+| Oracle key | Offline | `propose_settlement` once OutLayer's window passed, for a human to use | A wrong price the owner can override inside the dispute window |
+
+Testnet runs every role from simpler keys: its tokens are worthless.
+
 ## Adding an asset
 
 | Where | Change |
