@@ -135,14 +135,6 @@ describe("quote refusals", () => {
     expect(decide(quoteEvent(PUT, "buy", 1_000_000n), desk, { ...SETTINGS, maxDeltaUsd: 1 }, NOW)).toEqual({ ok: false, reason: "over delta cap" });
     expect(decide(quoteEvent(PUT, "buy", 1_000_000n), desk, { ...SETTINGS, maxVegaUsd: 0.001 }, NOW)).toEqual({ ok: false, reason: "over vega cap" });
   });
-
-  it("refuses everything while a kill switch is tripped", () => {
-    const { desk, kill } = testDesk();
-    kill.trip("hedge", "2 failures");
-    expect(decide(quoteEvent(PUT, "buy", size), desk, SETTINGS, NOW)).toMatchObject({ ok: false });
-    kill.clear("hedge");
-    expect(decide(quoteEvent(PUT, "buy", size), desk, SETTINGS, NOW)).toMatchObject({ ok: true });
-  });
 });
 
 describe("reservations", () => {

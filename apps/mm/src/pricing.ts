@@ -20,9 +20,8 @@ export function contractPrice(book: Book, series: Series, mark: SeriesMark, s: S
   const mid = theo(mark.vol, mark.capVol);
   const shocks = [[1, 1], [-1, -1], [SKEW_SHOCK, -SKEW_SHOCK], [-SKEW_SHOCK, SKEW_SHOCK]] as const;
   const prices = shocks.map(([near, far]) => theo(mark.vol + near * s.spreadVol, mark.capVol + far * s.spreadVol).price);
-  const hedge = Math.abs(mid.delta) * mark.forward * s.hedgeFee;
   const carry = width * s.carryQuote * years;
-  return { ask: Math.max(...prices) + 2 * hedge + carry, bid: Math.min(...prices) - hedge, vol: mark.vol };
+  return { ask: Math.max(...prices) + carry, bid: Math.min(...prices), vol: mark.vol };
 }
 
 export function premiumUsd(price: ContractPrice, contracts: number, mmSells: boolean, s: Settings): number | undefined {

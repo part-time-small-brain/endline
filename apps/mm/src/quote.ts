@@ -13,8 +13,6 @@ export interface Desk {
   intents: IntentsState;
   market: Market;
   inventory: Inventory;
-  hedges: Map<string, number>;
-  halted: () => string | undefined;
 }
 
 export type Decision = { ok: true; premium: bigint; diff: Diff; deadlineMs: number } | { ok: false; reason: string };
@@ -49,8 +47,6 @@ export function priceSeries(desk: Desk, series: Series, settings: Settings, now:
 
 export function decide(ev: QuoteEvent, desk: Desk, settings: Settings, now: number): Decision {
   const { book, market, inventory } = desk;
-  const halted = desk.halted();
-  if (halted) return reject(`halted (${halted})`);
   if (now > ev.deadline_ms) return reject("auction closed");
   if (inventory.has(ev.quote_id)) return reject("duplicate quote id");
   const series = book.series.get(ev.series_id);
@@ -97,8 +93,7 @@ export function decide(ev: QuoteEvent, desk: Desk, settings: Settings, now: numb
     return reject("no market data for inventory");
   }
   const deltaUsd = (e: typeof exposures) => (e.get(series.underlying)?.delta ?? 0) * mark.forward;
-  const hedgeUsd = (desk.hedges.get(series.underlying) ?? 0) * mark.forward;
-  if (over(deltaUsd(exposures) + hedgeUsd, legExposures.map(deltaUsd), settings.maxDeltaUsd)) return reject("over delta cap");
+  if (over(deltaUsd(exposures), legExposures.map(deltaUsd), settings.maxDeltaUsd)) return reject("over delta cap");
   const vega = (e: typeof exposures) => [...e.values()].reduce((sum, x) => sum + x.vega, 0);
   if (over(vega(exposures), legExposures.map(vega), settings.maxVegaUsd)) return reject("over vega cap");
 

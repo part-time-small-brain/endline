@@ -125,11 +125,9 @@ describe("marks", () => {
     expect(JSON.stringify({ method: "marks", params: published }).length).toBeLessThan(64 * 1024);
   });
 
-  it("publish nothing while halted or once the market data is stale", () => {
-    const { desk, kill } = testDesk();
+  it("publish nothing once the market data is stale", () => {
+    const { desk } = testDesk();
     expect(marks(desk, SETTINGS, NOW + SETTINGS.maxDataAgeMs)).toHaveLength(2);
     expect(marks(desk, SETTINGS, NOW + SETTINGS.maxDataAgeMs + 1)).toEqual([]);
-    kill.trip("hedge", "2 failures");
-    expect(marks(desk, SETTINGS, NOW)).toEqual([]);
   });
 });

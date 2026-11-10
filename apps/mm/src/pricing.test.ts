@@ -39,19 +39,19 @@ describe("premium", () => {
     const p = { kind: "call", forward: 80_000, strike: 79_000, width: 2_000, vol: 0.45, capVol: 0.45, years: 7 / 365 } as const;
     const mid = capped(p.kind, p.forward, p.strike, p.width, p.vol, p.capVol, p.years);
     expect(Math.abs(mid.vega)).toBeLessThan(0.05 * Math.abs(capped(p.kind, p.forward, p.strike, 1e9, p.vol, p.vol, p.years).vega));
-    const price = priceOf(p, { ...SETTINGS, hedgeFee: 0, carryQuote: 0 });
+    const price = priceOf(p, { ...SETTINGS, carryQuote: 0 });
     expect(price.ask - mid.price).toBeGreaterThan(0.02 * mid.price);
     expect(mid.price - price.bid).toBeGreaterThan(0.02 * mid.price);
     const legsApartFullSpread = capped(p.kind, p.forward, p.strike, p.width, p.vol + SETTINGS.spreadVol, p.capVol - SETTINGS.spreadVol, p.years).price;
     expect(price.ask - mid.price).toBeLessThan(0.75 * (legsApartFullSpread - mid.price));
   });
 
-  it("charges each fill the hedge trade it causes, and the buy also the close at expiry", () => {
+  it("charges only the vol spread and carry, nothing for a hedge, on a near-the-money bet with a big delta", () => {
     const p = { kind: "call", forward: 80_000, strike: 80_000, width: 2_000, vol: 0.4, capVol: 0.4, years: 1 / 365 } as const;
     const mid = capped(p.kind, p.forward, p.strike, p.width, p.vol, p.capVol, p.years);
     const price = priceOf(p, { ...SETTINGS, spreadVol: 1e-9, carryQuote: 0 });
-    expect(mid.price - price.bid).toBeCloseTo(Math.abs(mid.delta) * p.forward * SETTINGS.hedgeFee, 3);
-    expect(price.ask - mid.price).toBeCloseTo(2 * Math.abs(mid.delta) * p.forward * SETTINGS.hedgeFee, 3);
+    expect(price.ask - mid.price).toBeCloseTo(0, 4);
+    expect(mid.price - price.bid).toBeCloseTo(0, 4);
   });
 
   it("charges carry on the USDC locked, which is the width, not the strike", () => {

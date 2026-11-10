@@ -8,7 +8,6 @@ import { type Desk, maxTradeSize, priceSeries } from "./quote.ts";
 const MAX_BYTES = 64_000;
 
 export function marks(desk: Desk, settings: Settings, now: number): Mark[] {
-  if (desk.halted()) return [];
   const { book } = desk;
   const held = desk.inventory.confirmed();
   const units = (usd: number, roundUp: boolean) => {
