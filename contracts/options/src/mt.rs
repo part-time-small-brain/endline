@@ -132,7 +132,7 @@ impl Contract {
         for (i, token_id) in token_ids.iter().enumerate() {
             let refund = unused[i]
                 .min(amounts[i].0)
-                .min(self.balance_of(&receiver_id, token_id));
+                .min(self.live_balance_of(&receiver_id, token_id));
             if refund > 0 {
                 self.internal_transfer(
                     &receiver_id,
@@ -195,7 +195,7 @@ impl Contract {
         let key = (token_id.to_string(), account_id.clone());
         let balance = self.balances.get(&key).copied().unwrap_or(0);
         require!(balance >= amount, "insufficient balance");
-        if balance == amount && *account_id != self.intents_id {
+        if balance == amount && *account_id == env::current_account_id() {
             self.balances.remove(&key);
         } else {
             self.balances.insert(key, balance - amount);
@@ -268,12 +268,16 @@ impl Contract {
             receiver_id != self.intents_id || msg.is_empty() || msg.parse::<AccountId>().is_ok(),
             "deposits to intents take an empty msg or an account id"
         );
+        let fresh: Vec<bool> = token_ids
+            .iter()
+            .map(|t| !self.balances.contains_key(&(t.clone(), receiver_id.clone())))
+            .collect();
         let sender_id = match self.transfer_from_caller(&receiver_id, &token_ids, &amounts, memo) {
             Ok(sender_id) => sender_id,
             Err(reason) => {
                 env::log_str(&reason);
                 let intents_id = self.intents_id.clone();
-                for (token_id, amount) in token_ids.iter().zip(&amounts) {
+                for ((token_id, amount), fresh) in token_ids.iter().zip(&amounts).zip(fresh) {
                     self.internal_transfer(
                         &receiver_id,
                         &intents_id,
@@ -281,6 +285,9 @@ impl Contract {
                         amount.0,
                         Some("storage credit short"),
                     );
+                    if fresh && self.balance_of(&receiver_id, token_id) == 0 {
+                        self.balances.remove(&(token_id.clone(), receiver_id.clone()));
+                    }
                 }
                 return PromiseOrValue::Value(vec![U128(0); token_ids.len()]);
             }

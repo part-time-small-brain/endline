@@ -98,7 +98,7 @@ Writes close `write_cutoff_sec` before expiry. Exercise and redeem need a final 
 | `add_underlying`, `remove_oracle`, `set_paused` | Owner | 1 yocto |
 | `propose_owner(owner_id \| null)` | Owner | 1 yocto. Replaces any earlier proposal; `null` withdraws it |
 | `accept_owner()` | Proposed owner | 1 yocto. Ownership moves only now, so a typo can't lose it and a multisig or DAO proves it can call before it owns |
-| NEP-245 `mt_transfer`, `mt_batch_transfer`, `mt_transfer_call`, `mt_batch_transfer_call` | Holders | ≥ 1 yocto plus storage for new balance rows. From `intents.near` (an intents `mt_withdraw`) the receiver's storage credit pays instead. If it's short, `mt_batch_transfer` fails and `mt_batch_transfer_call` answers nothing used, so intents refunds either way. Max 10 tokens per batch. No approvals. Plain transfers to `intents.near` or this contract are rejected: use `mt_transfer_call` / `mt_batch_transfer_call`. Into `intents.near` the `msg` must be empty or an account id (a plain deposit) |
+| NEP-245 `mt_transfer`, `mt_batch_transfer`, `mt_transfer_call`, `mt_batch_transfer_call` | Holders | ≥ 1 yocto plus storage for new balance rows. A row that empties stays at zero, so a row is paid for once. From `intents.near` (an intents `mt_withdraw`) the receiver's storage credit pays instead. If it's short, `mt_batch_transfer` fails and `mt_batch_transfer_call` answers nothing used, so intents refunds either way. Max 10 tokens per batch. No approvals. Plain transfers to `intents.near` or this contract are rejected: use `mt_transfer_call` / `mt_batch_transfer_call`. Into `intents.near` the `msg` must be empty or an account id (a plain deposit) |
 
 Pause blocks writes and new series only. Exits are never blocked.
 
