@@ -1,7 +1,7 @@
-import { longPayout, type OptionKind } from "@endline/sdk";
+import { longPayout, type OptionKind, type Series } from "@endline/sdk";
 import { CaretUpDown } from "@phosphor-icons/react";
-import { m } from "motion/react";
-import { type KeyboardEvent, type PointerEvent, type ReactNode, useRef, useState } from "react";
+import { m, useInView, useReducedMotion } from "motion/react";
+import { type KeyboardEvent, type PointerEvent, type ReactNode, useEffect, useRef, useState } from "react";
 import { linear, ticks } from "../../lib/chart.ts";
 import { formatPrice, formatUsd, toNumber, toUnits } from "../../lib/money.ts";
 import { ticket } from "../../lib/ticket.ts";
@@ -28,18 +28,47 @@ const BOTTOM = 24;
 const PX_PER_USD = 2.1;
 const KEY_STEPS = 5;
 const KEYS: Record<string, number> = { ArrowUp: 1, ArrowRight: 1, ArrowDown: -1, ArrowLeft: -1 };
+const SWEEP_MS = 7_000;
+const TICK_MS = 80;
+
+function sweptEnd(series: Series, qd: number, phase: number): number {
+  const strike = toNumber(BigInt(series.strike), qd);
+  const width = toNumber(BigInt(series.width), qd);
+  const toward = series.kind === "call" ? 1 : -1;
+  return strike + toward * width * (0.25 + 1.25 * Math.sin(phase * 2 * Math.PI));
+}
 
 export function FloorDemo({ asset, quoteDecimals: qd }: Props) {
   const step = 10 ** Math.max(Math.floor(Math.log10(asset.spot)) - 2, 0);
   const snap = (price: number) => Math.round(price / step) * step;
+  const low = snap(asset.spot * (1 - RANGE));
+  const high = snap(asset.spot * (1 + RANGE));
+  const clampEnd = (value: number) => snap(Math.min(Math.max(value, low + step), high - step));
+  const balanced = (k: OptionKind) => balancedOf(asset, k, qd);
   const [kind, setKind] = useState<OptionKind>("call");
   const [payUsd, setPay] = useState(25);
-  const [end, setEnd] = useState(() => snap(asset.spot * 0.95));
+  const [playing, setPlaying] = useState(true);
+  const [end, setEnd] = useState(() => {
+    const first = balanced("call");
+    return clampEnd(first ? sweptEnd(first, qd, 0) : asset.spot);
+  });
   const [plot, { width, height }] = useSize<HTMLDivElement>();
   const dragging = useRef(false);
-
-  const balanced = (k: OptionKind) => balancedOf(asset, k, qd);
+  const started = useRef(performance.now());
+  const reduce = useReducedMotion();
+  const inView = useInView(plot);
   const series = balanced(kind);
+
+  useEffect(() => {
+    if (!playing || !series) return;
+    const moving = !reduce && inView;
+    const tick = () => setEnd(clampEnd(sweptEnd(series, qd, moving ? (performance.now() - started.current) / SWEEP_MS : 0)));
+    tick();
+    if (!moving) return;
+    const id = setInterval(tick, TICK_MS);
+    return () => clearInterval(id);
+  }, [playing, reduce, inView, series?.id, low, high, qd]);
+
   if (!series) return null;
 
   const up = kind === "call";
@@ -47,8 +76,6 @@ export function FloorDemo({ asset, quoteDecimals: qd }: Props) {
   const bought = ticket(series, BigInt(payUsd) * 10n ** BigInt(qd), asset.marks[series.id]);
   const paid = toNumber(bought.cost, qd);
   const payout = (price: number) => longPayout(bought.terms, bought.size, toUnits(price, qd));
-  const low = snap(asset.spot * (1 - RANGE));
-  const high = snap(asset.spot * (1 + RANGE));
   const y = linear([low, high], [height - BOTTOM, TOP]);
   const axis = width < 500 ? 64 : 88;
   const x0 = axis + (width - axis) * 0.46;
@@ -66,16 +93,17 @@ export function FloorDemo({ asset, quoteDecimals: qd }: Props) {
   const won = payout(end);
   const result = won - bought.cost;
   const price = (value: number) => formatPrice(toUnits(value, qd), qd);
-  const clampEnd = (value: number) => snap(Math.min(Math.max(value, low + step), high - step));
 
   const dragTo = (event: PointerEvent) => {
     const top = plot.current?.getBoundingClientRect().top ?? 0;
+    setPlaying(false);
     setEnd(clampEnd(y.invert(event.clientY - top)));
   };
   const key = (event: KeyboardEvent) => {
     const direction = KEYS[event.key];
     if (direction === undefined) return;
     event.preventDefault();
+    setPlaying(false);
     setEnd(clampEnd(end + direction * step * KEY_STEPS));
   };
 

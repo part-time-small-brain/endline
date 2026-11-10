@@ -200,3 +200,27 @@ test("with reduced motion the hero dots still color but stay on the page's dot g
   expect(await cursorLineOpacity(page)).toBe(0);
   await expect(canvas).toHaveAttribute("data-off-grid", "0");
 });
+
+test("the floor demo plays where the price ends until a visitor drags it", async ({ page }) => {
+  const slider = page.locator("#floor").getByRole("slider");
+  await slider.scrollIntoViewIfNeeded();
+  const first = await slider.getAttribute("aria-valuenow");
+  await expect.poll(() => slider.getAttribute("aria-valuenow")).not.toBe(first);
+  const box = (await slider.boundingBox())!;
+  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 3);
+  const held = await slider.getAttribute("aria-valuenow");
+  await page.waitForTimeout(600);
+  expect(await slider.getAttribute("aria-valuenow")).toBe(held);
+});
+
+test("with reduced motion the floor demo holds still on a price that pays", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.reload();
+  await ready(page);
+  const floor = page.locator("#floor");
+  await floor.getByRole("slider").scrollIntoViewIfNeeded();
+  const held = await floor.getByRole("slider").getAttribute("aria-valuenow");
+  await page.waitForTimeout(600);
+  expect(await floor.getByRole("slider").getAttribute("aria-valuenow")).toBe(held);
+  await expect(floor.getByText(/^Result /)).toHaveText(/^Result \+\$/);
+});
