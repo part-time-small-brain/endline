@@ -8,6 +8,7 @@ const QUOTE_URL = "https://1click.chaindefuser.com/v0/quote";
 const TIMEOUT_MS = 10_000;
 const MAX_DEADLINE_MS = 24 * 3_600_000;
 const MAX_QUOTES_PER_MINUTE = 60;
+const MAX_QUOTES_PER_CLIENT_PER_MINUTE = 10;
 
 const depositQuote = (quoteAsset: string) =>
   z
@@ -32,6 +33,7 @@ type DepositQuoteRequest = z.infer<ReturnType<typeof depositQuote>>;
 export class OneClick {
   readonly schema: ReturnType<typeof depositQuote>;
   private allow = rateLimit(MAX_QUOTES_PER_MINUTE, 60_000);
+  private allowClient = rateLimit(MAX_QUOTES_PER_CLIENT_PER_MINUTE, 60_000);
 
   constructor(
     quoteAsset: string,
@@ -40,8 +42,13 @@ export class OneClick {
     this.schema = depositQuote(quoteAsset);
   }
 
-  async quote(body: DepositQuoteRequest): Promise<unknown> {
-    if (!this.allow("all")) throw new HttpError(503, "too many deposit quotes right now, try again in a minute");
+  async quote(body: DepositQuoteRequest, client: string): Promise<unknown> {
+    const release = this.allowClient(client);
+    if (!release) throw new HttpError(429, "too many deposit quotes from your network, try again in a minute");
+    if (!this.allow("all")) {
+      release();
+      throw new HttpError(503, "too many deposit quotes right now, try again in a minute");
+    }
     let status: number;
     let text: string;
     try {

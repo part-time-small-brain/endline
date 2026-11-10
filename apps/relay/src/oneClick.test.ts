@@ -5,6 +5,7 @@ import { DEPOSIT, SIGNED_QUOTE } from "./test-fakes.ts";
 
 const USDC = DEPOSIT.destinationAsset;
 const HOUR_MS = 3_600_000;
+const CLIENT = "1.2.3.4";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -17,8 +18,8 @@ function upstream(status: number, body: string) {
   return fetch;
 }
 
-async function failure(oneClick: OneClick, deposit: object = DEPOSIT): Promise<HttpError> {
-  const error = await oneClick.quote(oneClick.schema.parse(deposit)).catch((e: unknown) => e);
+async function failure(oneClick: OneClick, deposit: object = DEPOSIT, client = CLIENT): Promise<HttpError> {
+  const error = await oneClick.quote(oneClick.schema.parse(deposit), client).catch((e: unknown) => e);
   expect(error).toBeInstanceOf(HttpError);
   return error as HttpError;
 }
@@ -26,7 +27,7 @@ async function failure(oneClick: OneClick, deposit: object = DEPOSIT): Promise<H
 it("forwards a deposit quote with the partner key and returns 1Click's signed quote", async () => {
   const oneClick = new OneClick(USDC, "partner-jwt");
   const fetch = upstream(201, JSON.stringify(SIGNED_QUOTE));
-  expect(await oneClick.quote(oneClick.schema.parse(DEPOSIT))).toEqual(SIGNED_QUOTE);
+  expect(await oneClick.quote(oneClick.schema.parse(DEPOSIT), CLIENT)).toEqual(SIGNED_QUOTE);
   const [url, init] = fetch.mock.calls[0] ?? [];
   expect(url).toBe("https://1click.chaindefuser.com/v0/quote");
   expect(init?.headers).toEqual({ "content-type": "application/json", "x-api-key": "partner-jwt" });
@@ -36,7 +37,7 @@ it("forwards a deposit quote with the partner key and returns 1Click's signed qu
 it("sends no key header without a partner key", async () => {
   const fetch = upstream(200, JSON.stringify(SIGNED_QUOTE));
   const oneClick = new OneClick(USDC, undefined);
-  await oneClick.quote(oneClick.schema.parse(DEPOSIT));
+  await oneClick.quote(oneClick.schema.parse(DEPOSIT), CLIENT);
   expect(fetch.mock.calls[0]?.[1]?.headers).toEqual({ "content-type": "application/json" });
 });
 
@@ -75,9 +76,25 @@ it("answers 502 when 1Click is unreachable", async () => {
 it("caps quotes across all clients so many IPs can't burn the key", async () => {
   const fetch = upstream(200, JSON.stringify(SIGNED_QUOTE));
   const oneClick = new OneClick(USDC, "partner-jwt");
-  for (let i = 0; i < 60; i++) await oneClick.quote(oneClick.schema.parse(DEPOSIT));
-  expect((await failure(oneClick)).status).toBe(503);
+  for (let i = 0; i < 60; i++) await oneClick.quote(oneClick.schema.parse(DEPOSIT), `10.0.0.${i}`);
+  expect((await failure(oneClick, DEPOSIT, "10.0.1.0")).status).toBe(503);
   expect(fetch).toHaveBeenCalledTimes(60);
+});
+
+it("caps each client at 10 quotes a minute before the shared cap, so one client can't block the rest", async () => {
+  const fetch = upstream(200, JSON.stringify(SIGNED_QUOTE));
+  const oneClick = new OneClick(USDC, "partner-jwt");
+  for (let i = 0; i < 10; i++) await oneClick.quote(oneClick.schema.parse(DEPOSIT), CLIENT);
+  for (let i = 0; i < 60; i++) expect((await failure(oneClick)).status).toBe(429);
+  expect(await oneClick.quote(oneClick.schema.parse(DEPOSIT), "5.6.7.8")).toEqual(SIGNED_QUOTE);
+  expect(fetch).toHaveBeenCalledTimes(11);
+});
+
+it("gives a client its slot back when the shared cap refuses it, so it isn't blamed for others", async () => {
+  upstream(200, JSON.stringify(SIGNED_QUOTE));
+  const oneClick = new OneClick(USDC, "partner-jwt");
+  for (let i = 0; i < 60; i++) await oneClick.quote(oneClick.schema.parse(DEPOSIT), `10.0.0.${i}`);
+  for (let i = 0; i < 20; i++) expect((await failure(oneClick)).status).toBe(503);
 });
 
 it.each([

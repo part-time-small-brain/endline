@@ -58,7 +58,7 @@ description: The rules every change keeps, what each actor can do, and the gaps 
 |---|---|
 | No audit | The contract, relay and app haven't had an external audit |
 | Contract NEAR reserve | If the contract's NEAR falls below its storage needs, failed payouts and deliveries can't be recorded and new settlements can't be stored. The monitor alerts below 2 NEAR over storage |
-| `/deposit-quote` is an open on-ramp under our 1Click key | It has no session, so a bot can quote deposits into any intents account. Fees can't be redirected and a 60/min cap protects the key, but heavy use can block deposit quotes for everyone for up to a minute |
+| `/deposit-quote` is an open on-ramp under our 1Click key | It has no session, so a bot can quote deposits into any intents account. Fees can't be redirected and caps of 10/min per IP (IPv6: per /48) and 60/min in total protect the key, but a bot spread over many networks can still block deposit quotes for everyone for up to a minute |
 | Quote spam is bounded | Someone holding enough premium can keep a series' inventory reserved without trading |
 | Sessions aren't bound to this app | A session is an empty intents payload, accepted by any service using the same scheme |
 | Removed keys | A removed key keeps quoting until its session deadline (≤ 7 days). Trades still need a fresh signature checked by intents |
