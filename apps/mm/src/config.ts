@@ -29,8 +29,8 @@ const ProposerEnv = Env.pick({ NETWORK_ID: true }).extend({
 });
 
 const SettlerEnv = z.object({
-  RELAYER_ACCOUNT_ID: AccountId,
-  RELAYER_PRIVATE_KEY: Env.shape.MM_PRIVATE_KEY,
+  SETTLER_ACCOUNT_ID: AccountId,
+  SETTLER_PRIVATE_KEY: Env.shape.MM_PRIVATE_KEY,
 });
 
 const RelayEnv = z.object({
@@ -96,5 +96,5 @@ export type SettlerConfig = ReturnType<typeof loadSettlerConfig>;
 export function loadSettlerConfig(env: Record<string, string | undefined>) {
   const e = SettlerEnv.parse(env);
   const d = readDeployment("mainnet");
-  return { rpcUrl: d.rpc_url, optionsId: d.options_id, relayerId: e.RELAYER_ACCOUNT_ID, relayerPrivateKey: e.RELAYER_PRIVATE_KEY };
+  return { rpcUrl: d.rpc_url, optionsId: d.options_id, accountId: e.SETTLER_ACCOUNT_ID, privateKey: e.SETTLER_PRIVATE_KEY };
 }

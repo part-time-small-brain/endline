@@ -5,7 +5,8 @@ root="${1:?usage: ORACLE_WASM_URL=… ORACLE_WASM_SHA256=… scripts/mainnet-pla
 url="${ORACLE_WASM_URL:?set ORACLE_WASM_URL (https://docs.endline.trade/developers/oracle#pinning-a-new-wasm)}"
 sha="${ORACLE_WASM_SHA256:?set ORACLE_WASM_SHA256}"
 opt="${OPTIONS_ID:-opt.$root}"
-oracle="${ORACLE_ACCOUNT_ID:-$root}"
+oracle="${ORACLE_ACCOUNT_ID:-oracle.$root}"
+settler="${SETTLER_ACCOUNT_ID:-settler.$root}"
 relayer="${RELAYER_ACCOUNT_ID:-relayer.$root}"
 mm="${MM_ACCOUNT_ID:-mm.$root}"
 repo="$(cd "$(dirname "$0")/.." && pwd)"
@@ -42,9 +43,8 @@ decimals() {
 [ -e "$HOME/.near-credentials/mainnet/$root.json" ] || [ -d "$HOME/.near-credentials/mainnet/$root" ] || fail "import $root into the legacy keychain (~/.near-credentials/mainnet)"
 [ "$(curl -sfL "$url" | shasum -a 256 | cut -d' ' -f1)" = "$sha" ] || fail "$url does not serve sha256 $sha"
 balance="$(near_balance "$root")"
-[ "$balance" -ge 15 ] || fail "$root has $balance NEAR, needs 15"
+[ "$balance" -ge 17 ] || fail "$root has $balance NEAR, needs 17"
 [ "$(near_balance "$opt")" -eq -1 ] || fail "$opt already exists: the contract is not upgradeable, pick a new account"
-[ "$(near_balance "$oracle")" -ge 0 ] || fail "$oracle does not exist"
 [ "$(decimals "$usdc")" = 6 ] || fail "$usdc is not 6 decimals"
 (cd "$repo/contracts/options" && cargo near build reproducible-wasm >&2)
 echo "preflight ok. Contract $(git -C "$repo" rev-parse --short HEAD), wasm sha256 $(shasum -a 256 "$wasm" | cut -d' ' -f1)" >&2
@@ -53,12 +53,15 @@ net="network-config mainnet"
 send="$net sign-with-legacy-keychain send"
 call="near contract call-function as-transaction"
 view="near contract call-function as-read-only"
-echo "# 0. Relayer and MM accounts, each with its own full-access key (the settler's RELAYER_PRIVATE_KEY, since request_settlement attaches NEAR, and MM_PRIVATE_KEY)"
-for account in "$relayer" "$mm"; do
+echo "# 0. One account per role, each with its own full-access key in your keychain. Only three keys go on the server:"
+echo "#    the relay's function-call key (below), MM_PRIVATE_KEY and SETTLER_PRIVATE_KEY. The relayer's and oracle's full-access keys stay offline"
+for spec in "$relayer:3" "$mm:3" "$settler:1" "$oracle:0.5"; do
+  account="${spec%%:*}"
+  near="${spec##*:}"
   if [ "$(near_balance "$account")" -eq -1 ]; then
-    echo "near account create-account fund-myself $account '3 NEAR' autogenerate-new-keypair save-to-legacy-keychain sign-as $root $send"
+    echo "near account create-account fund-myself $account '$near NEAR' autogenerate-new-keypair save-to-legacy-keychain sign-as $root $send"
   else
-    echo "# $account exists: needs ~3 NEAR and its key in ~/.near-credentials/mainnet/$account.json"
+    echo "# $account exists: needs ~$near NEAR and its key in ~/.near-credentials/mainnet/$account.json"
   fi
 done
 echo "# The relay only sends execute_intents: its RELAYER_PRIVATE_KEY is this function-call key, never the full-access one"
@@ -83,10 +86,11 @@ $call $opt add_oracle json-args '{"account_id":"$oracle"}' prepaid-gas '30 Tgas'
 $call $opt set_oracle_wasm json-args '{"oracle_wasm":{"outlayer_id":"outlayer.near","url":"$url","sha256":"$sha"}}' prepaid-gas '30 Tgas' attached-deposit '1 yoctoNEAR' sign-as $root $send
 
 # 5. MM: register its key on intents (public_key from ~/.near-credentials/mainnet/$mm.json), then fund its intents balance with USDC:
-#    a near-intents.org / 1Click deposit to $mm, or ft_transfer_call if $mm holds USDC on NEAR
+#    a near-intents.org / 1Click deposit to $mm, or ft_transfer_call if $mm holds USDC on NEAR.
+#    MM_PRIVATE_KEY sits on the server and can move this whole balance: fund working capital only and top it up from a wallet that never touches the server
 $call intents.near add_public_key json-args '{"public_key":"<$mm public key>"}' prepaid-gas '30 Tgas' attached-deposit '1 yoctoNEAR' sign-as $mm $send
 $call $usdc ft_transfer_call json-args '{"receiver_id":"intents.near","amount":"<usdc units>","msg":"$mm"}' prepaid-gas '100 Tgas' attached-deposit '1 yoctoNEAR' sign-as $mm $send
 
 # 6. After step 3 checks out, save as deploy/mainnet.json
-{"network":"mainnet","rpc_url":"https://rpc.mainnet.fastnear.com","owner":"$root","intents_id":"intents.near","options_id":"$opt","quote_asset":"nep141:$usdc","accounts":{"oracle":"$oracle","relayer":"$relayer","market_maker":"$mm"}}
+{"network":"mainnet","rpc_url":"https://rpc.mainnet.fastnear.com","owner":"$root","intents_id":"intents.near","options_id":"$opt","quote_asset":"nep141:$usdc","accounts":{"oracle":"$oracle","relayer":"$relayer","settler":"$settler","market_maker":"$mm"}}
 EOF
