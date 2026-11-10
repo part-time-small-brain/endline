@@ -6,7 +6,7 @@ import { Sheet } from "./Sheet.tsx";
 
 const CHOICES: { kind: WalletKind; title: string; body: string }[] = [
   { kind: "demo", title: "Demo wallet", body: "Starts with $250" },
-  { kind: "near", title: "NEAR wallet", body: "HOT, Meteor, Intear and more" },
+  { kind: "near", title: "NEAR wallet", body: "Meteor, Intear, Nightly and more" },
   { kind: "evm", title: "Ethereum wallet", body: "MetaMask, Rabby or any browser wallet" },
 ];
 
