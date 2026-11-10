@@ -18,7 +18,7 @@ Users fund a USDC balance in `intents.near` from any chain, buy with one signatu
 | Oracle WASM | `oracle/` (Rust, wasm32-wasip2) | Median of 7 exchanges' 30-min averages, checked against Deribit | OutLayer TEE (mainnet), our proposer (testnet) |
 | Market lister | `apps/mm` `list` | Keeps the next 4 daily expiries (plus a 4-hourly one on testnet) listed with calls and puts around spot for every underlying on the contract, each capped two strike steps out, writes inventory, burns unsold pairs after the write cutoff, redeems shorts and exercises its winning longs once final, and deletes its own series a week after their end once they owe nothing | Us, with the market maker's key |
 | Testnet proposer | `apps/mm` `propose` | Runs the pinned oracle WASM in wasmtime and proposes its price as the manual oracle | Us, testnet only |
-| Mainnet settler | `apps/mm` `settle` | From 5 min after expiry, calls `request_settlement` every 10 min until a price is proposed or the oracle window closes | Us, with the relayer's key, mainnet only |
+| Mainnet settler | `apps/mm` `settle` | From 5 min after expiry, calls `request_settlement` every 10 min until a price is proposed or the oracle window closes | Us, with the settler's own key, mainnet only |
 | Settlement monitor | `apps/mm` `monitor` | Checks every proposed price against Deribit, flags missing prices, watches the contract's NEAR reserve and pending oracle and owner changes | Us, read-only |
 | Web app | `apps/web` (React) | Up/Down buying, positions, collect, deposits | Us |
 | SDK | `packages/sdk` (TypeScript) | Series ids, payout math, fee-exact trade legs, intent payloads, signing, wire schemas | Library |
@@ -71,10 +71,10 @@ One account per role (`scripts/mainnet-plan.sh` creates them). Only three keys g
 
 | Key | Kept | Can do | If it leaks |
 |---|---|---|---|
-| Owner | Offline | Pause writes, override a price inside the dispute window, change oracles (live a day later) | Wrong prices until someone notices. Never user collateral |
+| Owner | Offline | Everything in [who can do what](./security#who-can-do-what) | Any price still in its dispute window, with no delay, and the contract itself, since ownership moves at once. It can't withdraw collateral, but with positions of its own a forced price moves collateral between holders |
 | Relayer function-call key | Server | `execute_intents` on `intents.near`, gas paid by the relayer | The relayer's NEAR, as gas |
 | Relayer full-access key | Offline | Anything on the relayer account | Nothing on the server to leak |
-| MM key | Server | Signs the MM's intents and pays its gas | The MM's whole intents balance: keep only working capital there, topped up from a wallet that never touches the server |
+| MM key | Server | The MM account's full-access key: signs its intents, pays its gas, attaches NEAR to `create_series` | The MM's whole intents balance and its NEAR: keep only working capital there, topped up from a wallet that never touches the server. Rotating it also needs `remove_public_key` on `intents.near` |
 | Settler key | Server | `request_settlement`, which attaches 0.01 NEAR, so it can't be a function-call key | The settler's NEAR (about 1) |
 | Oracle key | Offline | `propose_settlement` once OutLayer's window passed, for a human to use | A wrong price the owner can override inside the dispute window |
 

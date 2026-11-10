@@ -92,5 +92,5 @@ $call intents.near add_public_key json-args '{"public_key":"<$mm public key>"}' 
 $call $usdc ft_transfer_call json-args '{"receiver_id":"intents.near","amount":"<usdc units>","msg":"$mm"}' prepaid-gas '100 Tgas' attached-deposit '1 yoctoNEAR' sign-as $mm $send
 
 # 6. After step 3 checks out, save as deploy/mainnet.json
-{"network":"mainnet","rpc_url":"https://rpc.mainnet.fastnear.com","owner":"$root","intents_id":"intents.near","options_id":"$opt","quote_asset":"nep141:$usdc","accounts":{"oracle":"$oracle","relayer":"$relayer","market_maker":"$mm"}}
+{"network":"mainnet","rpc_url":"https://rpc.mainnet.fastnear.com","owner":"$root","intents_id":"intents.near","options_id":"$opt","quote_asset":"nep141:$usdc","accounts":{"oracle":"$oracle","relayer":"$relayer","settler":"$settler","market_maker":"$mm"}}
 EOF
