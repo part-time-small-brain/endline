@@ -24,7 +24,7 @@ services:
   monitor:
     <<: *app
     command: pnpm --filter @endline/mm start monitor
-    environment: [NETWORK_ID, RELAYER_ACCOUNT_ID, ALERT_WEBHOOK_URL, "HEALTH_URL=${HEALTH_URL:-http://web/health}"]
+    environment: [NETWORK_ID, RELAYER_ACCOUNT_ID, MM_ACCOUNT_ID, ALERT_WEBHOOK_URL, "HEALTH_URL=${HEALTH_URL:-http://web/health}"]
   proposer:
     <<: *app
     command: pnpm --filter @endline/mm start propose

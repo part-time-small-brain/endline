@@ -37,7 +37,7 @@ Read from the process environment.
 |---|---|
 | `RELAY_WS_URL` | Relay MM socket, e.g. `ws://localhost:8080/mm`. Quoting only |
 | `MM_API_KEY` | One of the relay's `MM_API_KEYS`, sent as `Authorization: Bearer <key>`. Quoting only |
-| `MM_ACCOUNT_ID` | Signer of quotes and writes |
+| `MM_ACCOUNT_ID` | Signer of quotes and writes. Monitor: optional, watches its NEAR for gas |
 | `MM_PRIVATE_KEY` | `ed25519:…` key registered for `MM_ACCOUNT_ID` on `intents_id` |
 | `NETWORK_ID` | `mainnet` or `testnet`, every command but `settle`. Picks `deploy/<NETWORK_ID>.json`, the only source of `rpc_url`, `intents_id` (the verifier; the monitor watches its NEAR) and `options_id`. No file (mainnet today): the command won't start. The monitor also uses it in the printed `near` commands |
 | `SPREAD_VOL_POINTS` | Vol shock priced into each side, default `2` |
@@ -46,13 +46,13 @@ Read from the process environment.
 | `MAX_SERIES_USD` | Max net short/long payout per series, default `5000`. The lister stocks at most this much per series |
 | `MAX_DELTA_USD` | Max net delta per underlying after a fill, default `50000`. Near expiry a full `MAX_TRADE_USD` trade near the money is up to `MAX_TRADE_USD × spot / width` of delta (~$80k for BTC) and gets refused; demo-size trades fit |
 | `MAX_VEGA_USD` | Max net vega per vol point, default `200` |
-| `ALERT_WEBHOOK_URL` | Optional. Monitor only: POSTs each `ALERT`/`RESOLVED`/`FINAL` line as `{"text","content"}` (Slack and Discord incoming webhooks) |
+| `ALERT_WEBHOOK_URL` | Optional. Monitor only: POSTs each `ALERT`/`RESOLVED`/`FINAL` line as `{"text","content"}`: Slack and Discord incoming webhooks, or Telegram as `https://api.telegram.org/bot<token>/sendMessage?chat_id=<chat id>` |
 | `HEALTH_URL` | Optional. Monitor only: the relay's `/health`, directly or through the web origin, checked every minute (`uptime`, `quotes` alerts) |
 | `RELAYER_ACCOUNT_ID` | Monitor only, optional: the relay's gas payer, whose NEAR it watches |
 | `SETTLER_ACCOUNT_ID` | Settler only: its own account, holding only the NEAR it attaches (1 NEAR lasts months at one request per expiry) |
 | `SETTLER_PRIVATE_KEY` | Settler only: that account's full-access `ed25519:…` key (a function-call key can't attach the deposit) |
 
-`monitor` needs only `NETWORK_ID` and the monitor vars: no account, no key.
+`monitor` needs only `NETWORK_ID` and the monitor vars: no key.
 
 Fixed constants (not env): carry 7 % a year on the USDC locked, max Deribit data age 10 s, quote lifetime 25 s.
 
@@ -117,9 +117,10 @@ Burn, redeem and exercise cover series that expired up to 7 days ago, so the MM'
 |---|---|---|
 | `settle` | Proposal before `final_at` that is off the reference (measured against the lower price) by more than 20 bps, the same tolerance as the oracle's Deribit veto; or that has no reference (Deribit down or no data) | `override_settlement` with `<price>` to fill in (derive it from the [oracle rules](https://docs.endline.trade/developers/oracle#what-it-computes), never paste Deribit), signed by the owner |
 | `missing` | No proposal at expiry + `oracle_window_sec` | `propose_settlement` with `<price>` to fill in, signed by the first `get_oracles` account |
-| `reserve <account>` | `amount − storage_usage × 10^19` yocto below 2 NEAR, for the options contract, `intents_id` and `RELAYER_ACCOUNT_ID` each | |
+| `reserve <account>` | `amount − storage_usage × 10^19` yocto below 2 NEAR, for the options contract, `intents_id`, `RELAYER_ACCOUNT_ID` and `MM_ACCOUNT_ID` each | |
 | `uptime` | `HEALTH_URL` set and it doesn't answer `200` with `{"ok":true}` within 5 s | The URL and the error |
 | `quotes` | `/health` answers with `market_makers: 0`: no MM connected, so nobody gets a quote. Stays open while `uptime` is | |
+| `priced` | An MM is connected but `/marks` next to `HEALTH_URL` is empty: nothing in the app has a price (lister failing, no USDC or NEAR, no Deribit data). Stays open while `uptime` or `quotes` is, or `/marks` can't be read | |
 | `pending oracle <account> <active_at>`, `pending wasm <sha256> <active_at>`, `pending owner <account>` | Each entry of `get_pending_oracle_changes` and `get_config.pending_owner_id`. Resolves once it takes effect or is withdrawn. `pending` alone: the views can't be read and no `pending` alert is open (open ones stay open). | What changes and when: `active_at` as a date, the owner on `accept_owner` |
 
 Reference price per `(underlying, expiry)`, from the underlying's Deribit index:

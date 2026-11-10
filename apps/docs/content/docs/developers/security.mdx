@@ -82,8 +82,8 @@ description: The rules every change keeps, what each actor can do, and the gaps 
 |---|---|
 | `settle` | A proposal before `final_at` more than 20 bps from the Deribit reference, or with no reference. Prints the `override_settlement` command |
 | `missing` | No proposal by `E + oracle_window_sec`. Prints the `propose_settlement` command |
-| `reserve` | NEAR minus storage cost below 2 NEAR, for the options contract, the intents contract and the relayer |
-| `uptime`, `quotes` | With `HEALTH_URL` set: the relay's `/health` doesn't answer `{"ok":true}` within 5 s, or no market maker is connected |
+| `reserve` | NEAR minus storage cost below 2 NEAR, for the options contract, the intents contract, the relayer and the market maker |
+| `uptime`, `quotes`, `priced` | With `HEALTH_URL` set: the relay's `/health` doesn't answer `{"ok":true}` within 5 s, no market maker is connected, or one is connected but `/marks` is empty |
 | `pending` | A pending oracle or oracle WASM (`get_pending_oracle_changes`, with when it takes effect) or a pending owner (`get_config.pending_owner_id`, until it accepts) |
 
 Not built yet: alerts on large single payouts, and a solvency check of locked collateral against the contract's intents USDC balance.

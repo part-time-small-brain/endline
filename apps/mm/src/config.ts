@@ -18,6 +18,7 @@ const Env = z.object({
 
 const MonitorEnv = Env.pick({ NETWORK_ID: true }).extend({
   RELAYER_ACCOUNT_ID: AccountId.optional(),
+  MM_ACCOUNT_ID: AccountId.optional(),
   ALERT_WEBHOOK_URL: z.url().optional(),
   HEALTH_URL: z.url().optional(),
 });
@@ -77,6 +78,7 @@ export function loadMonitorConfig(env: Record<string, string | undefined>) {
     optionsId: d.options_id,
     intentsId: d.intents_id,
     relayerId: e.RELAYER_ACCOUNT_ID,
+    mmId: e.MM_ACCOUNT_ID,
     networkId: e.NETWORK_ID,
     webhookUrl: e.ALERT_WEBHOOK_URL,
     healthUrl: e.HEALTH_URL,
