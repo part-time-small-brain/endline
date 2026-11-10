@@ -68,9 +68,6 @@ importers:
       near-api-js:
         specifier: ^7.3.1
         version: 7.3.1
-      viem:
-        specifier: ^2.57.10
-        version: 2.57.10(bufferutil@4.1.0)(typescript@7.0.2)(utf-8-validate@6.0.6)(zod@4.6.7)
       ws:
         specifier: ^8.22.0
         version: 8.22.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)

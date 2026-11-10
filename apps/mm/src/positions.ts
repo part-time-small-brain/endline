@@ -9,10 +9,7 @@ export async function positionsCommand(config: Config): Promise<void> {
   const [contract, underlyings, all] = await Promise.all([chain.contractConfig(), chain.underlyings(), chain.series()]);
   const book: Book = { ...contract, optionsId: config.optionsId, series: new Map(all.map((s) => [s.id, s])) };
   const market = new Market();
-  const [balances] = await Promise.all([
-    chain.balances([book.quoteAsset, ...all.flatMap((s) => [longAsset(book, s.id), shortAsset(book, s.id)])]),
-    market.refresh(underlyings),
-  ]);
+  const [balances] = await Promise.all([chain.balances([book.quoteAsset, ...all.flatMap((s) => [longAsset(book, s.id), shortAsset(book, s.id)])]), market.refresh(underlyings)]);
   const now = Date.now();
   const mark = (s: Series) => seriesMark(market, book, s);
 

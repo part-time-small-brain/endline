@@ -11,7 +11,6 @@
   "dependencies": {
     "@endline/sdk": "workspace:*",
     "near-api-js": "^7.3.1",
-    "viem": "^2.57.10",
     "ws": "^8.22.0",
     "zod": "^4.6.7"
   },

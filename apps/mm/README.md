@@ -1,6 +1,6 @@
 # Market maker
 
-Quotes option series to the RFQ relay, signs its `token_diff` leg with NEP-413, and tracks inventory and risk. It doesn't hedge: every option it sells is fully backed in USDC, and its delta and vega caps limit how much it can lose to a move. Why it exists: [Architecture](https://docs.endline.trade/developers/architecture). Trade protocol: [Relay API](https://docs.endline.trade/developers/relay-api).
+Quotes option series to the RFQ relay, signs its `token_diff` leg with NEP-413, and tracks inventory and risk. It doesn't hedge: every option it sells is fully backed in USDC; delta and vega caps limit the directional and vol exposure it takes on. Why it exists: [Architecture](https://docs.endline.trade/developers/architecture). Trade protocol: [Relay API](https://docs.endline.trade/developers/relay-api).
 
 ## Run
 
@@ -44,7 +44,7 @@ Read from the process environment.
 | `MIN_PREMIUM_USD` | Default `1`. Asks are floored to it, bids below it are refused |
 | `MAX_TRADE_USD` | Max payout (contracts × width) per quote, default `2000`, at most `1e9` |
 | `MAX_SERIES_USD` | Max net short/long payout per series, default `5000`. The lister stocks at most this much per series |
-| `MAX_DELTA_USD` | Max net delta per underlying after a fill, default `50000`. Near expiry a full `MAX_TRADE_USD` trade near the money is up to `MAX_TRADE_USD × spot / width` of delta (~$80k for BTC) and gets refused; demo-size trades fit. |
+| `MAX_DELTA_USD` | Max net delta per underlying after a fill, default `50000`. Near expiry a full `MAX_TRADE_USD` trade near the money is up to `MAX_TRADE_USD × spot / width` of delta (~$80k for BTC) and gets refused; demo-size trades fit |
 | `MAX_VEGA_USD` | Max net vega per vol point, default `200` |
 | `ALERT_WEBHOOK_URL` | Optional. Monitor only: POSTs each `ALERT`/`RESOLVED`/`FINAL` line as `{"text","content"}` (Slack and Discord incoming webhooks) |
 | `HEALTH_URL` | Optional. Monitor only: the relay's `/health`, directly or through the web origin, checked every minute (`uptime`, `quotes` alerts) |
@@ -90,7 +90,7 @@ The delta cap counts each position at:
 | short | minus the long's delta |
 | unsold pair | 0 (the collateral is USDC) |
 
-Stale data refuses each quote on its own. SIGINT/SIGTERM closes the relay socket and stops all timers; already-signed quotes stay valid until their deadline (25 s at most).
+SIGINT/SIGTERM closes the relay socket and stops all timers; already-signed quotes stay valid until their deadline (25 s at most).
 
 ## Market lister
 
