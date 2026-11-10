@@ -54,7 +54,7 @@ export function Lite({ state, nowSec, action, stickyAction }: Props) {
   const picked = (selected: boolean) => (selected ? "bg-side-field shadow-[inset_0_0_0_1px_var(--side)]" : "hover:bg-well");
   const move = (price: bigint) => spot !== undefined && spot > 0n ? formatPct(toNumber(price - spot, quoteDecimals) / toNumber(spot, quoteDecimals)) : "—";
   const endLabel = expiry !== undefined ? `${dayLabel(expiry, nowSec)} ${formatClock(expiry)}` : "Choose date";
-  const amountLabel = budget >= unit ? formatUsd(valid ? current.cost : budget, quoteDecimals, "up").replace(/\.00$/, "") : "—";
+  const amountLabel = budget >= unit ? formatUsd(budget, quoteDecimals).replace(/\.00$/, "") : "—";
   const priceLabel = strike !== undefined ? formatPrice(strike, quoteDecimals) : "—";
   const spotLabel = spot !== undefined ? formatPrice(spot, quoteDecimals) : "—";
   const chanceLabel = series ? formatChance(odds(series)) : "—";
@@ -271,6 +271,7 @@ export function Lite({ state, nowSec, action, stickyAction }: Props) {
             )}
           </dl>
           {!(series && current) && <p role="status" className="mt-3 text-sm text-ink-2">{empty}</p>}
+          {valid && current.capped && payout !== undefined && <p className="mt-3 text-sm text-ink-2">One trade pays out at most {formatUsd(payout, quoteDecimals)}, so this costs {formatUsd(current.cost, quoteDecimals, "up").replace(/\.00$/, "")}.</p>}
         </div>
 
         <div className={`mt-3 border-t border-rule pt-3.5 ${stickyAction ? "bottom-0 z-10 -mx-4 bg-page/95 px-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] backdrop-blur-md sm:mx-0 sm:px-0 [@media(min-height:44rem)]:sticky" : ""}`}>

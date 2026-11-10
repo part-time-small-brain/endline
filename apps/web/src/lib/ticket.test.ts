@@ -17,6 +17,7 @@ const ticketOf = (kind: "call" | "put", strike: bigint, width: bigint, size: big
   terms: { kind, strike, width, unit: BTC },
   size,
   cost,
+  capped: false,
   breakeven: null,
   cashOut: 0n,
 });
@@ -66,8 +67,9 @@ describe("ticket", () => {
       const budget = next(500n * USD);
       const most = next(BTC);
       const t = ticket(series, budget, mark(ask, bid, most));
-      const wanted = (budget * BTC) / ask;
-      expect(t.size).toBe(wanted < most ? wanted : most);
+      expect(t.size).toBeLessThanOrEqual(most);
+      expect(t.capped || (t.size + 1n) * ask > budget * BTC).toBe(true);
+      expect(!t.capped || t.size === most).toBe(true);
       expect(t.cost).toBe((t.size * ask + BTC - 1n) / BTC);
       expect(t.cost).toBeLessThanOrEqual(budget);
       expect(t.cashOut).toBe((t.size * bid) / BTC);
@@ -83,8 +85,9 @@ describe("ticket", () => {
 
   it("buys only what one trade may pay out, so a long shot costs less than the budget", () => {
     const capped = ticket(series, 100n * USD, mark(40n * USD, undefined, BTC));
-    expect(capped).toMatchObject({ size: BTC, cost: 40n * USD });
+    expect(capped).toMatchObject({ size: BTC, cost: 40n * USD, capped: true });
     expect(payoutMultiple(capped)).toBe(500n);
+    expect(ticket(series, 40n * USD, mark(40n * USD, undefined, BTC))).toMatchObject({ size: BTC, capped: false });
   });
 });
 

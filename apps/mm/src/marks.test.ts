@@ -52,12 +52,14 @@ describe("marks", () => {
       const { desk } = testDesk(1_800, [[long(PUT), 10n ** 10n]]);
       const maxSize = BigInt(marks(desk, settings, NOW).find((m) => m.series_id === PUT.id)?.max_size ?? 0);
       expect(maxSize).toBe((BigInt(Math.round(maxTradeUsd * 100)) * 10n ** 4n * 10n ** 8n) / 2_000_000_000n);
-      const reason = (size: bigint) => {
-        const d = decide(quoteEvent(PUT, "buy", size), desk, settings, NOW);
+      const reason = (side: "buy" | "sell", size: bigint) => {
+        const d = decide(quoteEvent(PUT, side, size), desk, settings, NOW);
         return d.ok ? "ok" : d.reason;
       };
-      expect(reason(maxSize)).toBe("ok");
-      expect(reason(maxSize + 1n)).toBe("over trade cap");
+      expect(reason("buy", maxSize)).toBe("ok");
+      expect(reason("buy", maxSize + 1n)).toBe("over trade cap");
+      expect(reason("sell", maxSize)).toBe("ok");
+      expect(reason("sell", maxSize + 1n)).toBe("over trade cap");
     }
   });
 

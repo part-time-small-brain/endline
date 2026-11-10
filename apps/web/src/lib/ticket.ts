@@ -5,6 +5,7 @@ export interface Ticket {
   terms: Terms;
   size: bigint;
   cost: bigint;
+  capped: boolean;
   breakeven: bigint | null;
   cashOut: bigint;
 }
@@ -17,7 +18,7 @@ export function ticket(series: Series, budget: bigint, mark: Mark | undefined): 
   const wanted = ask < terms.width ? sizeForBudget(budget, ask, terms.unit) : 0n;
   const size = wanted < most ? wanted : most;
   const cost = costOf(size, ask, terms.unit);
-  return { terms, size, cost, breakeven: breakeven(terms, size, cost), cashOut: (size * bid) / terms.unit };
+  return { terms, size, cost, capped: wanted > most, breakeven: breakeven(terms, size, cost), cashOut: (size * bid) / terms.unit };
 }
 
 export interface GoodCase {

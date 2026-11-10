@@ -21,6 +21,7 @@ describe("config", () => {
     ["a malformed Hyperliquid key", { HL_PRIVATE_KEY: "0x1234" }],
     ["a negative limit", { MAX_DELTA_USD: "-5" }],
     ["a non-numeric limit", { MAX_VEGA_USD: "lots" }],
+    ["a trade cap too big to count in quote units", { MAX_TRADE_USD: "1e10" }],
   ])("refuses %s", (_, override) => {
     expect(() => loadConfig({ ...ENV, ...override })).toThrow();
   });

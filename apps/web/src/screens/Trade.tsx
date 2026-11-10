@@ -49,7 +49,7 @@ export function Trade({ mode, nowSec, views, onConnect, onAddFunds, onQuote }: P
     </Button>
   ) : (
     <Button size="lg" tone={up ? "up" : "down"} disabled={!current || current.size === 0n} onClick={() => wallet && series && current && onQuote({ wallet, series, side: "buy", size: current.size, budget })}>
-      {budget < unit ? "Enter a valid amount" : `Buy ${up ? "Up" : "Down"} · ${formatUsd(current?.size ? current.cost : budget, quoteDecimals, "up").replace(/\.00$/, "")}`}
+      {budget < unit ? "Enter a valid amount" : `Buy ${up ? "Up" : "Down"} · ${formatUsd(budget, quoteDecimals).replace(/\.00$/, "")}`}
     </Button>
   );
 

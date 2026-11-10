@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
-import { formatPrice } from "../lib/money.ts";
+import { formatPrice, formatUsd } from "../lib/money.ts";
+import { maxPayout } from "@endline/sdk";
 import type { GoodCase, Ticket } from "../lib/ticket.ts";
 import { LABEL } from "./label.ts";
 import { Money } from "./Money.tsx";
@@ -26,6 +27,7 @@ export function Summary({ up, ticket, quoteDecimals, symbol, goodCase }: Props) 
           </Cell>
         )}
       </dl>
+      {ticket.capped && <p className="px-1 text-sm text-ink-2">One trade pays out at most {formatUsd(maxPayout(ticket.terms, ticket.size), quoteDecimals)}, so this costs {formatUsd(ticket.cost, quoteDecimals, "up").replace(/\.00$/, "")}.</p>}
       <dl className="flex justify-between gap-3 px-1 font-mono text-[0.6875rem] tracking-[0.08em] text-ink-3 uppercase">
         <div className="flex gap-1.5">
           <dt>Breakeven</dt>

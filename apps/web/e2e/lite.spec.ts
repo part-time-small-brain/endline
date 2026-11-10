@@ -385,7 +385,7 @@ test("Lite keeps its action and editable values usable on narrow phones and tabl
   await fitsHorizontally(page, amounts);
   await page.getByRole("button", { name: "Trade amount", exact: true }).click();
   await page.evaluate(() => window.scrollTo(0, 0));
-  await expect(page.getByRole("button", { name: "Trade amount", exact: true })).toHaveText(/^\$(1,)?\d{3}$/);
+  await expect(page.getByRole("button", { name: "Trade amount", exact: true })).toHaveText("$10,000");
   await expect(page.getByRole("button", { name: "Add funds to buy", exact: true })).toBeInViewport({ ratio: 1 });
   await expect(page.getByLabel("Trade ticket").getByText("Max loss", { exact: false })).toBeInViewport({ ratio: 1 });
   expect(await sideways(page)).toBeLessThanOrEqual(0);

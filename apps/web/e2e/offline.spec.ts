@@ -1,7 +1,7 @@
 import { listedWidth, type Mark, seriesId, toSign, type QuoteRequest, type StatusUpdate } from "@endline/sdk";
 import type { Page, Route } from "@playwright/test";
 import testnet from "../../../deploy/testnet.json" with { type: "json" };
-import { expect, handleOf, money, RPC, term, test } from "./fixtures.ts";
+import { expect, handleOf, money, openPopover, RPC, term, test } from "./fixtures.ts";
 
 const USD = 1_000_000;
 const NOW_MS = Date.parse(process.env.E2E_NOW ?? "2026-11-04T12:00:00Z");
@@ -457,7 +457,7 @@ test("offers only marked strikes, sizes at the mark's ask and takes the chance f
   await expect(page.getByText("No prices right now")).toBeVisible();
 });
 
-test("a long shot sizes to what one trade may pay out, and Pro's buy and Lite's stake say what it costs", async ({ page }) => {
+test("a long shot sizes to what one trade may pay out, and Pro and Lite say why it costs less than the stake", async ({ page }) => {
   await page.addInitScript(() => {
     (window as unknown as { ethereum: object }).ethereum = {
       async request({ method }: { method: string }) {
@@ -479,10 +479,14 @@ test("a long shot sizes to what one trade may pay out, and Pro's buy and Lite's 
   await page.getByRole("radio", { name: "$100", exact: true }).click();
   await expect.poll(() => money(term(page, "Max loss"))).toBe(40);
   await expect.poll(() => money(term(page, /^If BTC ends above /))).toBe(2_000);
-  await expect(page.getByRole("button", { name: "Buy Up · $40", exact: true })).toBeVisible();
+  const why = page.getByText("One trade pays out at most $2,000, so this costs $40.", { exact: true });
+  await expect(why).toBeVisible();
   await page.getByRole("button", { name: "Lite", exact: true }).click();
-  await expect(page.getByRole("button", { name: "Trade amount", exact: true })).toHaveText("$40");
+  await expect(page.getByRole("button", { name: "Trade amount", exact: true })).toHaveText("$100");
   await expect(page.getByLabel("Maximum payout", { exact: true })).toHaveText("$2,000");
+  await expect(why).toBeVisible();
+  await (await openPopover(page, "Trade amount")).getByRole("radio", { name: "$25", exact: true }).click();
+  await expect(why).toHaveCount(0);
 });
 
 test("a second listed asset brings the asset picker back in every mode, and a switch keeps the stake", async ({ page }) => {

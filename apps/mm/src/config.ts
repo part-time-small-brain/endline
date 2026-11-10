@@ -12,7 +12,7 @@ const Env = z.object({
   HL_ACCOUNT_ADDRESS: z.string().regex(/^0x[0-9a-fA-F]{40}$/).optional(),
   SPREAD_VOL_POINTS: positive(2),
   MIN_PREMIUM_USD: positive(1),
-  MAX_TRADE_USD: positive(2_000),
+  MAX_TRADE_USD: z.coerce.number().positive().max(1e9).default(2_000),
   MAX_SERIES_USD: positive(5_000),
   MAX_DELTA_USD: positive(50_000),
   MAX_VEGA_USD: positive(200),
