@@ -8,6 +8,7 @@ import { settlementReferences } from "./deribit.ts";
 const TICK_MS = 60_000;
 const HTTP_TIMEOUT_MS = 5_000;
 const Health = z.object({ ok: z.literal(true), market_makers: z.number() });
+const Marks = z.array(z.unknown());
 
 export async function monitorCommand(config: MonitorConfig, once: boolean): Promise<void> {
   const chain = new ChainReader(config.rpcUrl, config.optionsId);
@@ -32,7 +33,7 @@ export async function monitorCommand(config: MonitorConfig, once: boolean): Prom
 
 async function check(chain: ChainReader, config: MonitorConfig, final: Set<string>, open: ReadonlySet<string>): Promise<Alert[]> {
   const nowSec = Math.floor(Date.now() / 1000);
-  const accounts = [config.optionsId, config.intentsId, config.relayerId].filter((id) => id !== undefined);
+  const accounts = [config.optionsId, config.intentsId, config.relayerId, config.mmId].filter((id) => id !== undefined);
   const reserves = Promise.all(
     accounts.map(async (id): Promise<Alert | undefined> => {
       try {
@@ -82,10 +83,23 @@ async function healthAlerts(url: string, open: ReadonlySet<string>): Promise<Ale
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const health = Health.safeParse(await res.json());
     if (!health.success) throw new Error("no ok: true in the body");
-    return health.data.market_makers > 0 ? [] : [{ key: "quotes", text: `${url}: no market maker connected, nobody gets a quote. Check the mm service` }];
+    if (health.data.market_makers === 0) return [{ key: "quotes", text: `${url}: no market maker connected, nobody gets a quote. Check the mm service` }];
   } catch (e) {
-    const quotes = open.has("quotes") ? [{ key: "quotes", text: "" }] : [];
-    return [{ key: "uptime", text: `${url}: down: ${e}` }, ...quotes];
+    const held = ["quotes", "priced"].filter((key) => open.has(key)).map((key) => ({ key, text: "" }));
+    return [{ key: "uptime", text: `${url}: down: ${e}` }, ...held];
+  }
+  return pricedAlerts(new URL("/marks", url).toString(), open);
+}
+
+async function pricedAlerts(url: string, open: ReadonlySet<string>): Promise<Alert[]> {
+  try {
+    const res = await fetch(url, { signal: AbortSignal.timeout(HTTP_TIMEOUT_MS) });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const marks = Marks.parse(await res.json());
+    return marks.length > 0 ? [] : [{ key: "priced", text: `${url}: a market maker is connected but prices nothing. Check the lister's log and the MM's USDC and NEAR` }];
+  } catch (e) {
+    console.error(`monitor: ${url}: ${e}`);
+    return open.has("priced") ? [{ key: "priced", text: "" }] : [];
   }
 }
 

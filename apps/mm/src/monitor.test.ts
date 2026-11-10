@@ -25,6 +25,7 @@ const CONFIG = {
   optionsId: "opt.testnet",
   intentsId: "intents.testnet",
   relayerId: "relayer.testnet" as string | undefined,
+  mmId: undefined as string | undefined,
   networkId: "testnet" as const,
   webhookUrl: "https://hooks.example/x",
   healthUrl: undefined as string | undefined,
@@ -178,6 +179,16 @@ it("alerts the intents contract below 2 NEAR over storage and the relayer below 
   expect(chain.nearBalance.mock.calls.map(([id]) => id)).toEqual(["opt.testnet", "intents.testnet"]);
 });
 
+it("alerts the market maker running out of NEAR for gas once its account is set", async () => {
+  const log = vi.spyOn(console, "log").mockImplementation(() => {});
+  chain.series.mockResolvedValue([]);
+  chain.nearBalance.mockImplementation(async (accountId: string) => ({ amount: accountId === "mm.testnet" ? NEAR / 10n : 10n * NEAR, storageUsage: 0 }));
+  await monitorCommand({ ...CONFIG, webhookUrl: undefined }, true);
+  expect(log.mock.calls.map(([line]) => String(line)).filter((line) => line.startsWith("ALERT"))).toEqual([]);
+  await monitorCommand({ ...CONFIG, mmId: "mm.testnet", webhookUrl: undefined }, true);
+  expect(log.mock.calls.map(([line]) => String(line)).filter((line) => line.startsWith("ALERT"))).toEqual([expect.stringContaining("ALERT mm.testnet: 0.100 NEAR above storage")]);
+});
+
 it("keeps settlement alerts flowing when one reserve account can't be read", async () => {
   const log = vi.spyOn(console, "log").mockImplementation(() => {});
   chain.series.mockResolvedValue([]);
@@ -227,9 +238,10 @@ it("keeps settlement alerts flowing when pending changes can't be read", async (
 });
 
 const HEALTH_URL = "http://web/health";
+const MARKS_URL = "http://web/marks";
 const healthy = (marketMakers: number) => async () => Response.json({ ok: true, market_makers: marketMakers });
 
-function stack(replies: (() => Promise<Response>)[]) {
+function stack(replies: (() => Promise<Response>)[], marks: (() => Promise<Response>)[] = []) {
   vi.spyOn(console, "log").mockImplementation(() => {});
   chain.series.mockResolvedValue([]);
   chain.nearBalance.mockResolvedValue({ amount: 10n * NEAR, storageUsage: 0 });
@@ -238,6 +250,7 @@ function stack(replies: (() => Promise<Response>)[]) {
     "fetch",
     vi.fn(async (url: string, init?: RequestInit) => {
       if (url === HEALTH_URL) return replies[sleep.mock.calls.length]?.();
+      if (url === MARKS_URL) return (marks[sleep.mock.calls.length] ?? (async () => Response.json([{ series_id: "x" }])))();
       posted.push(JSON.parse(String(init?.body)).text);
       return new Response("", { status: 200 });
     }),
@@ -264,6 +277,22 @@ it("alerts no market maker on its own, keeps it open while the stack is down, an
     "ALERT http://web/health: down: Error: HTTP 502",
     "RESOLVED uptime",
     "RESOLVED quotes",
+  ]);
+});
+
+it("alerts a connected market maker that prices nothing, holds it through an outage and a bad /marks read, and resolves it once marks come back", async () => {
+  const empty = async () => Response.json([]);
+  const priced = async () => Response.json([{ series_id: "x" }]);
+  const { posted, run } = stack(
+    [healthy(1), async () => new Response("", { status: 502 }), healthy(1), healthy(1)],
+    [empty, priced, async () => new Response("", { status: 500 }), priced],
+  );
+  await run();
+  expect(posted).toEqual([
+    "ALERT http://web/marks: a market maker is connected but prices nothing. Check the lister's log and the MM's USDC and NEAR",
+    "ALERT http://web/health: down: Error: HTTP 502",
+    "RESOLVED uptime",
+    "RESOLVED priced",
   ]);
 });
 
