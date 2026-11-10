@@ -23,12 +23,14 @@ Exact rules: [Oracle WASM](./developers/oracle.mdx).
 
 | Step | When |
 |---|---|
-| Market ends | Once a day, shown in your time zone (08:00 UTC) |
+| Market ends | Once a day at 08:00 UTC, shown in your time zone. Testnet also lists a 4-hourly end |
 | Selling back closes | 30 min before the end |
 | Price requested | From 5 min after the end, by our settler every 10 min until a price is in. Anyone can request it too |
 | Manual price allowed | From 6 h after the end |
 | Dispute window | 1 h |
 | Auto-collect sent | 1 to 2 min after final |
+
+Testnet: selling back closes 60 s before the end, the price is proposed about 10 min after it and the dispute window is 2 min ([environments](./developers/architecture.mdx#environments)).
 
 The app shows "Waiting for the final price, usually about 1 h", then the proposed price and when it becomes final.
 

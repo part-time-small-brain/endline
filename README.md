@@ -1,8 +1,16 @@
 # Endline
 
+<<<<<<< HEAD
 [![ci](https://github.com/part-time-small-brain/endline/actions/workflows/ci.yml/badge.svg)](https://github.com/part-time-small-brain/endline/actions/workflows/ci.yml)
 
 Pick where crypto prices end. Fund from any chain, max loss is what you pay. Each position is a European, cash-settled option with a capped payout, fully backed in USDC, that lives and trades inside NEAR Intents. Live on NEAR testnet; mainnet (with deposits from any chain via 1Click) is built but not deployed yet.
+=======
+Pick where crypto prices end. Fund from any chain, max loss is what you pay. Each position is a European, cash-settled option, fully backed in USDC, that lives and trades inside NEAR Intents. Live on NEAR testnet; mainnet, with deposits from any chain via 1Click, is built but not deployed yet.
+
+**[App](https://app.endline.trade)** · [Landing](https://endline.trade) · [Docs](https://docs.endline.trade) · [Architecture](https://docs.endline.trade/developers/architecture) · [Security model](https://docs.endline.trade/developers/security)
+
+The contract is not audited.
+>>>>>>> origin/main
 
 ## The problem
 
@@ -15,15 +23,22 @@ Crypto options trade on centralized venues or inside one chain's DeFi, and an op
 | NEAR Intents (`intents.near`) | Holds every balance: users' USDC, the collateral, and the option tokens. A buy or sell-back is one signed `token_diff` intent matched against the market maker; payouts are intents transfers. Nothing is bridged. Intents has no testnet, so testnet runs a copy of the exact mainnet wasm |
 | NEP-245 option tokens | Each series (`BTC-27NOV26-81000_83000-C`: strike, cap, Up) is a multi-token minted by our options contract against USDC locked in full |
 | RFQ relay + market maker | The app asks the relay for a quote, the house market maker answers with a firm price from Deribit's volatility, the user signs, the relay submits |
-| Oracle WASM on OutLayer | The settlement price is the median of 7 exchanges' 30-minute averages, computed by our WASM, proposed on-chain and final after a dispute window. Mainnet runs it in an OutLayer TEE; testnet runs the same pinned WASM through our proposer as a manual oracle |
+| Oracle WASM on OutLayer | The settlement price is the median of 7 exchanges' 30-minute averages, computed by our WASM, proposed on-chain and final after a dispute window. On mainnet it runs in an OutLayer TEE; testnet runs the same pinned WASM through our proposer as a manual oracle |
 | 1Click | Deposits from other chains land as USDC in the user's intents balance (mainnet only, so not live yet) |
 | Wallets | NEAR wallets through NEAR Connect sign NEP-413; Ethereum wallets sign ERC-191 with the 0x address as the account |
+
+```text
+web ──HTTP──▶ relay ◀──WebSocket── market maker ──▶ Deribit (prices)
+ │              │
+ │ sign         └─ execute_intents([mm half, user half]) ──▶ intents.near ◀──▶ options contract
+ └──────────────────────────────────────────────────────────▶ (user deposits, balances)
+
+options contract ── request_settlement ──▶ OutLayer TEE (mainnet; testnet: our proposer) ── runs oracle WASM ──▶ 7 exchanges (+ Deribit check)
+```
 
 Tracks: `defi`.
 
 ## Try it (testnet)
-
-Live app: https://app.endline.trade (landing: https://endline.trade, docs: https://docs.endline.trade).
 
 1. Open the app. Lite starts with one editable sentence: end time, above or below, price to beat, amount and capped payout. Max loss and estimated chance stay visible. Lite / Pro / Tap in the header opens the chart ticket or the tap grid: rows of prices to beat, columns of end dates, tap a cell to buy it.
 2. Click Connect and pick a wallet.
@@ -65,8 +80,12 @@ Mainnet: not deployed yet.
 Built with near-sdk-rs, near-workspaces, NEAR Connect, near-api-js, viem, zod, React, Vite, Fumadocs, wasmtime and the NEAR Intents verifier and 1Click APIs.
 
 ```bash
-cargo test -p options -p oracle && pnpm -r test
+pnpm install && pnpm -r test
+cargo test -p options -p oracle
+(cd contracts/options && cargo near build non-reproducible-wasm) && scripts/fetch-sandbox-wasms.sh && cargo test -p sandbox-tests
 ```
+
+The last line runs the contract against the real mainnet `intents.near` wasm in a local sandbox.
 
 Contributors and agents: read [AGENTS.md](AGENTS.md) first. Full stack on testnet: [Running locally](https://docs.endline.trade/developers/running-locally#full-stack-on-testnet).
 

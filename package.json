@@ -1,6 +1,8 @@
 {
   "name": "endline",
   "private": true,
+  "description": "Crypto options settled through NEAR Intents",
+  "license": "MIT",
   "type": "module",
   "scripts": {
     "test": "pnpm -r test",
