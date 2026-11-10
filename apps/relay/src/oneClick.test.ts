@@ -81,13 +81,20 @@ it("caps quotes across all clients so many IPs can't burn the key", async () => 
   expect(fetch).toHaveBeenCalledTimes(60);
 });
 
-it("caps each client at 3 quotes a minute before the shared cap, so one client can't block the rest", async () => {
+it("caps each client at 10 quotes a minute before the shared cap, so one client can't block the rest", async () => {
   const fetch = upstream(200, JSON.stringify(SIGNED_QUOTE));
   const oneClick = new OneClick(USDC, "partner-jwt");
-  for (let i = 0; i < 3; i++) await oneClick.quote(oneClick.schema.parse(DEPOSIT), CLIENT);
+  for (let i = 0; i < 10; i++) await oneClick.quote(oneClick.schema.parse(DEPOSIT), CLIENT);
   for (let i = 0; i < 60; i++) expect((await failure(oneClick)).status).toBe(429);
   expect(await oneClick.quote(oneClick.schema.parse(DEPOSIT), "5.6.7.8")).toEqual(SIGNED_QUOTE);
-  expect(fetch).toHaveBeenCalledTimes(4);
+  expect(fetch).toHaveBeenCalledTimes(11);
+});
+
+it("gives a client its slot back when the shared cap refuses it, so it isn't blamed for others", async () => {
+  upstream(200, JSON.stringify(SIGNED_QUOTE));
+  const oneClick = new OneClick(USDC, "partner-jwt");
+  for (let i = 0; i < 60; i++) await oneClick.quote(oneClick.schema.parse(DEPOSIT), `10.0.0.${i}`);
+  for (let i = 0; i < 20; i++) expect((await failure(oneClick)).status).toBe(503);
 });
 
 it.each([
