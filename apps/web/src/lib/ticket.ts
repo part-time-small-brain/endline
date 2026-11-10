@@ -13,7 +13,9 @@ export function ticket(series: Series, budget: bigint, mark: Mark | undefined): 
   const terms = termsOf(series);
   const ask = BigInt(mark?.ask ?? 0);
   const bid = BigInt(mark?.bid ?? 0);
-  const size = mark && ask < terms.width ? sizeForBudget(budget, ask, terms.unit) : 0n;
+  const most = BigInt(mark?.max_size ?? 0);
+  const wanted = ask < terms.width ? sizeForBudget(budget, ask, terms.unit) : 0n;
+  const size = wanted < most ? wanted : most;
   const cost = costOf(size, ask, terms.unit);
   return { terms, size, cost, breakeven: breakeven(terms, size, cost), cashOut: (size * bid) / terms.unit };
 }

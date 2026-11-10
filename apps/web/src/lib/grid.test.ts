@@ -18,7 +18,7 @@ const listed = (strike: number, kind: OptionKind, expiry = DAY): ListedSeries =>
   option_asset: `nep245:opt.near:BTC-${expiry}-${strike}-${kind}`,
   quotable: true,
 });
-const marked = (series: ListedSeries[], ask = 400n * USD) => Object.fromEntries(series.map((s) => [s.id, { series_id: s.id, ask: ask.toString(), vol: 0.5 }]));
+const marked = (series: ListedSeries[], ask = 400n * USD) => Object.fromEntries(series.map((s) => [s.id, { series_id: s.id, ask: ask.toString(), max_size: (10n ** 8n).toString(), vol: 0.5 }]));
 const none = new Set<string>();
 
 describe("tap grid", () => {

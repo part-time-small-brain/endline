@@ -37,7 +37,7 @@ async function live(page: Page, marks: () => unknown[] | undefined | "hang", ind
   await page.route("**/series", (route) => route.fulfill({ json: { quote_asset: testnet.quote_asset, quote_decimals: 6, series } }));
   await page.route("**/marks", (route) => {
     const answer = marks();
-    if (answer !== "hang") route.fulfill({ json: answer ?? { error: "no market makers" } });
+    if (answer !== "hang") route.fulfill({ json: answer?.map((mark) => ({ max_size: String(100 * 10 ** 8), ...(mark as object) })) ?? { error: "no market makers" } });
   });
   await page.route("https://www.deribit.com/**", (route) =>
     route.fulfill({
@@ -586,6 +586,37 @@ test.describe("Tap", () => {
       expect.stringMatching(/^Up · BTC ends above \$81,000 · .* · pays up to 5\.0×$/),
       expect.stringMatching(/^Down · BTC ends below \$80,000 · .* · pays up to 5\.0×$/),
     ]);
+  });
+
+  test("asks only for what the market maker sells: a cheap cell quotes part of the stake, one it can't sell takes no tap", async ({ page }) => {
+    const asked: string[] = [];
+    await page.addInitScript(() => {
+      (window as unknown as { ethereum: object }).ethereum = {
+        async request({ method }: { method: string }) {
+          if (method === "eth_requestAccounts") return ["0x1111111111111111111111111111111111111111"];
+          throw new Error(method);
+        },
+      };
+    });
+    await page.route("**/fills/*", (route) => route.fulfill({ json: [] }));
+    await page.route("**/quote", (route) => void asked.push((route.request().postDataJSON() as QuoteRequest).size));
+    await live(page, () => [
+      { series_id: "BTC-5NOV26-81000_83000-C", ask: String(40 * USD), max_size: String(10 ** 8), vol: 0.4 },
+      { series_id: "BTC-5NOV26-80000_78000-P", ask: String(40 * USD), max_size: undefined, vol: 0.4 },
+    ]);
+    await page.route(RPC, (route) => {
+      const params = route.request().postDataJSON().params;
+      const args = JSON.parse(Buffer.from(params.args_base64, "base64").toString());
+      const value = params.method_name === "mt_batch_balance_of" ? args.token_ids.map(() => String(250 * USD)) : view[params.method_name];
+      route.fulfill({ json: { jsonrpc: "2.0", id: "web", result: { result: [...Buffer.from(JSON.stringify(value))] } } });
+    });
+    await page.getByRole("button", { name: "Connect", exact: true }).click();
+    await page.getByRole("button", { name: /Ethereum wallet/ }).click();
+    await page.getByRole("radio", { name: "$100", exact: true }).click();
+    const grid = page.getByRole("table");
+    await expect(grid.getByRole("button", { name: /^Down · BTC ends below \$80,000 · .* · no price right now$/ })).toBeDisabled();
+    await grid.getByRole("button", { name: /^Up · BTC ends above \$81,000 · .* · pays up to 50\.0×$/ }).click();
+    await expect.poll(() => asked[0]).toBe(String(10 ** 8));
   });
 
   test("a press that spans a cell turning from Up to Down buys nothing", async ({ page }) => {

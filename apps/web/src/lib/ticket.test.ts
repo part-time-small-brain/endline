@@ -56,16 +56,18 @@ describe("goodCase", () => {
 
 describe("ticket", () => {
   const series = { id: "BTC-X", underlying: "BTC", kind: "call" as const, strike: (81_000n * USD).toString(), width: (2_000n * USD).toString(), expiry: 1_800_000_000, underlying_decimals: 8 };
-  const mark = (ask: bigint, bid?: bigint) => ({ series_id: series.id, ask: ask.toString(), ...(bid === undefined ? {} : { bid: bid.toString() }), vol: 0.4 });
+  const mark = (ask: bigint, bid?: bigint, maxSize = 10n ** 30n) => ({ series_id: series.id, ask: ask.toString(), ...(bid === undefined ? {} : { bid: bid.toString() }), max_size: maxSize.toString(), vol: 0.4 });
 
-  it("sizes the budget at the market maker's ask and costs size × ask, rounded up, never over the budget", () => {
+  it("sizes the budget at the market maker's ask, up to what it sells, and costs size × ask, rounded up, never over the budget", () => {
     const next = random(7);
     for (let i = 0; i < 400; i++) {
       const ask = next(2_000n * USD - 1n);
       const bid = next(ask);
       const budget = next(500n * USD);
-      const t = ticket(series, budget, mark(ask, bid));
-      expect(t.size).toBe((budget * BTC) / ask);
+      const most = next(BTC);
+      const t = ticket(series, budget, mark(ask, bid, most));
+      const wanted = (budget * BTC) / ask;
+      expect(t.size).toBe(wanted < most ? wanted : most);
       expect(t.cost).toBe((t.size * ask + BTC - 1n) / BTC);
       expect(t.cost).toBeLessThanOrEqual(budget);
       expect(t.cashOut).toBe((t.size * bid) / BTC);
@@ -77,6 +79,13 @@ describe("ticket", () => {
     expect(ticket(series, 25n * USD, mark(2_000n * USD)).size).toBe(0n);
     expect(ticket(series, 25n * USD, mark(2_000n * USD - 1n)).size).toBeGreaterThan(0n);
     expect(ticket(series, 25n * USD, mark(650n * USD)).cashOut).toBe(0n);
+  });
+
+  it("buys only what the market maker sells, so a cheap cell costs less than the budget, and nothing where it can't sell", () => {
+    const capped = ticket(series, 100n * USD, mark(USD, undefined, 2n * BTC));
+    expect(capped).toMatchObject({ size: 2n * BTC, cost: 2n * USD });
+    expect(payoutMultiple(capped)).toBe(20_000n);
+    expect(ticket(series, 100n * USD, { ...mark(400n * USD), max_size: undefined })).toMatchObject({ size: 0n, cost: 0n });
   });
 });
 
