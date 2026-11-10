@@ -67,6 +67,7 @@ The run uses the latest 08:00 UTC fixing at least one minute in the past. Logic 
 | `on_settlement_result` | Never panics. Requires `ok`, the echoed `index` and `expiry`, and `price > 0`. Anything else is logged and nothing is stored |
 | Proposed | Final at `now + dispute_window_sec`. The owner may override before then |
 | Fallback | `propose_settlement` by a whitelisted oracle account, from `E + oracle_window_sec` |
+| Fallback price | Run the pinned WASM for that expiry before `E + 11 h`: Kraken serves only its latest 720 one-minute candles, so later runs miss a venue. The price is in quote units, 6 decimals (`74784910000` for $74,784.91) |
 
 ## Pinning a new WASM
 

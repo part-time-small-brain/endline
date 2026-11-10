@@ -79,7 +79,7 @@ impl Contract {
         let amounts = token_ids
             .iter()
             .map(|token_id| {
-                require!(self.token_exists(token_id), format!("unknown token {token_id}"));
+                require!(self.token_exists(token_id), "unknown token");
                 self.undelivered
                     .remove(&(owner_id.clone(), token_id.clone()))
                     .map(U128)

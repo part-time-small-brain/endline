@@ -1937,6 +1937,25 @@ fn worthless_tokens_left_on_the_ledger_read_as_zero_once_their_series_is_gone() 
 }
 
 #[test]
+fn undelivered_tokens_of_a_deleted_series_are_never_resent() {
+    let mut c = setup();
+    let id = create(&mut c, 120_000, W, OptionKind::Call);
+    write(&mut c, USDC_ASSET, W * USD, &id);
+    let unused = format!("[\"{BTC}\",\"0\"]").into_bytes();
+    assert_eq!(
+        delivered(&mut c, &id, PromiseResult::Successful(unused)),
+        (BTC, 0)
+    );
+    let now = settle(&mut c, 116_000);
+    close(&mut c, now, &id, 0, BTC);
+    ctx(acc("bob.near"), DELETE_AT, 0);
+    assert_eq!(c.delete_series(vec![id.clone()]), vec![id.clone()]);
+
+    ctx(acc("bob.near"), DELETE_AT, 1);
+    panics_with("unknown token", || c.retry_delivery(alice(), vec![id.clone()]));
+}
+
+#[test]
 fn refunds_are_summed_per_creator_capped_at_what_was_paid_and_an_unwritten_series_needs_no_price_even_while_paused(
 ) {
     let mut c = setup();
@@ -2035,25 +2054,6 @@ fn a_series_deleted_before_the_resolve_never_blocks_the_refund_of_the_others() {
     );
     assert_eq!(used, vec![U128(0), U128(BTC / 2)]);
     assert_eq!((bal(&c, alice(), &live), bal(&c, dex, &live)), (BTC / 2, 0));
-}
-
-#[test]
-fn undelivered_options_of_a_deleted_series_are_never_deposited_into_intents() {
-    let mut c = setup();
-    let id = create(&mut c, 110_000, W, OptionKind::Call);
-    write(&mut c, USDC_ASSET, W * USD, &id);
-    delivered(&mut c, &id, PromiseResult::Failed);
-    ctx(acc("bob.near"), T0, 1);
-    c.retry_delivery(alice(), vec![id.clone()]);
-    callback_ctx(T0, PromiseResult::Successful(b"[\"0\"]".to_vec()));
-    c.on_options_delivered(alice(), vec![id.clone()], vec![U128(BTC)]);
-    let now = settle(&mut c, 130_000);
-    close(&mut c, now, &id, BTC, 0);
-    ctx(acc("bob.near"), DELETE_AT, 0);
-    assert_eq!(c.delete_series(vec![id.clone()]), vec![id.clone()]);
-    ctx(acc("bob.near"), DELETE_AT, 1);
-    panics_with("unknown token", || c.retry_delivery(alice(), vec![short(&id)]));
-    assert_eq!(c.get_undelivered(alice(), short(&id)).0, BTC);
 }
 
 #[test]
