@@ -602,13 +602,13 @@ test("stops showing the last spot once Deribit fails", async ({ page }) => {
   await expect(handleOf(page)).toHaveCount(0);
 });
 
-test("drops the last day's line once Deribit's chart fails", async ({ page }) => {
+test("keeps the last day's line when Deribit's chart fails, since past prices don't go stale", async ({ page }) => {
   await live(page, () => [{ series_id: "BTC-5NOV26-81000_83000-C", ask: String(400 * USD), vol: 0.4 }]);
   const line = chartOf(page).locator("path.stroke-ink");
   await expect(line).toHaveAttribute("d", /L.*L/);
   await page.route("**/get_index_chart_data**", (route) => route.fulfill({ json: { error: "down" } }));
   await page.clock.fastForward(60_000);
-  await expect(line).toHaveAttribute("d", /^M[^L]*$/);
+  await expect(line).toHaveAttribute("d", /L.*L/);
 });
 
 test("stops showing the last prices once the relay's marks fail", async ({ page }) => {
