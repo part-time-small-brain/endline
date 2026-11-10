@@ -31,7 +31,7 @@ export function TapMode({ free, left, budget, quoteDecimals, onFree, onBudget }:
         <>
           <AmountPicker value={budget} quoteDecimals={quoteDecimals} onChange={onBudget} />
           <p className="text-sm text-ink-2">
-            Each tap opens a firm quote for one option at about {formatUsd(budget, quoteDecimals).replace(/\.00$/, "")}; you confirm it before anything is bought.
+            Each tap opens a firm quote at about {formatUsd(budget, quoteDecimals).replace(/\.00$/, "")}, less on a long shot that would pay out more than one trade may; you confirm it before anything is bought.
           </p>
         </>
       )}

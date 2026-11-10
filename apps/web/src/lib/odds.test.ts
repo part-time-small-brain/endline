@@ -48,7 +48,7 @@ describe("chance", () => {
 
 describe("nearestVol", () => {
   const listed = [20_000, 79_000, 81_000, 82_000].map((strike) => ({ id: `S${strike}`, strike: (BigInt(strike) * 1_000_000n).toString() }));
-  const mark = (id: string, vol: number) => ({ series_id: id, ask: "1", vol });
+  const mark = (id: string, vol: number) => ({ series_id: id, ask: "1", max_size: "1", vol });
 
   it("takes the vol of the priced strike nearest spot, skipping strikes without a mark", () => {
     const marks = { S20000: mark("S20000", 0.9), S81000: mark("S81000", 0.5), S82000: mark("S82000", 0.6) };

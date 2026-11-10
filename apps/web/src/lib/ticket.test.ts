@@ -81,11 +81,10 @@ describe("ticket", () => {
     expect(ticket(series, 25n * USD, mark(650n * USD)).cashOut).toBe(0n);
   });
 
-  it("buys only what the market maker sells, so a cheap cell costs less than the budget, and nothing where it can't sell", () => {
-    const capped = ticket(series, 100n * USD, mark(USD, undefined, 2n * BTC));
-    expect(capped).toMatchObject({ size: 2n * BTC, cost: 2n * USD });
-    expect(payoutMultiple(capped)).toBe(20_000n);
-    expect(ticket(series, 100n * USD, { ...mark(400n * USD), max_size: undefined })).toMatchObject({ size: 0n, cost: 0n });
+  it("buys only what one trade may pay out, so a long shot costs less than the budget", () => {
+    const capped = ticket(series, 100n * USD, mark(40n * USD, undefined, BTC));
+    expect(capped).toMatchObject({ size: BTC, cost: 40n * USD });
+    expect(payoutMultiple(capped)).toBe(500n);
   });
 });
 

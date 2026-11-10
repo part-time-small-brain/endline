@@ -13,7 +13,7 @@ const series = {
   option_asset: "opt:BTC-X",
   quotable: true,
 };
-const data = (marks: Record<string, { series_id: string; ask: string; bid?: string; vol: number }> | undefined) => ({
+const data = (marks: Record<string, { series_id: string; ask: string; bid?: string; max_size: string; vol: number }> | undefined) => ({
   listing: { quote_asset: "usdc", quote_decimals: 6, series: [series] },
   balances: { "opt:BTC-X": 25_000_000n },
   fills: [],
@@ -26,8 +26,8 @@ const valueOf = (marks: Parameters<typeof data>[0]) => positions(data(marks), NO
 
 describe("positions", () => {
   it("value an active position at the market maker's bid, $0 without a bid, and unknown without a mark or while marks fail", () => {
-    expect(valueOf({ "BTC-X": { series_id: "BTC-X", ask: "400000000", bid: "380000000", vol: 0.4 } })).toBe(95_000_000n);
-    expect(valueOf({ "BTC-X": { series_id: "BTC-X", ask: "400000000", vol: 0.4 } })).toBe(0n);
+    expect(valueOf({ "BTC-X": { series_id: "BTC-X", ask: "400000000", bid: "380000000", max_size: "100000000", vol: 0.4 } })).toBe(95_000_000n);
+    expect(valueOf({ "BTC-X": { series_id: "BTC-X", ask: "400000000", max_size: "100000000", vol: 0.4 } })).toBe(0n);
     expect(valueOf({})).toBeUndefined();
     expect(valueOf(undefined)).toBeUndefined();
   });
@@ -62,7 +62,7 @@ describe("positions", () => {
   });
 
   it("values a held cell at the bid, counts what was sold back in its P&L, and shows P&L only with a price and a cost", () => {
-    const marks = { "BTC-X": { series_id: "BTC-X", ask: "400000000", bid: "380000000", vol: 0.4 } };
+    const marks = { "BTC-X": { series_id: "BTC-X", ask: "400000000", bid: "380000000", max_size: "100000000", vol: 0.4 } };
     const fill = (side: "buy" | "sell", size: string, premium: string) => ({ quote_id: side, series_id: series.id, side, account_id: "user.near", size, premium, tx_hash: "tx", at_ms: NOW * 1_000 });
     const cell = (fills: ReturnType<typeof fill>[], withMarks: Parameters<typeof data>[0] = marks) => holding(positions({ ...data(withMarks), fills }, NOW) ?? [], series.id);
     expect(cell([])).toEqual({ value: 95_000_000n, pnl: undefined, change: undefined });
@@ -72,7 +72,7 @@ describe("positions", () => {
   });
 
   it("stop valuing at the bid once the series is close-only", () => {
-    const marks = { "BTC-X": { series_id: "BTC-X", ask: "400000000", bid: "380000000", vol: 0.4 } };
+    const marks = { "BTC-X": { series_id: "BTC-X", ask: "400000000", bid: "380000000", max_size: "100000000", vol: 0.4 } };
     expect(positions(data(marks), series.expiry - 1_800)?.[0]).toMatchObject({ status: "closed", valueNow: undefined });
   });
 });

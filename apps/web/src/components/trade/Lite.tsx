@@ -54,7 +54,7 @@ export function Lite({ state, nowSec, action, stickyAction }: Props) {
   const picked = (selected: boolean) => (selected ? "bg-side-field shadow-[inset_0_0_0_1px_var(--side)]" : "hover:bg-well");
   const move = (price: bigint) => spot !== undefined && spot > 0n ? formatPct(toNumber(price - spot, quoteDecimals) / toNumber(spot, quoteDecimals)) : "—";
   const endLabel = expiry !== undefined ? `${dayLabel(expiry, nowSec)} ${formatClock(expiry)}` : "Choose date";
-  const amountLabel = budget >= unit ? formatUsd(budget, quoteDecimals).replace(/\.00$/, "") : "—";
+  const amountLabel = budget >= unit ? formatUsd(valid ? current.cost : budget, quoteDecimals, "up").replace(/\.00$/, "") : "—";
   const priceLabel = strike !== undefined ? formatPrice(strike, quoteDecimals) : "—";
   const spotLabel = spot !== undefined ? formatPrice(spot, quoteDecimals) : "—";
   const chanceLabel = series ? formatChance(odds(series)) : "—";

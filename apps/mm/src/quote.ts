@@ -33,6 +33,10 @@ function termsMatch(ev: QuoteEvent, s: Series): boolean {
   );
 }
 
+export function maxTradeSize(book: Book, series: Series, settings: Settings): bigint {
+  return (toQuoteUnits(settings.maxTradeUsd, book.quoteDecimals, false) * 10n ** BigInt(series.underlying_decimals)) / BigInt(series.width);
+}
+
 export function priceSeries(desk: Desk, series: Series, settings: Settings, now: number): { ok: true; mark: SeriesMark; price: ContractPrice } | { ok: false; reason: string } {
   const { book } = desk;
   if (!isListed(series, book.quoteDecimals)) return reject("width we don't list");
@@ -63,7 +67,7 @@ export function decide(ev: QuoteEvent, desk: Desk, settings: Settings, now: numb
   const size = BigInt(ev.size);
   const n = contracts(series, size);
   const width = widthUsd(book, series);
-  if (n * width > settings.maxTradeUsd) return reject("over trade cap");
+  if (size > maxTradeSize(book, series, settings)) return reject("over trade cap");
   const mmSells = ev.side === "buy";
   const usd = premiumUsd(price, n, mmSells, settings);
   if (usd === undefined) return reject("below minimum premium");

@@ -37,7 +37,7 @@ async function live(page: Page, marks: () => unknown[] | undefined | "hang", ind
   await page.route("**/series", (route) => route.fulfill({ json: { quote_asset: testnet.quote_asset, quote_decimals: 6, series } }));
   await page.route("**/marks", (route) => {
     const answer = marks();
-    if (answer !== "hang") route.fulfill({ json: answer?.map((mark) => ({ max_size: String(100 * 10 ** 8), ...(mark as object) })) ?? { error: "no market makers" } });
+    if (answer !== "hang") route.fulfill({ json: answer?.map((mark) => ({ max_size: String(10 ** 8), ...(mark as object) })) ?? { error: "no market makers" } });
   });
   await page.route("https://www.deribit.com/**", (route) =>
     route.fulfill({
@@ -457,6 +457,34 @@ test("offers only marked strikes, sizes at the mark's ask and takes the chance f
   await expect(page.getByText("No prices right now")).toBeVisible();
 });
 
+test("a long shot sizes to what one trade may pay out, and Pro's buy and Lite's stake say what it costs", async ({ page }) => {
+  await page.addInitScript(() => {
+    (window as unknown as { ethereum: object }).ethereum = {
+      async request({ method }: { method: string }) {
+        if (method === "eth_requestAccounts") return ["0x1111111111111111111111111111111111111111"];
+        throw new Error(method);
+      },
+    };
+  });
+  await page.route("**/fills/*", (route) => route.fulfill({ json: [] }));
+  await live(page, () => [{ series_id: "BTC-5NOV26-81000_83000-C", ask: String(40 * USD), max_size: String(10 ** 8), vol: 0.4 }]);
+  await page.route(RPC, (route) => {
+    const params = route.request().postDataJSON().params;
+    const args = JSON.parse(Buffer.from(params.args_base64, "base64").toString());
+    const value = params.method_name === "mt_batch_balance_of" ? args.token_ids.map((id: string) => (id === testnet.quote_asset ? String(250 * USD) : "0")) : view[params.method_name];
+    route.fulfill({ json: { jsonrpc: "2.0", id: "web", ...(value === undefined ? { error: { message: "unknown" } } : { result: { result: [...Buffer.from(JSON.stringify(value))] } }) } });
+  });
+  await page.getByRole("button", { name: "Connect", exact: true }).click();
+  await page.getByRole("button", { name: /Ethereum wallet/ }).click();
+  await page.getByRole("radio", { name: "$100", exact: true }).click();
+  await expect.poll(() => money(term(page, "Max loss"))).toBe(40);
+  await expect.poll(() => money(term(page, /^If BTC ends above /))).toBe(2_000);
+  await expect(page.getByRole("button", { name: "Buy Up · $40", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Lite", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Trade amount", exact: true })).toHaveText("$40");
+  await expect(page.getByLabel("Maximum payout", { exact: true })).toHaveText("$2,000");
+});
+
 test("a second listed asset brings the asset picker back in every mode, and a switch keeps the stake", async ({ page }) => {
   const expiry = Date.UTC(2026, 10, 5, 8) / 1000;
   const sol = [150, 155].map((usd) => {
@@ -588,34 +616,32 @@ test.describe("Tap", () => {
     ]);
   });
 
-  test("asks only for what the market maker sells: a cheap cell quotes part of the stake, one it can't sell takes no tap", async ({ page }) => {
+  test("a long shot asks only for what one trade may pay out, at its own multiple", async ({ page }) => {
     const asked: string[] = [];
     await page.addInitScript(() => {
       (window as unknown as { ethereum: object }).ethereum = {
         async request({ method }: { method: string }) {
           if (method === "eth_requestAccounts") return ["0x1111111111111111111111111111111111111111"];
-          throw new Error(method);
+          if (method !== "personal_sign") throw new Error(method);
+          return `0x${"11".repeat(64)}1b`;
         },
       };
     });
     await page.route("**/fills/*", (route) => route.fulfill({ json: [] }));
     await page.route("**/quote", (route) => void asked.push((route.request().postDataJSON() as QuoteRequest).size));
-    await live(page, () => [
-      { series_id: "BTC-5NOV26-81000_83000-C", ask: String(40 * USD), max_size: String(10 ** 8), vol: 0.4 },
-      { series_id: "BTC-5NOV26-80000_78000-P", ask: String(40 * USD), max_size: undefined, vol: 0.4 },
-    ]);
+    await live(page, () => [{ series_id: "BTC-5NOV26-81000_83000-C", ask: String(40 * USD), max_size: String(10 ** 8), vol: 0.4 }]);
     await page.route(RPC, (route) => {
       const params = route.request().postDataJSON().params;
       const args = JSON.parse(Buffer.from(params.args_base64, "base64").toString());
-      const value = params.method_name === "mt_batch_balance_of" ? args.token_ids.map(() => String(250 * USD)) : view[params.method_name];
-      route.fulfill({ json: { jsonrpc: "2.0", id: "web", result: { result: [...Buffer.from(JSON.stringify(value))] } } });
+      const value = params.method_name === "current_salt" ? "00000000"
+        : params.method_name === "mt_batch_balance_of" ? args.token_ids.map((id: string) => (id === testnet.quote_asset ? String(250 * USD) : "0"))
+        : view[params.method_name];
+      route.fulfill({ json: { jsonrpc: "2.0", id: "web", ...(value === undefined ? { error: { message: "unknown" } } : { result: { result: [...Buffer.from(JSON.stringify(value))] } }) } });
     });
     await page.getByRole("button", { name: "Connect", exact: true }).click();
     await page.getByRole("button", { name: /Ethereum wallet/ }).click();
     await page.getByRole("radio", { name: "$100", exact: true }).click();
-    const grid = page.getByRole("table");
-    await expect(grid.getByRole("button", { name: /^Down · BTC ends below \$80,000 · .* · no price right now$/ })).toBeDisabled();
-    await grid.getByRole("button", { name: /^Up · BTC ends above \$81,000 · .* · pays up to 50\.0×$/ }).click();
+    await page.getByRole("table").getByRole("button", { name: /^Up · BTC ends above \$81,000 · .* · pays up to 50\.0×$/ }).click();
     await expect.poll(() => asked[0]).toBe(String(10 ** 8));
   });
 
@@ -644,7 +670,7 @@ test.describe("Tap", () => {
 
   test("a held cell shows what it's worth and its P&L, and glows and flashes each time spot crosses its price to beat", async ({ page }) => {
     let index = 80_650;
-    let marks: Mark[] = [{ series_id: "BTC-5NOV26-81000_83000-C", ask: String(400 * USD), bid: String(380 * USD), vol: 0.4 }];
+    let marks: Mark[] = [{ series_id: "BTC-5NOV26-81000_83000-C", ask: String(400 * USD), bid: String(380 * USD), max_size: String(10 ** 8), vol: 0.4 }];
     const token = `nep245:${testnet.options_id}:BTC-5NOV26-81000_83000-C`;
     await page.addInitScript(() => {
       (window as unknown as { ethereum: object }).ethereum = {
@@ -689,7 +715,7 @@ test.describe("Tap", () => {
     await page.clock.fastForward(5_000);
     await expect.poll(flashes, { intervals: [50] }).toBe(1);
     await expect(cell).toHaveAccessibleName(/· up \$2\.60 · you hold this$/);
-    marks = [{ series_id: "BTC-5NOV26-81000_83000-C", ask: String(400 * USD), vol: 0.4 }];
+    marks = [{ series_id: "BTC-5NOV26-81000_83000-C", ask: String(400 * USD), max_size: String(10 ** 8), vol: 0.4 }];
     await page.clock.fastForward(5_000);
     await expect(cell).toHaveText("$0.00-100%5.0×");
     await expect(cell.getByText("-100%")).toHaveCSS("font-size", "16px");

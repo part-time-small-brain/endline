@@ -27,7 +27,7 @@ describe("relay client", () => {
     client.start();
     await expect.poll(() => quotes.length).toBe(1);
     client.send({ quote_id: "q1", premium: "30000000", signed: { standard: "erc191", payload: "{}", signature: "secp256k1:s" } });
-    client.publish([{ series_id: PUT.id, ask: "650000000", vol: 0.4 }]);
+    client.publish([{ series_id: PUT.id, ask: "650000000", max_size: "100000000", vol: 0.4 }]);
     await expect.poll(() => received.length).toBe(2);
     client.close();
 
