@@ -82,7 +82,7 @@ export function FloorDemo({ asset, quoteDecimals: qd }: Props) {
   return (
     <section id="floor" data-side={up ? "up" : "down"} className="border-y border-rule py-24 lg:py-36">
       <div className="mx-auto max-w-7xl px-4 lg:px-12">
-        <SectionHead title="You can't lose more than you pay">Drag where {asset.symbol} ends.</SectionHead>
+        <SectionHead title="No liquidations. Ever.">Drag where {asset.symbol} ends.</SectionHead>
         <div className="grid grid-cols-1 gap-8 lg:grid-cols-[400px_minmax(0,1fr)] lg:gap-12">
           <Reveal className="flex flex-col gap-6">
             <Segmented label="Your side" value={kind} onChange={setKind} options={(["call", "put"] as const).map((k) => {

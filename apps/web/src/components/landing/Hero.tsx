@@ -75,7 +75,7 @@ export function Hero({ nowSec }: { nowSec: number }) {
           </h1>
           <Rise delay={0.3}>
             <p className="mt-12 max-w-[520px] text-base text-ink-2 lg:text-xl">
-              Choose whether the price ends above or below your line. The most you can lose is what you pay.
+              Choose whether the price ends above or below your line. See your payout before you sign.
             </p>
           </Rise>
           <Rise delay={0.42}>

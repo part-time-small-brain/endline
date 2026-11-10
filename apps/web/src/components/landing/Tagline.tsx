@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 
-const WORDS = "You choose the line and the side. If you are wrong, you lose what you paid. If you are right, the further the price runs, the more you get, up to the cap.".split(" ");
+const WORDS = "You choose the line and the side. The further the price runs your way, the more you get, up to the cap. Your stake is all that's ever at risk.".split(" ");
 const TRIGGER = 0.62;
 
 export function Tagline() {
