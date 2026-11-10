@@ -129,6 +129,18 @@ describe("quote refusals", () => {
     expect(decide(quoteEvent(PUT, "sell", 1_000_000n), poor, SETTINGS, NOW)).toEqual({ ok: false, reason: "insufficient inventory" });
   });
 
+  it("lets a book already over the series and delta caps sell back, and still refuses a trade that adds to it", () => {
+    const { desk } = testDesk(1_800, [[short(PUT), PAIRS + 10_000_000n]]);
+    const deltaUsd = (exposure(desk.book, desk.inventory.confirmed(), (s) => seriesMark(desk.market, desk.book, s), NOW).get("BTC")?.delta ?? 0) * (seriesMark(desk.market, desk.book, PUT)?.forward ?? 0);
+    const settings = { ...SETTINGS, maxSeriesUsd: 100, maxDeltaUsd: Math.abs(deltaUsd) / 2 };
+    expect(deltaUsd).not.toBe(0);
+    expect(decide(quoteEvent(PUT, "sell", 2_000_000n), desk, settings, NOW)).toMatchObject({ ok: true });
+    expect(decide(quoteEvent(PUT, "buy", 1_000_000n), desk, settings, NOW)).toEqual({ ok: false, reason: "over series cap" });
+    const deltaOnly = { ...settings, maxSeriesUsd: 1e9 };
+    expect(decide(quoteEvent(PUT, "sell", 2_000_000n), desk, deltaOnly, NOW)).toMatchObject({ ok: true });
+    expect(decide(quoteEvent(PUT, "buy", 1_000_000n), desk, deltaOnly, NOW)).toEqual({ ok: false, reason: "over delta cap" });
+  });
+
   it("refuses when the trade would push net delta or vega over the cap", () => {
     const { desk } = testDesk();
     expect(decide(quoteEvent(PUT, "buy", 1_000_000n), desk, SETTINGS, NOW)).toMatchObject({ ok: true });

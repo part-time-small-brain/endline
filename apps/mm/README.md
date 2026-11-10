@@ -42,7 +42,7 @@ Read from the process environment.
 | `NETWORK_ID` | `mainnet` or `testnet`, every command but `settle`. Picks `deploy/<NETWORK_ID>.json`, the only source of `rpc_url`, `intents_id` (the verifier; the monitor watches its NEAR) and `options_id`. No file (mainnet today): the command won't start. The monitor also uses it in the printed `near` commands |
 | `SPREAD_VOL_POINTS` | Vol shock priced into each side, default `2` |
 | `MIN_PREMIUM_USD` | Default `1`. Asks are floored to it, bids below it are refused |
-| `MAX_TRADE_USD` | Max payout (contracts × width) per quote, default `2000`, at most `1e9` |
+| `MAX_TRADE_USD` | Max payout (contracts × width) per quote, default `2000`, at most `1e9`. The lister reads it too, to keep that much USDC free: set it the same for both |
 | `MAX_SERIES_USD` | Max net short/long payout per series, default `5000`. The lister stocks at most this much per series |
 | `MAX_DELTA_USD` | Max net delta per underlying after a fill, default `50000`. Near expiry a full `MAX_TRADE_USD` trade near the money is up to `MAX_TRADE_USD × spot / width` of delta (~$80k for BTC) and gets refused; demo-size trades fit |
 | `MAX_VEGA_USD` | Max net vega per vol point, default `200` |
@@ -65,7 +65,7 @@ On every relay `quote` event the bot refuses unless all of these hold:
 - the quote deadline (now + 25 s) is before `expiry − timing.write_cutoff_sec`;
 - the Deribit data is fresh;
 - the premium is below the most the size can pay (`floor(size·W/unit)`), which the $1 minimum can otherwise exceed;
-- size, series, delta and vega caps hold with every outstanding quote counted as filled;
+- the size cap holds; series, delta and vega caps hold with every outstanding quote counted as filled, or, whichever pending legs fill, the trade leaves that exposure no farther from zero;
 - the MM's intents balance covers the gross leg after reserving it for every outstanding quote.
 
 Pricing is Black-76 on Deribit's `underlying_price` and `mark_iv` (`get_book_summary_by_currency` and `get_index_price` per underlying every 2 s). A capped series is two options: long at the strike `K`, short at the cap (`K + W` for Up, `K − W` for Down), each with its own vol, `σ` at `K` and `σcap` at the cap. Vols come from the nearest Deribit expiry, interpolated in log-moneyness (a listed strike gets its own vol); the forward is the Deribit index unless that expiry is listed.
@@ -78,7 +78,7 @@ After each Deribit refresh the bot sends the relay its [marks](https://docs.endl
 
 The leg comes from the SDK's `buyDiffs`/`sellDiffs`. The nonce is versioned, uses the verifier's `current_salt` and the same deadline.
 
-A reservation is released only when a balance read that started 3 s after its deadline comes back, whatever the relay reports: the signed leg stays fillable until then, so a relay that lied about `expired` could otherwise gather legs past the caps. So each of the series, delta and vega caps is checked against the confirmed balances plus the new trade plus every pending leg that pushes the same way, in both directions: the cap holds whichever pending legs fill. A settled trade counts in both its balance and its reservation for about 30 s, which only makes quoting stricter. A read that started before the last applied one is dropped, so a trade that settled while the relay was unreachable can't be quoted twice.
+A reservation is released only when a balance read that started 3 s after its deadline comes back, whatever the relay reports: the signed leg stays fillable until then, so a relay that lied about `expired` could otherwise gather legs past the caps. So each of the series, delta and vega caps is checked against the confirmed balances plus the new trade plus every pending leg that pushes the same way, in both directions: the cap holds whichever pending legs fill. A book already over a cap (spot moved) still takes a trade that, whichever pending legs fill, ends within the cap or nearer zero than without it, so users can sell back. A settled trade counts in both its balance and its reservation for about 30 s, which only makes quoting stricter. A read that started before the last applied one is dropped, so a trade that settled while the relay was unreachable can't be quoted twice.
 
 ## Risk
 
@@ -91,17 +91,17 @@ The delta cap counts each position at:
 | short | minus the long's delta |
 | unsold pair | 0 (the collateral is USDC) |
 
-SIGINT/SIGTERM closes the relay socket and stops all timers; already-signed quotes stay valid until their deadline (25 s at most).
+SIGINT/SIGTERM closes the relay socket and stops all timers; already-signed quotes stay valid until their deadline (25 s at most). So on start the bot waits 28 s (quote lifetime + 3 s chain lag) and reads balances again before connecting to the relay: it has no reservations for the last process's legs.
 
 ## Market lister
 
-`list` uses the same env as `write` (MM account and key; `MAX_SERIES_USD` caps the per-series target). Every 10 min (`--once`: one pass, then exit), and on start, it reads the contract's config, underlyings and series, the Deribit index per underlying, and the MM's intents balances, then acts. One log line per action; a failed read or transaction is logged and retried next pass. The MM pays its own gas; actions are 3 s apart (RPC rate limits).
+`list` uses the same env as `write` (MM account and key; `MAX_SERIES_USD` caps the per-series target; `MAX_TRADE_USD` sets the USDC it keeps free). Every 10 min (`--once`: one pass, then exit), and on start, it reads the contract's config, underlyings and series, the Deribit index per underlying, and the MM's intents balances, then acts. One log line per action; a failed read or transaction is logged and retried next pass. The MM pays its own gas; actions are 3 s apart (RPC rate limits).
 
 | Step | What |
 |---|---|
 | Expiries | Next 4 daily 08:00 UTC expiries still writable 10 min from now (`expiry − write_cutoff_sec > now + 600`) and within `max_horizon_sec`. If `period_sec` < 1 day (testnet), also the next 4-hourly expiry (00, 04, …, 20 UTC) at least 90 min out, unless it is a daily. All on the contract's grid |
 | Strikes | Step = largest 1/2/5×10^n at most 1.5 % of spot (BTC $80k → $1,000). Dailies: 5 strikes around spot; short expiry: the strike either side of spot. Calls and puts, width 2 steps of the strike's own grid (`listedWidth` in the SDK: BTC $2,000), so a strike keeps its id when spot re-centres; puts whose width would reach the strike are skipped |
-| Create and write | Per target, nearest expiry and strike first: `create_series` if missing (30 TGas, 0.05 NEAR attached, storage charged, the rest refunded), then straight away top long inventory up to `min(MAX_SERIES_USD, $500)` of max payout, if the gap is at least the underlying's `min_write`, so a fresh contract gets prices within the first few series. Collateral is `ceil(n·W)` USDC, never spending the last $500 of USDC. Targets with nothing to write are created after the rest |
+| Create and write | Per target, nearest expiry and strike first: `create_series` if missing (30 TGas, 0.05 NEAR attached, storage charged, the rest refunded), then straight away top long inventory up to `min(MAX_SERIES_USD, $500)` of max payout, if the gap is at least the underlying's `min_write`, so a fresh contract gets prices within the first few series. Collateral is `ceil(n·W)` USDC, never spending the last `max($500, MAX_TRADE_USD)` of USDC, so a pending quote that buys back from a user still settles. Targets with nothing to write are created after the rest |
 | Burn | From `expiry − write_cutoff_sec`, burn the MM's unsold pairs (`min(long, short)`) with `burn_pair`: one intent per series |
 | Redeem | Once a series' price is final, redeem the MM's shorts beyond its pairs, up to 10 per intent |
 | Exercise | Once a series' price is final, exercise the MM's longs beyond its pairs (bought back from users) that pay something, up to 10 per intent |

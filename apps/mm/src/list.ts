@@ -61,7 +61,7 @@ async function tick(chain: Chain, config: Config): Promise<void> {
   const held = (asset: string) => balances.get(asset) ?? 0n;
 
   const longs = new Map(wanted.map((t) => [t.id, held(long(t.id))]));
-  const writes = new Map(planWrites(wanted, markets, terms, longs, balances).map((w) => [w.id, w]));
+  const writes = new Map(planWrites(wanted, markets, terms, longs, balances, config.settings.maxTradeUsd).map((w) => [w.id, w]));
   for (const t of [...wanted.filter((t) => writes.has(t.id)), ...wanted.filter((t) => !writes.has(t.id))]) {
     if (!ids.has(t.id)) {
       if (!(await attempt(`create ${t.id}`, () => chain.createSeries(t.underlying, t.strike, t.width, t.expiry, t.kind, CREATE_DEPOSIT)))) continue;

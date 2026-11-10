@@ -86,9 +86,9 @@ export function targets(terms: ListingTerms, markets: Market[], nowSec: number, 
   return list.sort((a, b) => rank(a) - rank(b) || a.expiry - b.expiry || a.distance - b.distance).map(({ distance, ...t }) => t);
 }
 
-export function planWrites(targets: Target[], markets: Market[], terms: ListingTerms, longs: Map<string, bigint>, balances: Map<string, bigint>): Write[] {
+export function planWrites(targets: Target[], markets: Market[], terms: ListingTerms, longs: Map<string, bigint>, balances: Map<string, bigint>, maxTradeUsd: number): Write[] {
   const usdUnits = (usd: number) => BigInt(Math.floor(usd * 10 ** terms.quoteDecimals));
-  let free = (balances.get(terms.quoteAsset) ?? 0n) - usdUnits(RESERVE_USD);
+  let free = (balances.get(terms.quoteAsset) ?? 0n) - usdUnits(Math.max(RESERVE_USD, maxTradeUsd));
   const writes: Write[] = [];
   for (const t of targets) {
     const m = markets.find((x) => x.symbol === t.underlying);

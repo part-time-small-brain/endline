@@ -1,10 +1,11 @@
+import { setTimeout as sleep } from "node:timers/promises";
 import { Chain } from "./chain.ts";
 import type { Config } from "./config.ts";
 import { CHAIN_LAG_MS, Inventory } from "./inventory.ts";
 import { Market } from "./market.ts";
 import { marks } from "./marks.ts";
 import { type Book, liveAssets } from "./portfolio.ts";
-import type { Desk } from "./quote.ts";
+import { type Desk, QUOTE_TTL_MS } from "./quote.ts";
 import { Quoter } from "./quoter.ts";
 import { RelayClient } from "./relay.ts";
 import { nep413Signer } from "./signer.ts";
@@ -53,6 +54,8 @@ export async function runBot(config: Config, relay: { url: string; apiKey: strin
     onFill: () => setTimeout(() => void refreshInventory().catch((e) => log(`post-fill inventory refresh failed: ${e}`)), CHAIN_LAG_MS + 500),
     log,
   });
+  await sleep(QUOTE_TTL_MS + CHAIN_LAG_MS);
+  await refreshInventory();
   client.start();
 
   const stop = () => {
