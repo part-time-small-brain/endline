@@ -51,6 +51,8 @@ describe("settlementAlert", () => {
     const alert = check(proposed("80000000000"), undefined);
     expect(alert?.key).toBe(check(proposed("80000000000"), 90_000)?.key);
     expect(alert?.text).toContain("no Deribit reference");
+    expect(alert?.title).toBe(`Can't check the settlement price for BTC ${new Date(EXPIRY * 1000).toISOString().slice(0, 16).replace("T", " ")} UTC`);
+    expect(check(proposed("80000000000"), 90_000)?.title).toMatch(/^Settlement price for BTC .* UTC looks wrong$/);
     expect(alert?.text).toContain(`"price":"<price>"`);
   });
 

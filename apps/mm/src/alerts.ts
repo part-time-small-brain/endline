@@ -39,7 +39,7 @@ export function settlementAlert(c: Contract, s: ExpiryState, nowSec: number): Al
   const override = nearCall(c, "override_settlement", args, "1 yoctoNEAR", c.ownerId);
   return {
     key: `settle ${s.underlying} ${s.expiry}`,
-    title: `Settlement price for ${name} looks wrong`,
+    title: off === undefined ? `Can't check the settlement price for ${name}` : `Settlement price for ${name} looks wrong`,
     text: `${name}: proposed ${proposed.toFixed(2)} by ${s.settlement.proposed_by}, ${reference}${gap}, final at ${iso(s.settlement.final_at)}. Override: ${override}`,
   };
 }
@@ -76,7 +76,7 @@ function toNear(yocto: bigint): string {
 }
 
 function iso(unixSec: number): string {
-  return new Date(unixSec * 1000).toISOString();
+  return `${new Date(unixSec * 1000).toISOString().slice(0, 16).replace("T", " ")} UTC`;
 }
 
 function nearCall(c: Contract, method: string, args: object, deposit: string, signer: string): string {

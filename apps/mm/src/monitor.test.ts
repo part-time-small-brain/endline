@@ -104,7 +104,7 @@ it("says a flagged price went final instead of calling it resolved", async () =>
   vi.spyOn(Date, "now").mockImplementation(() => (NOW_SEC + 60 * sleep.mock.calls.length) * 1000);
   const posted = webhook();
   await ticks(3);
-  const title = `Settlement price for BTC ${new Date(EXPIRY * 1000).toISOString()} looks wrong`;
+  const title = `Can't check the settlement price for BTC ${new Date(EXPIRY * 1000).toISOString().slice(0, 16).replace("T", " ")} UTC`;
   expect(posted).toEqual([`ok 🔴 testnet · ${title}`, `ok ⚠️ testnet · Final: ${title}`]);
 });
 
@@ -147,6 +147,23 @@ it("threads a resolution under its Telegram alert and says how long it lasted", 
     expect.not.objectContaining({ reply_parameters: expect.anything() }),
     expect.objectContaining({ text: "✅ testnet · Resolved: Relayer low on NEAR\nLasted 1 h 34 min", reply_parameters: { message_id: 41, allow_sending_without_reply: true } }),
   ]);
+});
+
+it("never adds reply_parameters for a webhook that returns no message id, like Slack or Discord", async () => {
+  vi.spyOn(console, "log").mockImplementation(() => {});
+  chain.series.mockResolvedValue([]);
+  const relayer = [NEAR, 10n * NEAR];
+  chain.nearBalance.mockImplementation(async (accountId: string) => ({ amount: accountId === "relayer.testnet" ? relayer[sleep.mock.calls.length] : 10n * NEAR, storageUsage: 0 }));
+  const bodies: Record<string, unknown>[] = [];
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (_url: string, init?: RequestInit) => {
+      bodies.push(JSON.parse(String(init?.body)));
+      return new Response("ok", { status: 200 });
+    }),
+  );
+  await ticks(relayer.length);
+  expect(bodies.map((b) => Object.keys(b))).toEqual([["text", "content"], ["text", "content"]]);
 });
 
 it("skips Deribit for an unsettled expiry inside the oracle window", async () => {
@@ -236,7 +253,7 @@ it("alerts each pending oracle, WASM and owner change once, holds them through a
   chain.pendingChanges.mockImplementation(async () => pending[sleep.mock.calls.length] ?? Promise.reject(new Error("RPC timeout")));
   webhook();
   await ticks(pending.length);
-  const at = new Date(activeAt * 1000).toISOString();
+  const at = `${new Date(activeAt * 1000).toISOString().slice(0, 16).replace("T", " ")} UTC`;
   expect(log.mock.calls.map(([line]) => String(line)).filter((line) => !line.startsWith("monitor:"))).toEqual([
     `ALERT [testnet] New oracle pending: opt.testnet: oracle evil.testnet pending, active at ${at}`,
     `ALERT [testnet] New oracle WASM pending: opt.testnet: oracle WASM ${"ab".repeat(32)} (https://x/oracle.wasm, outlayer.testnet) pending, active at ${at}`,
@@ -312,12 +329,12 @@ it("alerts a connected market maker that prices nothing, holds it through an out
   );
   await run();
   expect(posted).toEqual([
-    "🔴 testnet · Nothing priced\nhttp://web/marks: a market maker is connected but prices nothing. Check the lister's log, Deribit, and the MM's USDC and NEAR",
+    "🔴 testnet · Market maker prices nothing\nhttp://web/marks: a market maker is connected but prices nothing. Check the lister's log, Deribit, and the MM's USDC and NEAR",
     "🔴 testnet · Relay down\nhttp://web/health: Error: HTTP 502",
     "🔴 testnet · No market maker connected\nhttp://web/health: nobody gets a quote. Check the mm service",
     "✅ testnet · Resolved: Relay down\nLasted 0 min",
     "✅ testnet · Resolved: No market maker connected\nLasted 0 min",
-    "✅ testnet · Resolved: Nothing priced\nLasted 0 min",
+    "✅ testnet · Resolved: Market maker prices nothing\nLasted 0 min",
   ]);
 });
 

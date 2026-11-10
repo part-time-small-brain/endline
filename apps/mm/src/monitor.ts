@@ -19,27 +19,25 @@ interface Opened {
 export async function monitorCommand(config: MonitorConfig, once: boolean): Promise<void> {
   const chain = new ChainReader(config.rpcUrl, config.optionsId);
   const final = new Set<string>();
-  const open = new Set<string>();
-  const opened = new Map<string, Opened>();
+  const open = new Map<string, Opened>();
   const net = config.networkId;
   for (;;) {
     try {
-      const { fresh, resolved } = dedupe(open, await check(chain, config, final, open));
+      const { fresh, resolved } = dedupe(new Set(open.keys()), await check(chain, config, final, open));
       for (const alert of fresh) {
         const sent = await notify(config.webhookUrl, `ALERT [${net}] ${alert.title}: ${alert.text}`, `🔴 ${net} · ${alert.title}\n${alert.text}`);
         if (!sent) continue;
-        open.add(alert.key);
-        opened.set(alert.key, { title: alert.title, at: Date.now(), messageId: sent.messageId });
+        open.set(alert.key, { title: alert.title, at: Date.now(), messageId: sent.messageId });
       }
       for (const key of resolved) {
-        const o = opened.get(key) ?? { title: key, at: Date.now() };
+        const o = open.get(key);
+        if (!o) continue;
         const took = duration(Date.now() - o.at);
         const sent = final.has(key.replace(/^settle /, ""))
           ? await notify(config.webhookUrl, `FINAL [${net}] ${o.title}: the flagged price is final now, after ${took}`, `⚠️ ${net} · Final: ${o.title}\nThe flagged price can't be overridden any more. Check it`, o.messageId)
           : await notify(config.webhookUrl, `RESOLVED [${net}] ${o.title}, after ${took}`, `✅ ${net} · Resolved: ${o.title}\nLasted ${took}`, o.messageId);
         if (!sent) continue;
         open.delete(key);
-        opened.delete(key);
       }
       console.log(`monitor: ${open.size} open alerts`);
     } catch (e) {
@@ -50,7 +48,7 @@ export async function monitorCommand(config: MonitorConfig, once: boolean): Prom
   }
 }
 
-async function check(chain: ChainReader, config: MonitorConfig, final: Set<string>, open: ReadonlySet<string>): Promise<Alert[]> {
+async function check(chain: ChainReader, config: MonitorConfig, final: Set<string>, open: ReadonlyMap<string, Opened>): Promise<Alert[]> {
   const nowSec = Math.floor(Date.now() / 1000);
   const accounts = [
     ["Options contract", config.optionsId],
@@ -64,7 +62,7 @@ async function check(chain: ChainReader, config: MonitorConfig, final: Set<strin
         const { amount, storageUsage } = await chain.nearBalance(id);
         return reserveAlert(role, id, amount, storageUsage);
       } catch (e) {
-        return { key: `reserve ${id}`, title: `Can't read the ${role.toLowerCase()}'s NEAR`, text: `${id}: can't read balance: ${e}` };
+        return { key: `reserve ${id}`, title: `Can't read ${role.toLowerCase()} NEAR balance`, text: `${id}: can't read balance: ${e}` };
       }
     }),
   );
@@ -72,7 +70,7 @@ async function check(chain: ChainReader, config: MonitorConfig, final: Set<strin
     (changes) => pendingAlerts(config.optionsId, changes),
     (e): Alert[] => {
       console.error(`monitor: pending changes: ${e}`);
-      const stillOpen = [...open].filter((key) => key.startsWith("pending")).map(held);
+      const stillOpen = [...open.keys()].filter((key) => key.startsWith("pending")).map(held);
       return stillOpen.length > 0 ? stillOpen : [{ key: "pending", title: "Can't read pending admin changes", text: `${config.optionsId}: can't read pending changes: ${e}` }];
     },
   );
@@ -101,7 +99,7 @@ async function check(chain: ChainReader, config: MonitorConfig, final: Set<strin
   return [...alerts, ...reserveAlerts, ...pendingChangeAlerts, ...uptimeAlerts].filter((a) => a !== undefined);
 }
 
-async function healthAlerts(url: string, open: ReadonlySet<string>): Promise<Alert[]> {
+async function healthAlerts(url: string, open: ReadonlyMap<string, Opened>): Promise<Alert[]> {
   const priced = open.has("priced") ? [held("priced")] : [];
   try {
     const res = await fetch(url, { signal: AbortSignal.timeout(HTTP_TIMEOUT_MS) });
@@ -116,12 +114,12 @@ async function healthAlerts(url: string, open: ReadonlySet<string>): Promise<Ale
   return pricedAlerts(new URL("/marks", url).toString(), open);
 }
 
-async function pricedAlerts(url: string, open: ReadonlySet<string>): Promise<Alert[]> {
+async function pricedAlerts(url: string, open: ReadonlyMap<string, Opened>): Promise<Alert[]> {
   try {
     const res = await fetch(url, { signal: AbortSignal.timeout(HTTP_TIMEOUT_MS) });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const marks = Marks.parse(await res.json());
-    return marks.length > 0 ? [] : [{ key: "priced", title: "Nothing priced", text: `${url}: a market maker is connected but prices nothing. Check the lister's log, Deribit, and the MM's USDC and NEAR` }];
+    return marks.length > 0 ? [] : [{ key: "priced", title: "Market maker prices nothing", text: `${url}: a market maker is connected but prices nothing. Check the lister's log, Deribit, and the MM's USDC and NEAR` }];
   } catch (e) {
     console.error(`monitor: ${url}: ${e}`);
     return open.has("priced") ? [held("priced")] : [];
