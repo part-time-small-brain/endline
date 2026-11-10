@@ -4,7 +4,7 @@ Pick where crypto prices end. Up or Down, capped payout, max loss is what you pa
 
 **[App](https://app.endline.trade)** · [Landing](https://endline.trade) · [Docs](https://docs.endline.trade) · [Architecture](https://docs.endline.trade/developers/architecture) · [Security model](https://docs.endline.trade/developers/security)
 
-Status: testnet, test tokens only. The contract is not audited.
+The contract is not audited; testnet uses test tokens only.
 
 ## The problem
 
@@ -27,14 +27,12 @@ web ──HTTP──▶ relay ◀──WebSocket── market maker ──▶ De
  │ sign         └─ execute_intents([mm half, user half]) ──▶ intents.near ◀──▶ options contract
  └──────────────────────────────────────────────────────────▶ (user deposits, balances)
 
-options contract ── request_settlement ──▶ OutLayer TEE ── runs oracle WASM ──▶ 7 exchanges (+ Deribit check)
+options contract ── request_settlement ──▶ OutLayer TEE (mainnet; testnet: our proposer) ── runs oracle WASM ──▶ 7 exchanges (+ Deribit check)
 ```
 
 Tracks: `defi`.
 
 ## Try it (testnet)
-
-Live app: https://app.endline.trade (landing: https://endline.trade, docs: https://docs.endline.trade).
 
 1. Open the app. Lite starts with one editable sentence: end time, above or below, price to beat, amount and capped payout. Max loss and estimated chance stay visible. Lite / Pro / Tap in the header opens the chart ticket or the tap grid: rows of prices to beat, columns of end dates, tap a cell to buy it.
 2. Click Connect and pick a wallet.
