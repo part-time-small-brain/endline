@@ -3,13 +3,13 @@ import { useTheme } from "../hooks/useTheme.ts";
 import { pull } from "../lib/dots.ts";
 
 const REACH = 160;
-const ROUND = { x: REACH, y: REACH };
+const RADII = { x: REACH, y: REACH };
 const EASE = 0.22;
 const DOT = 1.1;
-const LIT = 0.9;
+const DOT_ALPHA = 0.9;
 const WASH = 3.2 * REACH;
 const WASH_ALPHA = 0.2;
-const COLS = 4096;
+const ROW_STRIDE = 4096;
 
 export function AppDots({ up }: { up: boolean }) {
   const ref = useRef<HTMLCanvasElement>(null);
@@ -44,8 +44,8 @@ export function AppDots({ up }: { up: boolean }) {
         const first = (at: number) => Math.max(0, Math.ceil((at - REACH) / gap - 0.5));
         for (let row = first(y); (row + 0.5) * gap < y + REACH; row++) {
           for (let col = first(x); (col + 0.5) * gap < x + REACH; col++) {
-            const { strength } = pull((col + 0.5) * gap - x, (row + 0.5) * gap - y, ROUND, 0);
-            if (strength > 0) target.set(row * COLS + col, strength);
+            const { strength } = pull((col + 0.5) * gap - x, (row + 0.5) * gap - y, RADII, 0);
+            if (strength > 0) target.set(row * ROW_STRIDE + col, strength);
           }
         }
       }
@@ -67,9 +67,9 @@ export function AppDots({ up }: { up: boolean }) {
           continue;
         }
         lit.set(key, now);
-        ctx.globalAlpha = LIT * now;
+        ctx.globalAlpha = DOT_ALPHA * now;
         ctx.beginPath();
-        ctx.arc(((key % COLS) + 0.5) * gap - scrollX, (Math.floor(key / COLS) + 0.5) * gap - scrollY, DOT + now, 0, 2 * Math.PI);
+        ctx.arc(((key % ROW_STRIDE) + 0.5) * gap - scrollX, (Math.floor(key / ROW_STRIDE) + 0.5) * gap - scrollY, DOT + now, 0, 2 * Math.PI);
         ctx.fill();
       }
       ctx.globalAlpha = 1;
@@ -92,9 +92,12 @@ export function AppDots({ up }: { up: boolean }) {
       wake();
     };
     const out = (event: PointerEvent) => {
-      if (event.relatedTarget) return;
+      if (event.relatedTarget || !cursor) return;
       cursor = undefined;
       wake();
+    };
+    const scrolled = () => {
+      if (cursor || lit.size > 0) wake();
     };
     repaint.current = () => {
       color = getComputedStyle(canvas).getPropertyValue("--side");
@@ -105,13 +108,13 @@ export function AppDots({ up }: { up: boolean }) {
     const size = new ResizeObserver(resize);
     size.observe(canvas);
     addEventListener("pointermove", move);
-    addEventListener("scroll", wake, { passive: true });
+    addEventListener("scroll", scrolled, { passive: true });
     document.addEventListener("pointerout", out);
     return () => {
       cancelAnimationFrame(frame);
       size.disconnect();
       removeEventListener("pointermove", move);
-      removeEventListener("scroll", wake);
+      removeEventListener("scroll", scrolled);
       document.removeEventListener("pointerout", out);
       repaint.current = undefined;
     };
@@ -126,7 +129,7 @@ export function AppDots({ up }: { up: boolean }) {
         ref={washRef}
         data-side={side}
         aria-hidden="true"
-        className="pointer-events-none fixed top-0 left-0 -z-10 rounded-full bg-[radial-gradient(closest-side,var(--side-glow),transparent)] opacity-0"
+        className="pointer-events-none fixed top-0 left-0 -z-10 rounded-full bg-[radial-gradient(closest-side,var(--side-glow),transparent)] opacity-0 motion-reduce:hidden"
         style={{ width: WASH, height: WASH }}
       />
       <canvas ref={ref} data-side={side} aria-hidden="true" className="pointer-events-none fixed inset-0 -z-10 size-full" />
