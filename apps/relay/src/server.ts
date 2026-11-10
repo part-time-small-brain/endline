@@ -107,7 +107,7 @@ export function createRelayServer(relay: Relay, fills: Fills, hub: MmHub, collec
         return [200, { tx_hash: await faucet.drip((await parseBody(request, FaucetRequest)).account_id, clientKey(request, trustProxy, SITE_IPV6_GROUPS)) }];
       case "POST /deposit-quote":
         if (!isJson(request)) throw new HttpError(415, "send application/json");
-        return [200, await oneClick.quote(await parseBody(request, oneClick.schema))];
+        return [200, await oneClick.quote(await parseBody(request, oneClick.schema), clientKey(request, trustProxy, SITE_IPV6_GROUPS))];
       case "GET /status/:arg":
         return [200, relay.status(param)];
       case "GET /fills/:arg":

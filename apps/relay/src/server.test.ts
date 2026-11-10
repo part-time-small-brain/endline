@@ -161,18 +161,24 @@ describe("http", () => {
     expect([call.status, await call.json()]).toEqual([503, { error: "no price for this cell right now" }]);
   });
 
-  it("counts free calls per client network behind the proxy: IPv4 address, IPv6 /48", async () => {
+  it("counts free calls and deposit quotes per client network behind the proxy: IPv4 address, IPv6 /48", async () => {
     const add = vi.spyOn(calls, "add");
+    const quote = vi.spyOn(oneClick, "quote").mockResolvedValue(SIGNED_QUOTE);
     const proxied = createRelayServer(relay, fills, hub, collector, oneClick, calls, undefined, true);
     await new Promise<void>((resolve) => proxied.listen(0, "127.0.0.1", resolve));
     const body = JSON.stringify({ series_id: SERIES.id, signer: { standard: "nep413", signer_id: "alice.near" }, session: session("alice.near") });
     try {
       for (const ip of ["2001:db8:1:1::1", "2001:db8:1:ffff::1", "2001:db8:2::1", "1.2.3.4"]) {
-        await fetch(`http://127.0.0.1:${(proxied.address() as AddressInfo).port}/calls`, { method: "POST", body, headers: { "content-type": "application/json", "x-forwarded-for": `6.6.6.6, ${ip}` } });
+        const headers = { "content-type": "application/json", "x-forwarded-for": `6.6.6.6, ${ip}` };
+        await fetch(`http://127.0.0.1:${(proxied.address() as AddressInfo).port}/calls`, { method: "POST", body, headers });
+        await fetch(`http://127.0.0.1:${(proxied.address() as AddressInfo).port}/deposit-quote`, { method: "POST", body: JSON.stringify(DEPOSIT), headers });
       }
-      expect(add.mock.calls.map(([, client]) => client)).toEqual(["2001:db8:1", "2001:db8:1", "2001:db8:2", "1.2.3.4"]);
+      const networks = ["2001:db8:1", "2001:db8:1", "2001:db8:2", "1.2.3.4"];
+      expect(add.mock.calls.map(([, client]) => client)).toEqual(networks);
+      expect(quote.mock.calls.map(([, client]) => client)).toEqual(networks);
     } finally {
       add.mockRestore();
+      quote.mockRestore();
       await new Promise((resolve) => proxied.close(resolve));
     }
   });
