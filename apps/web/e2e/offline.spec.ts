@@ -1,7 +1,7 @@
 import { listedWidth, type Mark, seriesId, toSign, type QuoteRequest, type StatusUpdate } from "@endline/sdk";
 import type { Page, Route } from "@playwright/test";
 import testnet from "../../../deploy/testnet.json" with { type: "json" };
-import { expect, handleOf, money, openPopover, RPC, term, test } from "./fixtures.ts";
+import { chartOf, expect, handleOf, money, openPopover, RPC, term, test } from "./fixtures.ts";
 
 const USD = 1_000_000;
 const NOW_MS = Date.parse(process.env.E2E_NOW ?? "2026-11-04T12:00:00Z");
@@ -49,7 +49,7 @@ async function live(page: Page, marks: () => unknown[] | undefined | "hang", ind
   await page.goto("/app");
 }
 
-async function quoteFlow(page: Page, open = true) {
+async function quoteFlow(page: Page, open = true, ask = 400) {
   const state = {
     quotes: 0,
     premium: 25,
@@ -128,7 +128,7 @@ async function quoteFlow(page: Page, open = true) {
       ? { headers: { "x-status": String(status) }, json: { error: "status unavailable" } }
       : { json: { quote_id: id, status, tx_hash: status === "settled" ? "original-fill" : undefined } });
   });
-  await live(page, () => [{ series_id: "BTC-5NOV26-81000_83000-C", ask: String(400 * USD), bid: String(380 * USD), vol: 0.4 }]);
+  await live(page, () => [{ series_id: "BTC-5NOV26-81000_83000-C", ask: String(ask * USD), bid: String(380 * USD), vol: 0.4 }]);
   await page.route(RPC, async (route) => {
     const params = route.request().postDataJSON().params;
     const args = JSON.parse(Buffer.from(params.args_base64, "base64").toString());
@@ -586,6 +586,29 @@ test("Lite date chances match the nearest marked price it selects", async ({ pag
   await expect(page.getByText("Full payout if BTC ends above $84,000", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Price to beat", exact: true }).click();
   await expect(page.getByRole("radiogroup", { name: "Prices to beat" }).getByRole("radio")).toHaveCount(2);
+});
+
+test("the swap card shows every decimal of the option amount the wallet will sign", async ({ page }) => {
+  await quoteFlow(page, true, 300);
+  await expect(page.getByRole("dialog")).toContainText("0.08333333 BTC Up");
+});
+
+test("stops showing the last spot once Deribit fails", async ({ page }) => {
+  await live(page, () => [{ series_id: "BTC-5NOV26-81000_83000-C", ask: String(400 * USD), vol: 0.4 }]);
+  await expect(handleOf(page)).toBeVisible();
+  await page.route("**/get_index_price**", (route) => route.fulfill({ json: { error: "down" } }));
+  await page.clock.fastForward(5_000);
+  await expect(page.getByText("No live BTC price right now")).toBeVisible();
+  await expect(handleOf(page)).toHaveCount(0);
+});
+
+test("drops the last day's line once Deribit's chart fails", async ({ page }) => {
+  await live(page, () => [{ series_id: "BTC-5NOV26-81000_83000-C", ask: String(400 * USD), vol: 0.4 }]);
+  const line = chartOf(page).locator("path.stroke-ink");
+  await expect(line).toHaveAttribute("d", /L.*L/);
+  await page.route("**/get_index_chart_data**", (route) => route.fulfill({ json: { error: "down" } }));
+  await page.clock.fastForward(60_000);
+  await expect(line).toHaveAttribute("d", /^M[^L]*$/);
 });
 
 test("stops showing the last prices once the relay's marks fail", async ({ page }) => {

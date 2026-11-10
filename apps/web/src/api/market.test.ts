@@ -1,7 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { chartPoints, deribitMarket } from "./market.ts";
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.restoreAllMocks();
+});
 
 const serve = (body: (url: string) => unknown) => {
   const fetch = vi.fn(async (url: string) => {
@@ -11,6 +14,23 @@ const serve = (body: (url: string) => unknown) => {
   vi.stubGlobal("fetch", fetch);
   return fetch;
 };
+
+describe("a hanging Deribit", () => {
+  it("gives up after 5 s on both the spot and the chart, so the app stops showing old prices", async () => {
+    const timers: [number, AbortController][] = [];
+    vi.spyOn(AbortSignal, "timeout").mockImplementation((ms) => {
+      const controller = new AbortController();
+      timers.push([ms, controller]);
+      return controller.signal;
+    });
+    vi.stubGlobal("fetch", vi.fn((_url: string, init?: RequestInit) => new Promise((_, reject) => init?.signal?.addEventListener("abort", () => reject(init.signal?.reason)))));
+    const pending = [deribitMarket().snapshot(["BTC"]), deribitMarket().history("BTC")];
+    for (const request of pending) request.catch(() => {});
+    expect(timers.map(([ms]) => ms)).toEqual([5_000, 5_000]);
+    for (const [, controller] of timers) controller.abort(new Error("timed out"));
+    for (const request of pending) await expect(request).rejects.toThrow("timed out");
+  });
+});
 
 describe("chartPoints", () => {
   it("keeps a point every 5 minutes and always the latest, whatever the spacing it gets", () => {

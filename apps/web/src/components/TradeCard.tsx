@@ -17,7 +17,7 @@ export function TradeCard({ series, legs, quoteAsset, quoteDecimals }: Props) {
       <span>{formatToken(leg.amount, quoteDecimals)} USDC</span>
     ) : (
       <span>
-        {formatToken(leg.amount, series.underlying_decimals, 6)} {seriesTitle(series, quoteDecimals)}
+        {formatToken(leg.amount, series.underlying_decimals, series.underlying_decimals)} {seriesTitle(series, quoteDecimals)}
         <span className="block text-xs font-normal text-ink-2">{capLabel(series, quoteDecimals)}</span>
         <span className="block text-xs font-normal text-ink-2">Ends {formatEnds(series.expiry)} <span className="text-ink-3">· {formatUtc(series.expiry)}</span></span>
       </span>
