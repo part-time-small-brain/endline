@@ -1,10 +1,10 @@
 # Endline
 
-Pick where crypto prices end. Up or Down, capped payout, max loss is what you pay. Each position is a European, cash-settled option, fully backed in USDC, that lives and trades inside NEAR Intents. Live on NEAR testnet; mainnet, with deposits from any chain via 1Click, is built but not deployed yet.
+Pick where crypto prices end. Fund from any chain, max loss is what you pay. Each position is a European, cash-settled option, fully backed in USDC, that lives and trades inside NEAR Intents. Live on NEAR testnet; mainnet, with deposits from any chain via 1Click, is built but not deployed yet.
 
 **[App](https://app.endline.trade)** · [Landing](https://endline.trade) · [Docs](https://docs.endline.trade) · [Architecture](https://docs.endline.trade/developers/architecture) · [Security model](https://docs.endline.trade/developers/security)
 
-The contract is not audited; testnet uses test tokens only.
+The contract is not audited.
 
 ## The problem
 
