@@ -33,14 +33,14 @@ export const test = base.extend({
 
 export { expect };
 
-export interface Box {
+interface Box {
   left: number;
   right: number;
   top: number;
   bottom: number;
 }
 
-export interface Chart {
+interface Chart {
   top: number;
   bottom: number;
   handle: Box;

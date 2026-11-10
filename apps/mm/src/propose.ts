@@ -18,7 +18,7 @@ const MAX_AGE_SEC = 86_400;
 const OracleWasm = z.object({ url: z.url(), sha256: z.string().regex(/^[0-9a-f]{64}$/) });
 type OracleWasm = z.infer<typeof OracleWasm>;
 const Fixing = z.object({ ok: z.boolean(), price: z.string().regex(/^[1-9][0-9]*$/).nullable(), source: z.string() }).loose();
-export type Fixing = z.infer<typeof Fixing>;
+type Fixing = z.infer<typeof Fixing>;
 
 export function due(series: Series[], settled: Set<string>, nowSec: number, fromSec: number, untilSec: number): { underlying: string; expiry: number }[] {
   const keys = new Map(series.map((s) => [`${s.underlying} ${s.expiry}`, { underlying: s.underlying, expiry: s.expiry }]));
