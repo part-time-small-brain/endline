@@ -87,7 +87,7 @@ Writes close `write_cutoff_sec` before expiry. Exercise and redeem need a final 
 |---|---|---|
 | `exercise(token_id, amount)`, `redeem(...)`, `burn_pair(series_id, amount)` | Holder on the contract's own ledger | 1 yocto. Pays into the caller's intents balance |
 | `withdraw_claimable(owner_id, asset)` | Anyone | 1 yocto. Retries a failed payout, always to `owner_id` |
-| `retry_delivery(owner_id, token_ids)` | Anyone | 1 yocto, max 10 tokens. Resends options whose deposit into `owner_id`'s intents balance failed or came back unused (`get_undelivered`). Until then they sit in the contract's intents ledger row |
+| `retry_delivery(owner_id, token_ids)` | Anyone | 1 yocto, max 10 tokens. Resends options whose deposit into `owner_id`'s intents balance failed or came back unused (`get_undelivered`). Until then they sit in the contract's intents ledger row. Panics for tokens of a deleted series |
 | `storage_deposit(account_id?, registration_only?)` | Anyone | NEP-145 subset. The attached NEAR, minus its own record, becomes `account_id`'s storage credit (default: the caller). It pays for new balance rows when options leave intents to this ledger. Can't be withdrawn; `registration_only: true` is rejected |
 | `request_settlement(underlying, expiry)` | Anyone | Attach ≥ 0.01 NEAR, 300 TGas (less is refused). From expiry + 5 min until expiry + `oracle_window_sec` |
 | `propose_settlement(underlying, expiry, price)` | Oracle account | 1 yocto. Manual fallback. Needs a listed series at that expiry, only from expiry + `oracle_window_sec`, once per key |
