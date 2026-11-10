@@ -96,7 +96,7 @@ test("the 320px landing keeps risk copy and payout controls inside the viewport"
   await page.reload();
   await ready(page);
   await expect.poll(() => sideways(page)).toBeLessThanOrEqual(0);
-  const risk = hero(page).getByText("Choose whether the price ends above or below your line. The most you can lose is what you pay.");
+  const risk = hero(page).getByText("Choose whether the price ends above or below your line. See your payout before you sign.");
   expect(await risk.evaluate((element) => element.getBoundingClientRect().right - document.documentElement.clientWidth)).toBeLessThanOrEqual(0);
   const controls = page.locator("#floor").getByRole("radiogroup", { name: "Your side" });
   await controls.scrollIntoViewIfNeeded();

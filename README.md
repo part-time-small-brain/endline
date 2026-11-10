@@ -2,7 +2,7 @@
 
 [![ci](https://github.com/part-time-small-brain/endline/actions/workflows/ci.yml/badge.svg)](https://github.com/part-time-small-brain/endline/actions/workflows/ci.yml)
 
-Pick where crypto prices end. Fund from any chain, max loss is what you pay. Each position is a European, cash-settled option, fully backed in USDC, that lives and trades inside NEAR Intents. Live on NEAR testnet; mainnet, with deposits from any chain via 1Click, is built but not deployed yet.
+Pick where crypto prices end. Fund from any chain, see your payout before you sign, never get liquidated. Each position is a European, cash-settled option, fully backed in USDC, that lives and trades inside NEAR Intents.
 
 **[App](https://app.endline.trade)** · [Landing](https://endline.trade) · [Docs](https://docs.endline.trade) · [Architecture](https://docs.endline.trade/developers/architecture) · [Security model](https://docs.endline.trade/developers/security)
 
@@ -20,7 +20,7 @@ Crypto options trade on centralized venues or inside one chain's DeFi, and an op
 | NEP-245 option tokens | Each series (`BTC-27NOV26-81000_83000-C`: strike, cap, Up) is a multi-token minted by our options contract against USDC locked in full |
 | RFQ relay + market maker | The app asks the relay for a quote, the house market maker answers with a firm price from Deribit's volatility, the user signs, the relay submits |
 | Oracle WASM on OutLayer | The settlement price is the median of 7 exchanges' 30-minute averages, computed by our WASM, proposed on-chain and final after a dispute window. On mainnet it runs in an OutLayer TEE; testnet runs the same pinned WASM through our proposer as a manual oracle |
-| 1Click | Deposits from other chains land as USDC in the user's intents balance (mainnet only, so not live yet) |
+| 1Click | Deposits from other chains land as USDC in the user's intents balance (mainnet) |
 | Wallets | NEAR wallets through NEAR Connect sign NEP-413; Ethereum wallets sign ERC-191 with the 0x address as the account |
 
 ```text
@@ -57,8 +57,6 @@ Without a wallet: `pnpm install && VITE_MOCK=1 pnpm --filter @endline/web dev`, 
 | Intents (copy of the mainnet wasm) | `intents.near-options-dev.testnet` |
 | USDC (mock, 6 decimals) | `usdc.near-options-dev.testnet` |
 | Oracle WASM | pinned by sha256 on the contract (`get_oracle_wasm`); the testnet proposer runs it as the manual oracle `oracle.near-options-dev.testnet` |
-
-Mainnet: not deployed yet.
 
 ## Repo
 
