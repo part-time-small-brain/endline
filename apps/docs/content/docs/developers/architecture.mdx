@@ -14,7 +14,7 @@ Users fund a USDC balance in `intents.near` from any chain, buy with one signatu
 | Options contract | `contracts/options` (Rust) | The rules and the money: holds collateral, mints option tokens, settles, pays out | NEAR, deployed once |
 | `intents.near` | [near/intents](https://github.com/near/intents) | Holds every balance, settles trades atomically, cross-chain deposits and withdrawals | NEAR Intents team |
 | Relay | `apps/relay` (TypeScript) | RFQ auction, submits matched trades, relays gasless collects | Us |
-| Market maker | `apps/mm` (TypeScript) | Writes options, quotes, takes the other side, hedges | Us. Anyone can run another |
+| Market maker | `apps/mm` (TypeScript) | Writes options, quotes, takes the other side | Us. Anyone can run another |
 | Oracle WASM | `oracle/` (Rust, wasm32-wasip2) | Median of 7 exchanges' 30-min averages, checked against Deribit | OutLayer TEE (mainnet), our proposer (testnet) |
 | Market lister | `apps/mm` `list` | Keeps the next 4 daily expiries (plus a 4-hourly one on testnet) listed with calls and puts around spot for every underlying on the contract, each capped two strike steps out, writes inventory, burns unsold pairs after the write cutoff, redeems shorts and exercises its winning longs once final, and deletes its own series a week after their end once they owe nothing | Us, with the market maker's key |
 | Testnet proposer | `apps/mm` `propose` | Runs the pinned oracle WASM in wasmtime and proposes its price as the manual oracle | Us, testnet only |
@@ -26,7 +26,7 @@ Users fund a USDC balance in `intents.near` from any chain, buy with one signatu
 ## How they talk
 
 ```text
-web ──HTTP──▶ relay ◀──WebSocket── market maker ──▶ Deribit (prices), Hyperliquid (hedge)
+web ──HTTP──▶ relay ◀──WebSocket── market maker ──▶ Deribit (prices)
  │              │
  │ sign         └─ execute_intents([mm half, user half]) ──▶ intents.near ◀──▶ options contract
  └──────────────────────────────────────────────────────────▶ (user deposits, balances)

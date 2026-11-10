@@ -1,6 +1,6 @@
 # Market maker
 
-Quotes option series to the RFQ relay, signs its `token_diff` leg with NEP-413, tracks inventory and risk, and delta-hedges on Hyperliquid. Why it exists: [Architecture](https://docs.endline.trade/developers/architecture). Trade protocol: [Relay API](https://docs.endline.trade/developers/relay-api).
+Quotes option series to the RFQ relay, signs its `token_diff` leg with NEP-413, and tracks inventory and risk. It doesn't hedge: every option it sells is fully backed in USDC; delta and vega caps limit the directional and vol exposure it takes on. Why it exists: [Architecture](https://docs.endline.trade/developers/architecture). Trade protocol: [Relay API](https://docs.endline.trade/developers/relay-api).
 
 ## Run
 
@@ -40,13 +40,11 @@ Read from the process environment.
 | `MM_ACCOUNT_ID` | Signer of quotes and writes |
 | `MM_PRIVATE_KEY` | `ed25519:…` key registered for `MM_ACCOUNT_ID` on `intents_id` |
 | `NETWORK_ID` | `mainnet` or `testnet`, every command but `settle`. Picks `deploy/<NETWORK_ID>.json`, the only source of `rpc_url`, `intents_id` (the verifier; the monitor watches its NEAR) and `options_id`. No file (mainnet today): the command won't start. The monitor also uses it in the printed `near` commands |
-| `HL_PRIVATE_KEY` | Optional `0x…` Hyperliquid key. Unset: hedges are only logged, never sent. Trades on Hyperliquid testnet unless the NEAR RPC is mainnet |
-| `HL_ACCOUNT_ADDRESS` | Optional `0x…` account whose positions are hedged. Set it when `HL_PRIVATE_KEY` is an API (agent) wallet: positions live on the main account, not the agent's own address. Default: the key's address. The account must hold only this bot's hedges: every position on it counts as one, and a coin with no option market (no spot price) fails the hedge |
 | `SPREAD_VOL_POINTS` | Vol shock priced into each side, default `2` |
 | `MIN_PREMIUM_USD` | Default `1`. Asks are floored to it, bids below it are refused |
 | `MAX_TRADE_USD` | Max payout (contracts × width) per quote, default `2000`, at most `1e9` |
 | `MAX_SERIES_USD` | Max net short/long payout per series, default `5000`. The lister stocks at most this much per series |
-| `MAX_DELTA_USD` | Max net delta per underlying right after a fill, before its hedge, default `50000`. Near expiry a full `MAX_TRADE_USD` trade near the money is up to `MAX_TRADE_USD × spot / width` of delta (~$80k for BTC) and gets refused; demo-size trades fit. Also each hedge order's size limit |
+| `MAX_DELTA_USD` | Max net delta per underlying after a fill, default `50000`. Near expiry a full `MAX_TRADE_USD` trade near the money is up to `MAX_TRADE_USD × spot / width` of delta (~$80k for BTC) and gets refused; demo-size trades fit |
 | `MAX_VEGA_USD` | Max net vega per vol point, default `200` |
 | `ALERT_WEBHOOK_URL` | Optional. Monitor only: POSTs each `ALERT`/`RESOLVED`/`FINAL` line as `{"text","content"}` (Slack and Discord incoming webhooks) |
 | `HEALTH_URL` | Optional. Monitor only: the relay's `/health`, directly or through the web origin, checked every minute (`uptime`, `quotes` alerts) |
@@ -55,12 +53,11 @@ Read from the process environment.
 
 `monitor` needs only `NETWORK_ID` and the monitor vars: no account, no key.
 
-Fixed constants (not env): Hyperliquid taker fee 4.5 bps, carry 7 % a year on the USDC locked, hedge band $50, max Deribit data age 10 s, quote lifetime 25 s.
+Fixed constants (not env): carry 7 % a year on the USDC locked, max Deribit data age 10 s, quote lifetime 25 s.
 
 ## How it quotes
 
 On every relay `quote` event the bot refuses unless all of these hold:
-- no kill switch is tripped;
 - the auction (`deadline_ms`) is still open;
 - the series exists on the contract with the same terms, the assets are its long token and the contract's `quote_asset`, and `fee_pips` equals the verifier's `fee`;
 - the series' width is the lister's (`listedWidth`), so a third party's copy of a strike at another width is never quoted;
@@ -73,19 +70,18 @@ On every relay `quote` event the bot refuses unless all of these hold:
 Pricing is Black-76 on Deribit's `underlying_price` and `mark_iv` (`get_book_summary_by_currency` and `get_index_price` per underlying every 2 s). A capped series is two options: long at the strike `K`, short at the cap (`K + W` for Up, `K − W` for Down), each with its own vol, `σ` at `K` and `σcap` at the cap. Vols come from the nearest Deribit expiry, interpolated in log-moneyness (a listed strike gets its own vol); the forward is the Deribit index unless that expiry is listed.
 
 - Scenarios: both vols ± spread, and each vol moving spread / 2 the opposite way (σ up, σcap down, and the reverse).
-- Hedge = |delta| × forward × the Hyperliquid fee: the trade one fill causes.
-- Ask = the highest scenario + 2 × hedge (now and the close at expiry) + carry, at least `MIN_PREMIUM_USD`, rounded up to quote units.
-- Bid = the lowest scenario − hedge, rounded down.
+- Ask = the highest scenario + carry, at least `MIN_PREMIUM_USD`, rounded up to quote units.
+- Bid = the lowest scenario, rounded down.
 
-After each Deribit refresh the bot sends the relay its [marks](https://docs.endline.trade/developers/relay-api): the same ask and bid for one whole option, before the $1 minimum, and `σ`, plus `max_size`, the most option units that pay out at most `MAX_TRADE_USD`: the same integer limit a quote checks. The ask is lifted so a `max_size` buy at it pays at least `MIN_PREMIUM_USD`, so the app never shows a long shot cheaper than a buy costs. Marks go out for every series it holds long or short tokens of that passes the checks above that don't depend on the quote (kill switch, width, deadline before the write cutoff, fresh data) and whose ask converts to quote units below the width, ranked by what its tokens there are worth at that bid and ask and cut off under the relay's 64 KB frame limit, so tokens others send it can't push its own series out cheaply. It publishes after every refresh, also one that failed for some underlying, so the others keep their marks.
+After each Deribit refresh the bot sends the relay its [marks](https://docs.endline.trade/developers/relay-api): the same ask and bid for one whole option, before the $1 minimum, and `σ`, plus `max_size`, the most option units that pay out at most `MAX_TRADE_USD`: the same integer limit a quote checks. The ask is lifted so a `max_size` buy at it pays at least `MIN_PREMIUM_USD`, so the app never shows a long shot cheaper than a buy costs. Marks go out for every series it holds long or short tokens of that passes the checks above that don't depend on the quote (width, deadline before the write cutoff, fresh data) and whose ask converts to quote units below the width, ranked by what its tokens there are worth at that bid and ask and cut off under the relay's 64 KB frame limit, so tokens others send it can't push its own series out cheaply. It publishes after every refresh, also one that failed for some underlying, so the others keep their marks.
 
 The leg comes from the SDK's `buyDiffs`/`sellDiffs`. The nonce is versioned, uses the verifier's `current_salt` and the same deadline.
 
 A reservation is released only when a balance read that started 3 s after its deadline comes back, whatever the relay reports: the signed leg stays fillable until then, so a relay that lied about `expired` could otherwise gather legs past the caps. So each of the series, delta and vega caps is checked against the confirmed balances plus the new trade plus every pending leg that pushes the same way, in both directions: the cap holds whichever pending legs fill. A settled trade counts in both its balance and its reservation for about 30 s, which only makes quoting stricter. A read that started before the last applied one is dropped, so a trade that settled while the relay was unreachable can't be quoted twice.
 
-## Hedging and kill switches
+## Risk
 
-Every 30 s, and after each `settled` fill, the bot sets the Hyperliquid perp per underlying to minus the option delta. Orders are IOC at mid ± 0.5 %, only when the gap is at least $50, and each at most `MAX_DELTA_USD` worth. If filled orders leave the position it reads back unchanged on two rebalances in a row (wrong `HL_ACCOUNT_ADDRESS`; one lagging read is tolerated), hedging stops and the `hedge` kill switch halts quoting until a restart. Without `HL_PRIVATE_KEY` the order is logged and a virtual position is tracked instead.
+The delta cap counts each position at:
 
 | Position | Delta per contract |
 |---|---|
@@ -94,11 +90,7 @@ Every 30 s, and after each `settled` fill, the bot sets the Hyperliquid perp per
 | short | minus the long's delta |
 | unsold pair | 0 (the collateral is USDC) |
 
-Quoting stops while:
-- two hedges in a row have failed (cleared by the next success);
-- hedged net delta or net vega is over its cap after a hedge.
-
-Stale data refuses each quote on its own. SIGINT/SIGTERM closes the relay socket and stops all timers; already-signed quotes stay valid until their deadline (25 s at most).
+SIGINT/SIGTERM closes the relay socket and stops all timers; already-signed quotes stay valid until their deadline (25 s at most).
 
 ## Market lister
 

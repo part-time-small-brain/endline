@@ -10,9 +10,7 @@
   },
   "dependencies": {
     "@endline/sdk": "workspace:*",
-    "@nktkas/hyperliquid": "^0.33.3",
     "near-api-js": "^7.3.1",
-    "viem": "^2.57.10",
     "ws": "^8.22.0",
     "zod": "^4.6.7"
   },

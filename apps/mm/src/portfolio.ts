@@ -7,7 +7,7 @@ export interface Book extends ContractConfig {
   series: Map<string, Series>;
 }
 
-export interface Exposure {
+interface Exposure {
   delta: number;
   vega: number;
 }

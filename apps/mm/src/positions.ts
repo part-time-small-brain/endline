@@ -1,20 +1,15 @@
 import type { Series } from "@endline/sdk";
 import { Chain } from "./chain.ts";
 import type { Config } from "./config.ts";
-import { createExchange } from "./hyperliquid.ts";
 import { Market } from "./market.ts";
 import { type Book, contracts, exposure, greeks, longAsset, seriesMark, shortAsset } from "./portfolio.ts";
 
 export async function positionsCommand(config: Config): Promise<void> {
   const chain = new Chain(config);
-  const [contract, underlyings, all, network] = await Promise.all([chain.contractConfig(), chain.underlyings(), chain.series(), chain.networkId()]);
+  const [contract, underlyings, all] = await Promise.all([chain.contractConfig(), chain.underlyings(), chain.series()]);
   const book: Book = { ...contract, optionsId: config.optionsId, series: new Map(all.map((s) => [s.id, s])) };
   const market = new Market();
-  const [balances, hedges] = await Promise.all([
-    chain.balances([book.quoteAsset, ...all.flatMap((s) => [longAsset(book, s.id), shortAsset(book, s.id)])]),
-    createExchange({ privateKey: config.hlPrivateKey, account: config.hlAccount, testnet: network !== "mainnet" }, console.log).positions(),
-    market.refresh(underlyings),
-  ]);
+  const [balances] = await Promise.all([chain.balances([book.quoteAsset, ...all.flatMap((s) => [longAsset(book, s.id), shortAsset(book, s.id)])]), market.refresh(underlyings)]);
   const now = Date.now();
   const mark = (s: Series) => seriesMark(market, book, s);
 
@@ -35,12 +30,8 @@ export async function positionsCommand(config: Config): Promise<void> {
   }
 
   const exposures = exposure(book, balances, mark, now);
-  if (!config.hlPrivateKey) console.log("hedging disabled (no HL_PRIVATE_KEY): perp positions shown as 0");
-  for (const coin of new Set([...exposures.keys(), ...hedges.keys()])) {
-    const options = exposures.get(coin) ?? { delta: 0, vega: 0 };
-    const perp = hedges.get(coin) ?? 0;
+  for (const [coin, options] of exposures) {
     const spot = market.spot(coin)?.price ?? Number.NaN;
-    const net = options.delta + perp;
-    console.log(`${coin}: options delta ${options.delta.toFixed(5)} perp ${perp} net ${net.toFixed(5)} ($${(net * spot).toFixed(0)}) vega $${options.vega.toFixed(2)}`);
+    console.log(`${coin}: delta ${options.delta.toFixed(5)} ($${(options.delta * spot).toFixed(0)}) vega $${options.vega.toFixed(2)}`);
   }
 }

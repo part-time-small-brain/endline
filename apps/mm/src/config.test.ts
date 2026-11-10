@@ -11,14 +11,13 @@ const ENV = {
 const STALE = { NEAR_RPC_URL: "https://rpc.stale.example", INTENTS_ID: "intents.stale.testnet", OPTIONS_ID: "opt.stale.testnet" };
 
 describe("config", () => {
-  it("turns vol points and bps into fractions", () => {
-    expect(loadConfig(ENV).settings).toMatchObject({ spreadVol: 0.02, hedgeFee: 0.00045 });
+  it("turns vol points into a fraction", () => {
+    expect(loadConfig(ENV).settings).toMatchObject({ spreadVol: 0.02 });
   });
 
   it.each([
     ["a missing network", { NETWORK_ID: undefined }],
     ["a key without the curve prefix", { MM_PRIVATE_KEY: "1".repeat(64) }],
-    ["a malformed Hyperliquid key", { HL_PRIVATE_KEY: "0x1234" }],
     ["a negative limit", { MAX_DELTA_USD: "-5" }],
     ["a non-numeric limit", { MAX_VEGA_USD: "lots" }],
     ["a trade cap too big to count in quote units", { MAX_TRADE_USD: "1e10" }],
