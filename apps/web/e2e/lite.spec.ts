@@ -561,3 +561,13 @@ test("pickers stay on screen with reduced motion while the ticket keeps updating
     await page.keyboard.press("Escape");
   }
 });
+
+test("the app header links to the docs on every page from tablet width up", async ({ page }) => {
+  await page.setViewportSize({ width: 768, height: 900 });
+  for (const path of ["/app", "/app/positions"]) {
+    await page.goto(path);
+    const docs = page.locator("header").first().getByRole("navigation", { name: "App", exact: true }).getByRole("link", { name: "Docs" });
+    await expect(docs).toBeVisible();
+    await expect(docs).toHaveAttribute("href", "/docs");
+  }
+});
