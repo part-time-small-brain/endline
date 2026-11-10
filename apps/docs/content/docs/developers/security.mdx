@@ -36,7 +36,7 @@ description: The rules every change keeps, what each actor can do, and the gaps 
 | Forged or stale OutLayer result | WASM pinned by sha256; private callback with capped read; a stale callback can't release a newer lock |
 | Missing price | Market stays pending. No fallback payout formula. `burn_pair` always works |
 | Settlement-window games | Writes and quotes stop at the TWAP window start |
-| Storage paid by the contract | New ledger rows from intents withdrawals are paid from the receiver's `storage_deposit` credit, other ledger transfers by the sender. The contract's intents row stays at zero, so writes never re-create it. Rows for failed deliveries and for refunds back to a sender are still the contract's, net zero over a full cycle |
+| Storage paid by the contract | New ledger rows from intents withdrawals are paid from the receiver's `storage_deposit` credit, other ledger transfers by the sender. A balance row that empties stays at zero, so a refund or a later deposit lands in a row its owner already paid for. Rows for failed deliveries are still the contract's |
 | Failed option delivery | Options stay in the contract's intents row and are recorded per owner; anyone can resend them with `retry_delivery`, so intents-only owners (EVM, passkey) never need to call the contract |
 | Double exercise | Ledger closes burn before paying; intents closes park tokens in the contract's intents balance |
 | Deleting a series someone is still owed on | `delete_series` only from 7 days after expiry, only when no holder could still be paid: the open longs, open shorts and pairs it counts pay 0 at the final price, bounded on their totals so per-holder rounding is covered. The refund goes to the creator and never exceeds the storage it frees or what was paid |
@@ -62,7 +62,7 @@ description: The rules every change keeps, what each actor can do, and the gaps 
 | Quote spam is bounded | Someone holding enough premium can keep a series' inventory reserved without trading |
 | Sessions aren't bound to this app | A session is an empty intents payload, accepted by any service using the same scheme |
 | Removed keys | A removed key keeps quoting until its session deadline (≤ 7 days). Trades still need a fresh signature checked by intents |
-| Withdraw with `msg` | A user-made panic in `mt_batch_transfer_call` on an intents `mt_withdraw` with `msg` can burn that user's own options. A receiver short of storage credit is not one of these: the call answers nothing used and intents refunds. Rows a refund empties are removed, and the next withdraw pays for them again. So anyone can spend a receiver's credit by withdrawing 1 unit to it with a `msg` its `mt_on_transfer` refuses, at about their own gas cost. No tokens are lost |
+| Withdraw with `msg` | A user-made panic in `mt_batch_transfer_call` on an intents `mt_withdraw` with `msg` can burn that user's own options. A receiver short of storage credit is not one of these: the call answers nothing used and intents refunds. |
 | Oracle trust | A whitelisted oracle account or the OutLayer operator can propose any positive price. The defence is the dispute window, the monitor and an owner override in time |
 | Oracle timeouts | The WASM has only a connect timeout. A hanging exchange can push a run past its limit, and someone retries |
 | Owner can stall settlement | With no oracle account and a WASM that never returns a price, markets stay pending and nothing pays out. `burn_pair` still works |

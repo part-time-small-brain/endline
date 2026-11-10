@@ -1969,3 +1969,118 @@ fn a_refund_that_bounces_is_reported_and_stays_in_the_contract() {
         json!({"account_id": "alice.near", "amount": "7"})
     );
 }
+
+#[test]
+fn a_refund_after_a_transfer_call_lands_in_a_row_the_sender_paid_for() {
+    let mut c = setup();
+    let id = create(&mut c, 110_000, W, OptionKind::Call);
+    write(&mut c, USDC_ASSET, W * USD, &id);
+    let a = alice();
+    let tokens = vec![id.clone(), short(&id)];
+    withdraw_from_intents(&mut c, a.clone(), &id, 1_000);
+    withdraw_from_intents(&mut c, a.clone(), &short(&id), 1_000);
+    let receiver = acc("dex.near");
+    ctx(a.clone(), T0, DEPOSIT);
+    let _ = c.mt_batch_transfer_call(
+        receiver.clone(),
+        tokens.clone(),
+        vec![U128(1_000), U128(1_000)],
+        None,
+        None,
+        "keep one".into(),
+    );
+    c.balances.flush();
+    callback_ctx(T0, PromiseResult::Successful(b"[\"999\",\"999\"]".to_vec()));
+    let before = near_sdk::env::storage_usage();
+    c.mt_resolve_transfer(
+        vec![a.clone(), a.clone()],
+        receiver.clone(),
+        tokens,
+        vec![U128(1_000), U128(1_000)],
+    );
+    c.balances.flush();
+    assert_eq!(near_sdk::env::storage_usage(), before);
+    assert_eq!((bal(&c, a, &id), bal(&c, receiver, &id)), (999, 1));
+}
+
+#[test]
+fn a_series_deleted_before_the_resolve_never_blocks_the_refund_of_the_others() {
+    let mut c = setup();
+    let live = create(&mut c, 110_000, W, OptionKind::Call);
+    let dead = create(&mut c, 120_000, W, OptionKind::Call);
+    write(&mut c, USDC_ASSET, W * USD, &live);
+    write(&mut c, USDC_ASSET, W * USD, &dead);
+    withdraw_from_intents(&mut c, alice(), &live, BTC / 2);
+    withdraw_from_intents(&mut c, alice(), &dead, BTC / 2);
+    let now = settle(&mut c, 116_000);
+    close(&mut c, now, &dead, 0, BTC);
+    let dex = acc("dex.near");
+    ctx(alice(), DELETE_AT, 10u128.pow(24));
+    let _ = c.mt_batch_transfer_call(
+        dex.clone(),
+        vec![live.clone(), dead.clone()],
+        vec![U128(BTC / 2), U128(BTC / 2)],
+        None,
+        None,
+        "swap".into(),
+    );
+    ctx(acc("bob.near"), DELETE_AT, 0);
+    assert_eq!(c.delete_series(vec![dead.clone()]), vec![dead.clone()]);
+    callback_ctx(DELETE_AT, PromiseResult::Failed);
+    let used = c.mt_resolve_transfer(
+        vec![alice(), alice()],
+        dex.clone(),
+        vec![live.clone(), dead],
+        vec![U128(BTC / 2), U128(BTC / 2)],
+    );
+    assert_eq!(used, vec![U128(0), U128(BTC / 2)]);
+    assert_eq!((bal(&c, alice(), &live), bal(&c, dex, &live)), (BTC / 2, 0));
+}
+
+#[test]
+fn undelivered_options_of_a_deleted_series_are_never_deposited_into_intents() {
+    let mut c = setup();
+    let id = create(&mut c, 110_000, W, OptionKind::Call);
+    write(&mut c, USDC_ASSET, W * USD, &id);
+    delivered(&mut c, &id, PromiseResult::Failed);
+    ctx(acc("bob.near"), T0, 1);
+    c.retry_delivery(alice(), vec![id.clone()]);
+    callback_ctx(T0, PromiseResult::Successful(b"[\"0\"]".to_vec()));
+    c.on_options_delivered(alice(), vec![id.clone()], vec![U128(BTC)]);
+    let now = settle(&mut c, 130_000);
+    close(&mut c, now, &id, BTC, 0);
+    ctx(acc("bob.near"), DELETE_AT, 0);
+    assert_eq!(c.delete_series(vec![id.clone()]), vec![id.clone()]);
+    ctx(acc("bob.near"), DELETE_AT, 1);
+    panics_with("unknown token", || c.retry_delivery(alice(), vec![short(&id)]));
+    assert_eq!(c.get_undelivered(alice(), short(&id)).0, BTC);
+}
+
+#[test]
+fn an_undo_for_short_storage_credit_never_removes_a_row_a_pending_refund_needs() {
+    let mut c = setup();
+    let id = create(&mut c, 110_000, W, OptionKind::Call);
+    write(&mut c, USDC_ASSET, W * USD, &id);
+    let (bob, carol, dex) = (acc("bob.near"), acc("carol.near"), acc("dex.near"));
+    withdraw_from_intents(&mut c, bob.clone(), &id, 1_000);
+    ctx(bob, T0, DEPOSIT);
+    c.mt_transfer(carol.clone(), id.clone(), U128(1_000), None, None);
+    ctx(carol.clone(), T0, DEPOSIT);
+    let _ = c.mt_transfer_call(dex.clone(), id.clone(), U128(1_000), None, None, "x".into());
+    ctx(intents(), T0, 1);
+    let _ = c.mt_batch_transfer_call(
+        carol.clone(),
+        vec![id.clone(), short(&id)],
+        vec![U128(1), U128(1)],
+        None,
+        None,
+        "y".into(),
+    );
+    c.balances.flush();
+    callback_ctx(T0, PromiseResult::Failed);
+    let before = near_sdk::env::storage_usage();
+    c.mt_resolve_transfer(vec![carol.clone()], dex, vec![id.clone()], vec![U128(1_000)]);
+    c.balances.flush();
+    assert_eq!(near_sdk::env::storage_usage(), before);
+    assert_eq!(bal(&c, carol, &id), 1_000);
+}
