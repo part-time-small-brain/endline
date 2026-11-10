@@ -71,7 +71,8 @@ it("alerts an unverifiable proposal when Deribit is down and keeps posting after
   expect(alerts[0]).toContain("no Deribit reference");
   expect(alerts[1]).toContain("1.000 NEAR above storage");
   expect(hooks).toHaveLength(2);
-  expect(hooks[1]).toEqual({ text: alerts[1], content: alerts[1] });
+  const message = "🔴 testnet · Options contract low on NEAR\nopt.testnet: 1.000 NEAR above storage, below the 2.000 NEAR reserve. Top it up";
+  expect(hooks[1]).toEqual({ text: message, content: message });
 });
 
 function ticks(n: number, config = CONFIG) {
@@ -89,7 +90,7 @@ function webhook(down: boolean[] = []) {
       if (url.includes("deribit")) return new Response("", { status: 503 });
       const { text } = JSON.parse(String(init?.body));
       const failed = down[sleep.mock.calls.length] ?? false;
-      posted.push(`${failed ? "failed" : "ok"} ${text.split(":")[0]}`);
+      posted.push(`${failed ? "failed" : "ok"} ${text.split("\n")[0]}`);
       return new Response("", { status: failed ? 502 : 200 });
     }),
   );
@@ -103,7 +104,8 @@ it("says a flagged price went final instead of calling it resolved", async () =>
   vi.spyOn(Date, "now").mockImplementation(() => (NOW_SEC + 60 * sleep.mock.calls.length) * 1000);
   const posted = webhook();
   await ticks(3);
-  expect(posted).toEqual([`ok ALERT BTC ${new Date(EXPIRY * 1000).toISOString().split(":")[0]}`, `ok FINAL settle BTC ${EXPIRY}`]);
+  const title = `Can't check the settlement price for BTC ${new Date(EXPIRY * 1000).toISOString().slice(0, 16).replace("T", " ")} UTC`;
+  expect(posted).toEqual([`ok 🔴 testnet · ${title}`, `ok ⚠️ testnet · Final: ${title}`]);
 });
 
 it("never resolves an alert that cleared before any post of it got through", async () => {
@@ -113,7 +115,7 @@ it("never resolves an alert that cleared before any post of it got through", asy
   chain.nearBalance.mockImplementation(async (accountId: string) => ({ amount: accountId === "relayer.testnet" ? relayer[sleep.mock.calls.length] : 10n * NEAR, storageUsage: 0 }));
   const posted = webhook([true]);
   await ticks(3);
-  expect(posted).toEqual(["failed ALERT relayer.testnet"]);
+  expect(posted).toEqual(["failed 🔴 testnet · Relayer low on NEAR"]);
 });
 
 it("retries an alert and its resolution until the webhook takes them, and posts each once", async () => {
@@ -123,7 +125,45 @@ it("retries an alert and its resolution until the webhook takes them, and posts 
   chain.nearBalance.mockImplementation(async (accountId: string) => ({ amount: accountId === "relayer.testnet" ? relayer[sleep.mock.calls.length] : 10n * NEAR, storageUsage: 0 }));
   const posted = webhook([true, false, false, true]);
   await ticks(relayer.length);
-  expect(posted).toEqual(["failed ALERT relayer.testnet", "ok ALERT relayer.testnet", "failed RESOLVED reserve relayer.testnet", "ok RESOLVED reserve relayer.testnet"]);
+  expect(posted).toEqual(["failed 🔴 testnet · Relayer low on NEAR", "ok 🔴 testnet · Relayer low on NEAR", "failed ✅ testnet · Resolved: Relayer low on NEAR", "ok ✅ testnet · Resolved: Relayer low on NEAR"]);
+});
+
+it("threads a resolution under its Telegram alert and says how long it lasted", async () => {
+  vi.spyOn(console, "log").mockImplementation(() => {});
+  chain.series.mockResolvedValue([]);
+  const relayer = [NEAR, NEAR, 10n * NEAR];
+  chain.nearBalance.mockImplementation(async (accountId: string) => ({ amount: accountId === "relayer.testnet" ? relayer[sleep.mock.calls.length] : 10n * NEAR, storageUsage: 0 }));
+  vi.spyOn(Date, "now").mockImplementation(() => (NOW_SEC + 47 * 60 * sleep.mock.calls.length) * 1000);
+  const bodies: Record<string, unknown>[] = [];
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (_url: string, init?: RequestInit) => {
+      bodies.push(JSON.parse(String(init?.body)));
+      return Response.json({ ok: true, result: { message_id: 40 + bodies.length } });
+    }),
+  );
+  await ticks(relayer.length);
+  expect(bodies).toEqual([
+    expect.not.objectContaining({ reply_parameters: expect.anything() }),
+    expect.objectContaining({ text: "✅ testnet · Resolved: Relayer low on NEAR\nLasted 1 h 34 min", reply_parameters: { message_id: 41, allow_sending_without_reply: true } }),
+  ]);
+});
+
+it("never adds reply_parameters for a webhook that returns no message id, like Slack or Discord", async () => {
+  vi.spyOn(console, "log").mockImplementation(() => {});
+  chain.series.mockResolvedValue([]);
+  const relayer = [NEAR, 10n * NEAR];
+  chain.nearBalance.mockImplementation(async (accountId: string) => ({ amount: accountId === "relayer.testnet" ? relayer[sleep.mock.calls.length] : 10n * NEAR, storageUsage: 0 }));
+  const bodies: Record<string, unknown>[] = [];
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (_url: string, init?: RequestInit) => {
+      bodies.push(JSON.parse(String(init?.body)));
+      return new Response("ok", { status: 200 });
+    }),
+  );
+  await ticks(relayer.length);
+  expect(bodies.map((b) => Object.keys(b))).toEqual([["text", "content"], ["text", "content"]]);
 });
 
 it("skips Deribit for an unsettled expiry inside the oracle window", async () => {
@@ -171,11 +211,11 @@ it("alerts the intents contract below 2 NEAR over storage and the relayer below 
     return log.mock.calls.map(([line]) => String(line)).filter((line) => line.startsWith("ALERT"));
   };
 
-  expect(await alerts()).toEqual([expect.stringContaining("ALERT relayer.testnet: ")]);
+  expect(await alerts()).toEqual([expect.stringContaining("ALERT [testnet] Relayer low on NEAR: relayer.testnet: ")]);
   balances["intents.testnet"] = { amount: NEAR + 2n * NEAR - 1n, storageUsage: 100_000 };
-  expect(await alerts()).toEqual([expect.stringContaining("ALERT intents.testnet: "), expect.stringContaining("ALERT relayer.testnet: ")]);
+  expect(await alerts()).toEqual([expect.stringContaining("ALERT [testnet] Intents contract low on NEAR: intents.testnet: "), expect.stringContaining("ALERT [testnet] Relayer low on NEAR: relayer.testnet: ")]);
   chain.nearBalance.mockClear();
-  expect(await alerts({ ...CONFIG, relayerId: undefined })).toEqual([expect.stringContaining("ALERT intents.testnet: ")]);
+  expect(await alerts({ ...CONFIG, relayerId: undefined })).toEqual([expect.stringContaining("ALERT [testnet] Intents contract low on NEAR: intents.testnet: ")]);
   expect(chain.nearBalance.mock.calls.map(([id]) => id)).toEqual(["opt.testnet", "intents.testnet"]);
 });
 
@@ -186,7 +226,7 @@ it("alerts the market maker running out of NEAR for gas once its account is set"
   await monitorCommand({ ...CONFIG, webhookUrl: undefined }, true);
   expect(log.mock.calls.map(([line]) => String(line)).filter((line) => line.startsWith("ALERT"))).toEqual([]);
   await monitorCommand({ ...CONFIG, mmId: "mm.testnet", webhookUrl: undefined }, true);
-  expect(log.mock.calls.map(([line]) => String(line)).filter((line) => line.startsWith("ALERT"))).toEqual([expect.stringContaining("ALERT mm.testnet: 0.100 NEAR above storage")]);
+  expect(log.mock.calls.map(([line]) => String(line)).filter((line) => line.startsWith("ALERT"))).toEqual([expect.stringContaining("ALERT [testnet] Market maker low on NEAR: mm.testnet: 0.100 NEAR above storage")]);
 });
 
 it("keeps settlement alerts flowing when one reserve account can't be read", async () => {
@@ -213,14 +253,14 @@ it("alerts each pending oracle, WASM and owner change once, holds them through a
   chain.pendingChanges.mockImplementation(async () => pending[sleep.mock.calls.length] ?? Promise.reject(new Error("RPC timeout")));
   webhook();
   await ticks(pending.length);
-  const at = new Date(activeAt * 1000).toISOString();
+  const at = `${new Date(activeAt * 1000).toISOString().slice(0, 16).replace("T", " ")} UTC`;
   expect(log.mock.calls.map(([line]) => String(line)).filter((line) => !line.startsWith("monitor:"))).toEqual([
-    `ALERT opt.testnet: oracle evil.testnet pending, active at ${at}`,
-    `ALERT opt.testnet: oracle WASM ${"ab".repeat(32)} (https://x/oracle.wasm, outlayer.testnet) pending, active at ${at}`,
-    "ALERT opt.testnet: owner dao.testnet pending, takes over when it calls accept_owner",
-    `RESOLVED pending oracle evil.testnet ${activeAt}`,
-    `RESOLVED pending wasm ${"ab".repeat(32)} ${activeAt}`,
-    "RESOLVED pending owner dao.testnet",
+    `ALERT [testnet] New oracle pending: opt.testnet: oracle evil.testnet pending, active at ${at}`,
+    `ALERT [testnet] New oracle WASM pending: opt.testnet: oracle WASM ${"ab".repeat(32)} (https://x/oracle.wasm, outlayer.testnet) pending, active at ${at}`,
+    "ALERT [testnet] New contract owner pending: opt.testnet: owner dao.testnet pending, takes over when it calls accept_owner",
+    "RESOLVED [testnet] New oracle pending, after 0 min",
+    "RESOLVED [testnet] New oracle WASM pending, after 0 min",
+    "RESOLVED [testnet] New contract owner pending, after 0 min",
   ]);
 });
 
@@ -233,7 +273,7 @@ it("keeps settlement alerts flowing when pending changes can't be read", async (
   await monitorCommand({ ...CONFIG, webhookUrl: undefined }, true);
   expect(log.mock.calls.map(([line]) => String(line)).filter((line) => line.startsWith("ALERT"))).toEqual([
     expect.stringContaining("no Deribit reference"),
-    "ALERT opt.testnet: can't read pending changes: Error: RPC timeout",
+    "ALERT [testnet] Can't read pending admin changes: opt.testnet: can't read pending changes: Error: RPC timeout",
   ]);
 });
 
@@ -266,17 +306,17 @@ it.each([
 ])("alerts the stack down once on %s and resolves it when /health is ok with a market maker", async (_, down) => {
   const { posted, run } = stack([down, down, healthy(1)]);
   await run();
-  expect(posted).toEqual([expect.stringMatching(/^ALERT http:\/\/web\/health: down: /), "RESOLVED uptime"]);
+  expect(posted).toEqual([expect.stringMatching(/^🔴 testnet · Relay down\nhttp:\/\/web\/health: /), "✅ testnet · Resolved: Relay down\nLasted 0 min"]);
 });
 
 it("alerts no market maker on its own, keeps it open while the stack is down, and resolves uptime when the relay is back and quotes when an MM connects", async () => {
   const { posted, run } = stack([healthy(0), async () => new Response("", { status: 502 }), healthy(0), healthy(1)]);
   await run();
   expect(posted).toEqual([
-    "ALERT http://web/health: no market maker connected, nobody gets a quote. Check the mm service",
-    "ALERT http://web/health: down: Error: HTTP 502",
-    "RESOLVED uptime",
-    "RESOLVED quotes",
+    "🔴 testnet · No market maker connected\nhttp://web/health: nobody gets a quote. Check the mm service",
+    "🔴 testnet · Relay down\nhttp://web/health: Error: HTTP 502",
+    "✅ testnet · Resolved: Relay down\nLasted 0 min",
+    "✅ testnet · Resolved: No market maker connected\nLasted 0 min",
   ]);
 });
 
@@ -289,12 +329,12 @@ it("alerts a connected market maker that prices nothing, holds it through an out
   );
   await run();
   expect(posted).toEqual([
-    "ALERT http://web/marks: a market maker is connected but prices nothing. Check the lister's log, Deribit, and the MM's USDC and NEAR",
-    "ALERT http://web/health: down: Error: HTTP 502",
-    "ALERT http://web/health: no market maker connected, nobody gets a quote. Check the mm service",
-    "RESOLVED uptime",
-    "RESOLVED quotes",
-    "RESOLVED priced",
+    "🔴 testnet · Market maker prices nothing\nhttp://web/marks: a market maker is connected but prices nothing. Check the lister's log, Deribit, and the MM's USDC and NEAR",
+    "🔴 testnet · Relay down\nhttp://web/health: Error: HTTP 502",
+    "🔴 testnet · No market maker connected\nhttp://web/health: nobody gets a quote. Check the mm service",
+    "✅ testnet · Resolved: Relay down\nLasted 0 min",
+    "✅ testnet · Resolved: No market maker connected\nLasted 0 min",
+    "✅ testnet · Resolved: Market maker prices nothing\nLasted 0 min",
   ]);
 });
 
@@ -310,5 +350,5 @@ it("alerts the stack down when /health hangs past the 5 s timeout", async () => 
   vi.stubGlobal("fetch", vi.fn((_url: string, init?: RequestInit) => new Promise((_, reject) => init?.signal?.addEventListener("abort", () => reject(init.signal?.reason)))));
   await monitorCommand({ ...CONFIG, healthUrl: HEALTH_URL, webhookUrl: undefined }, true);
   expect(timeout).toHaveBeenCalledExactlyOnceWith(5_000);
-  expect(log).toHaveBeenCalledWith("ALERT http://web/health: down: TimeoutError: The operation was aborted due to timeout");
+  expect(log).toHaveBeenCalledWith("ALERT [testnet] Relay down: http://web/health: TimeoutError: The operation was aborted due to timeout");
 });

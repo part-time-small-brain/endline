@@ -6,6 +6,7 @@ const YOCTO_PER_BYTE = 10n ** 19n;
 
 export interface Alert {
   key: string;
+  title: string;
   text: string;
 }
 
@@ -28,7 +29,7 @@ export function settlementAlert(c: Contract, s: ExpiryState, nowSec: number): Al
   if (!s.settlement) {
     if (nowSec < s.expiry + c.oracleWindowSec) return undefined;
     const propose = nearCall(c, "propose_settlement", args, "1 yoctoNEAR", c.oracles[0] ?? "<oracle>");
-    return { key: `missing ${s.underlying} ${s.expiry}`, text: `${name}: no settlement after the oracle window, ${reference}. Propose: ${propose}` };
+    return { key: `missing ${s.underlying} ${s.expiry}`, title: `No settlement price for ${name}`, text: `${name}: no settlement after the oracle window, ${reference}. Propose: ${propose}` };
   }
   if (nowSec >= s.settlement.final_at) return undefined;
   const proposed = Number(s.settlement.price) / 10 ** c.quoteDecimals;
@@ -38,24 +39,25 @@ export function settlementAlert(c: Contract, s: ExpiryState, nowSec: number): Al
   const override = nearCall(c, "override_settlement", args, "1 yoctoNEAR", c.ownerId);
   return {
     key: `settle ${s.underlying} ${s.expiry}`,
+    title: off === undefined ? `Can't check the settlement price for ${name}` : `Settlement price for ${name} looks wrong`,
     text: `${name}: proposed ${proposed.toFixed(2)} by ${s.settlement.proposed_by}, ${reference}${gap}, final at ${iso(s.settlement.final_at)}. Override: ${override}`,
   };
 }
 
-export function reserveAlert(accountId: string, amount: bigint, storageUsage: number): Alert | undefined {
+export function reserveAlert(role: string, accountId: string, amount: bigint, storageUsage: number): Alert | undefined {
   const free = amount - BigInt(storageUsage) * YOCTO_PER_BYTE;
   if (free >= MIN_RESERVE_YOCTO) return undefined;
-  return { key: `reserve ${accountId}`, text: `${accountId}: ${toNear(free)} NEAR above storage, below the ${toNear(MIN_RESERVE_YOCTO)} NEAR reserve. Top it up` };
+  return { key: `reserve ${accountId}`, title: `${role} low on NEAR`, text: `${accountId}: ${toNear(free)} NEAR above storage, below the ${toNear(MIN_RESERVE_YOCTO)} NEAR reserve. Top it up` };
 }
 
 export function pendingAlerts(optionsId: string, p: PendingChanges): Alert[] {
-  const alerts = p.oracles.map(([id, activeAt]) => ({ key: `pending oracle ${id} ${activeAt}`, text: `${optionsId}: oracle ${id} pending, active at ${iso(activeAt)}` }));
+  const alerts = p.oracles.map(([id, activeAt]) => ({ key: `pending oracle ${id} ${activeAt}`, title: "New oracle pending", text: `${optionsId}: oracle ${id} pending, active at ${iso(activeAt)}` }));
   if (p.oracle_wasm) {
     const { oracle_wasm: w, active_at } = p.oracle_wasm;
-    alerts.push({ key: `pending wasm ${w.sha256} ${active_at}`, text: `${optionsId}: oracle WASM ${w.sha256} (${w.url}, ${w.outlayer_id}) pending, active at ${iso(active_at)}` });
+    alerts.push({ key: `pending wasm ${w.sha256} ${active_at}`, title: "New oracle WASM pending", text: `${optionsId}: oracle WASM ${w.sha256} (${w.url}, ${w.outlayer_id}) pending, active at ${iso(active_at)}` });
   }
   if (p.pending_owner_id) {
-    alerts.push({ key: `pending owner ${p.pending_owner_id}`, text: `${optionsId}: owner ${p.pending_owner_id} pending, takes over when it calls accept_owner` });
+    alerts.push({ key: `pending owner ${p.pending_owner_id}`, title: "New contract owner pending", text: `${optionsId}: owner ${p.pending_owner_id} pending, takes over when it calls accept_owner` });
   }
   return alerts;
 }
@@ -74,7 +76,7 @@ function toNear(yocto: bigint): string {
 }
 
 function iso(unixSec: number): string {
-  return new Date(unixSec * 1000).toISOString();
+  return `${new Date(unixSec * 1000).toISOString().slice(0, 16).replace("T", " ")} UTC`;
 }
 
 function nearCall(c: Contract, method: string, args: object, deposit: string, signer: string): string {
