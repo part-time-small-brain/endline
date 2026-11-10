@@ -1,37 +1,10 @@
 import type { CDPSession, Page } from "@playwright/test";
-import { expect, handleOf, money, openPopover, sideways, test } from "./fixtures.ts";
+import { canvasPixels, expect, handleOf, money, openPopover, sideways, test, tintOf } from "./fixtures.ts";
 
 const hero = (page: Page) => page.getByRole("region", { name: "Pick a side of the line." });
 const ready = (page: Page) => expect(hero(page).getByLabel("Maximum payout")).toHaveText(/^\$[\d,.]+$/);
 
-async function pixels(page: Page, x: number, y: number, width: number, height: number) {
-  return hero(page)
-    .locator("canvas")
-    .evaluate(
-      (canvas: HTMLCanvasElement, area) => {
-        const box = canvas.getBoundingClientRect();
-        const scale = canvas.width / box.width;
-        const copy = document.createElement("canvas");
-        copy.width = area.width * scale;
-        copy.height = area.height * scale;
-        const ctx = copy.getContext("2d", { willReadFrequently: true }) as CanvasRenderingContext2D;
-        ctx.drawImage(canvas, (area.x - box.left) * scale, (area.y - box.top) * scale, copy.width, copy.height, 0, 0, copy.width, copy.height);
-        return Array.from(ctx.getImageData(0, 0, copy.width, copy.height).data);
-      },
-      { x, y, width, height },
-    );
-}
-
-function tintOf(data: number[]) {
-  let up = 0;
-  let down = 0;
-  for (let i = 0; i < data.length; i += 4) {
-    const [r = 0, g = 0, , a = 0] = data.slice(i, i + 4);
-    if (a > 64 && g - r > 60) up++;
-    if (a > 64 && r - g > 60) down++;
-  }
-  return up && down ? "mixed" : up ? "up" : down ? "down" : "none";
-}
+const pixels = (page: Page, x: number, y: number, width: number, height: number) => canvasPixels(hero(page).locator("canvas"), x, y, width, height);
 
 async function tints(page: Page, x: number, y: number) {
   return { above: tintOf(await pixels(page, x - 30, y - 30, 60, 24)), below: tintOf(await pixels(page, x - 30, y + 6, 60, 24)) };

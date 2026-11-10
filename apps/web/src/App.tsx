@@ -4,6 +4,7 @@ import { useApp } from "./app/context.ts";
 import { useData } from "./app/data.tsx";
 import { Link, navigate, usePathname } from "./app/router.tsx";
 import { usePositions } from "./app/usePositions.ts";
+import { AppDots } from "./components/AppDots.tsx";
 import { CollectBanner } from "./components/CollectBanner.tsx";
 import { ConnectSheet } from "./components/ConnectSheet.tsx";
 import { DepositSheet } from "./components/deposit/DepositSheet.tsx";
@@ -64,6 +65,7 @@ function Shell({ route, onConnect, onAddFunds, onQuote }: {
         </div>
       )}
       <main className="flex min-h-0 flex-1 flex-col">
+        {route !== "trade" && <AppDots up />}
         {route === "trade" && <Trade mode={mode} nowSec={nowSec} views={views} onConnect={onConnect} onAddFunds={onAddFunds} onQuote={onQuote} />}
         {route === "positions" && (
           <div className="mx-auto w-full max-w-2xl px-4 pt-3 pb-10 lg:px-6 lg:pt-6">
