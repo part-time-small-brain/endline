@@ -25,7 +25,7 @@ export interface Target {
   usd: number;
 }
 
-export interface Write {
+interface Write {
   id: string;
   collateral: bigint;
 }
@@ -36,7 +36,7 @@ export interface Holding {
   short: bigint;
 }
 
-export interface Close {
+interface Close {
   id: string;
   amount: bigint;
 }

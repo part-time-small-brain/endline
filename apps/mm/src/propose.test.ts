@@ -2,7 +2,6 @@ import { createHash } from "node:crypto";
 import { EventEmitter } from "node:events";
 import { writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
 import { PassThrough } from "node:stream";
 import type { Series } from "@endline/sdk";
 import { afterEach, describe, expect, it, vi } from "vitest";

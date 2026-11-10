@@ -15,7 +15,7 @@ export interface Desk {
   inventory: Inventory;
 }
 
-export type Decision = { ok: true; premium: bigint; diff: Diff; deadlineMs: number } | { ok: false; reason: string };
+type Decision = { ok: true; premium: bigint; diff: Diff; deadlineMs: number } | { ok: false; reason: string };
 
 const reject = (reason: string) => ({ ok: false, reason }) as const;
 

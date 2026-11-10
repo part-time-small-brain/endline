@@ -17,7 +17,6 @@ export function contractPrice(book: Book, series: Series, mark: SeriesMark, s: S
   const years = (series.expiry * 1000 - now) / YEAR_MS;
   const theo = (vol: number, capVol: number) =>
     capped(series.kind, mark.forward, strikeUsd(book, series), width, Math.max(vol, MIN_VOL), Math.max(capVol, MIN_VOL), years);
-  const mid = theo(mark.vol, mark.capVol);
   const shocks = [[1, 1], [-1, -1], [SKEW_SHOCK, -SKEW_SHOCK], [-SKEW_SHOCK, SKEW_SHOCK]] as const;
   const prices = shocks.map(([near, far]) => theo(mark.vol + near * s.spreadVol, mark.capVol + far * s.spreadVol).price);
   const carry = width * s.carryQuote * years;
