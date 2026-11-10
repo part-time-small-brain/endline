@@ -1,4 +1,4 @@
-import { ChartLine, Plus, SignOut, Stack, Wallet } from "@phosphor-icons/react";
+import { BookOpen, ChartLine, Plus, SignOut, Stack, Wallet } from "@phosphor-icons/react";
 import { useApp } from "../app/context.ts";
 import { useData } from "../app/data.tsx";
 import { Link } from "../app/router.tsx";
@@ -61,6 +61,13 @@ export function Header({ route, open, toCollect, onConnect, onAddFunds }: Props)
             {href === config.paths.positions && badge}
           </Link>
         ))}
+        <a
+          href="/docs"
+          className="relative hidden h-11 items-center gap-2 border-y-2 border-y-transparent px-1 sm:inline-flex font-mono text-xs font-semibold tracking-[0.06em] text-ink-2 uppercase transition-colors duration-150 hover:text-ink"
+        >
+          <BookOpen size={18} aria-hidden="true" />
+          <span className="sr-only lg:not-sr-only">Docs</span>
+        </a>
       </nav>
       {route === "trade" && (
         <div aria-label="Trade view" role="group" className="flex shrink-0 grow rounded-xl ring-1 ring-ink/20 ring-inset sm:grow-0">
