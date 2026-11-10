@@ -3,6 +3,7 @@ import type { PendingChanges, ProposedSettlement, SettlementTerms } from "./chai
 const MAX_DEV_BPS = 20;
 const MIN_RESERVE_YOCTO = 2n * 10n ** 24n;
 const YOCTO_PER_BYTE = 10n ** 19n;
+const KRAKEN_HISTORY_SEC = 11 * 3_600;
 
 export interface Alert {
   key: string;
@@ -29,7 +30,9 @@ export function settlementAlert(c: Contract, s: ExpiryState, nowSec: number): Al
   if (!s.settlement) {
     if (nowSec < s.expiry + c.oracleWindowSec) return undefined;
     const propose = nearCall(c, "propose_settlement", args, "1 yoctoNEAR", c.oracles[0] ?? "<oracle>");
-    return { key: `missing ${s.underlying} ${s.expiry}`, title: `No settlement price for ${name}`, text: `${name}: no settlement after the oracle window, ${reference}. Propose: ${propose}` };
+    const example = (7_478_491n * 10n ** BigInt(c.quoteDecimals)) / 100n;
+    const how = `Run the pinned WASM before ${iso(s.expiry + KRAKEN_HISTORY_SEC)}, Kraken keeps only 12 h of candles. Price in quote units, ${c.quoteDecimals} decimals ($74,784.91 = ${example})`;
+    return { key: `missing ${s.underlying} ${s.expiry}`, title: `No settlement price for ${name}`, text: `${name}: no settlement after the oracle window, ${reference}. ${how}. Propose: ${propose}` };
   }
   if (nowSec >= s.settlement.final_at) return undefined;
   const proposed = Number(s.settlement.price) / 10 ** c.quoteDecimals;

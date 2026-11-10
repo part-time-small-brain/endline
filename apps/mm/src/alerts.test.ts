@@ -63,6 +63,12 @@ describe("settlementAlert", () => {
     expect(alert?.text).toContain(`propose_settlement json-args '{"underlying":"BTC","expiry":${EXPIRY},"price":"<price>"}' prepaid-gas '30 Tgas' attached-deposit '1 yoctoNEAR' sign-as oracle.testnet`);
   });
 
+  it("tells the proposer the deadline to reproduce the price with all venues, and its units", () => {
+    const text = check(null, 80_000, { nowSec: EXPIRY + 600 })?.text;
+    expect(text).toContain(`Run the pinned WASM before ${new Date((EXPIRY + 11 * 3_600) * 1000).toISOString().slice(0, 16).replace("T", " ")} UTC`);
+    expect(text).toContain("6 decimals ($74,784.91 = 74784910000)");
+  });
+
   it("still asks for a manual proposal with no reference and no oracle account", () => {
     const text = check(null, undefined, { nowSec: EXPIRY + 10_000, contract: { ...CONTRACT, oracles: [] } })?.text;
     expect(text).toContain(`"price":"<price>"`);
