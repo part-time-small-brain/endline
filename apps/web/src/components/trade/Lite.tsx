@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import type { useTicket } from "../../app/useTicket.ts";
 import { assetName } from "../../lib/labels.ts";
 import { formatChance, formatMultiple, formatPct, formatPrice, formatUsd, toNumber, toUnits } from "../../lib/money.ts";
-import { payoutMultiple } from "../../lib/ticket.ts";
+import { capNote, payoutMultiple } from "../../lib/ticket.ts";
 import { dayLabel, formatClock, formatUtc } from "../../lib/time.ts";
 import { Brackets } from "../Brackets.tsx";
 import { pickWithArrows } from "../Chips.tsx";
@@ -44,6 +44,7 @@ export function Lite({ state, nowSec, action, stickyAction }: Props) {
   const valid = current && current.size > 0n;
   const payout = valid ? maxPayout(current.terms, current.size) : undefined;
   const multiple = valid ? payoutMultiple(current) : undefined;
+  const note = current && capNote(current, budget, quoteDecimals);
   const strike = series ? BigInt(series.strike) : undefined;
   const pinned = stickyAction ? "[@media(min-height:44rem)]:scroll-mb-40" : "";
   const chip = `relative inline-flex min-h-11 max-w-full items-center gap-[0.25em] rounded-md border px-[0.4em] py-[0.08em] align-middle leading-tight font-semibold transition-colors ${pinned} ${legend}`;
@@ -271,6 +272,7 @@ export function Lite({ state, nowSec, action, stickyAction }: Props) {
             )}
           </dl>
           {!(series && current) && <p role="status" className="mt-3 text-sm text-ink-2">{empty}</p>}
+          {note && <p className="mt-3 text-sm text-ink-2">{note}</p>}
         </div>
 
         <div className={`mt-3 border-t border-rule pt-3.5 ${stickyAction ? "bottom-0 z-10 -mx-4 bg-page/95 px-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] backdrop-blur-md sm:mx-0 sm:px-0 [@media(min-height:44rem)]:sticky" : ""}`}>

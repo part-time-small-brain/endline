@@ -35,7 +35,7 @@ Read from the process environment (no `.env` loading).
 |---|---|
 | `GET /health` | `{ok, market_makers}` |
 | `GET /series` | `{quote_asset, quote_decimals, series: [Series + option_asset + quotable]}`. `quotable` is false from `expiry − timing.write_cutoff_sec`, and for a width other than the lister's (`listedWidth` in the SDK), since anyone can create the same strike with another width and no market maker stocks it. Only series that expired less than 7 days ago or later (`CLAIM_WINDOW_SEC`, also the auto-collect deadline) |
-| `GET /marks` | `[{series_id, ask, bid?, vol}]` per series: the lowest ask (with that MM's `vol`) and highest bid across connected MMs, from marks received in the last 10 s. An MM's marks go when it disconnects ([Relay API](https://docs.endline.trade/developers/relay-api)) |
+| `GET /marks` | `[{series_id, ask, bid?, max_size, vol}]` per series: the lowest ask (with that MM's `vol` and `max_size`) and highest bid across connected MMs, from marks received in the last 10 s. An MM's marks go when it disconnects ([Relay API](https://docs.endline.trade/developers/relay-api)) |
 | `POST /quote` | `QuoteRequest` (with a signed `session`) → `Quote`. A buy must be at least the underlying's `min_write` (smaller sizes can't be collected gaslessly); sells of any size. A new quote expires the signer's earlier unsigned one; their quotes in auction or settling must fit their intents balance ([Relay API](https://docs.endline.trade/developers/relay-api#open-quotes)) |
 | `POST /publish` | `PublishRequest` → `StatusUpdate` (200 settled, 422 failed) |
 | `GET /status/:quote_id` | `StatusUpdate`. `expired` from `sign_by_ms`; forgotten after an hour (then `404`) |
@@ -74,7 +74,7 @@ Both take only an exercise, exactly as the SDK's `exerciseOptions` builds and `t
 |---|---|
 | Relay → MM | `{"method":"quote","params":QuoteEvent}`. `side` is the user's side. `deadline_ms` is when the auction closes; later answers are dropped |
 | MM → relay | `{"method":"quote_response","params":{quote_id, premium, signed}}`. One answer per quote per connection |
-| MM → relay | `{"method":"marks","params":[{series_id, ask, bid?, vol}]}`. Replaces that MM's previous marks ([Relay API](https://docs.endline.trade/developers/relay-api)) |
+| MM → relay | `{"method":"marks","params":[{series_id, ask, bid?, max_size, vol}]}`. Replaces that MM's previous marks ([Relay API](https://docs.endline.trade/developers/relay-api)) |
 | Relay → MM | `{"method":"quote_status","params":StatusUpdate}` to the winner after a publish (`settled` with `tx_hash`, or `failed` with `reason`), or `expired` at `sign_by_ms` if the user never published, when the same signer asks for a new quote, or right after the auction if the user's balance no longer covers the quote |
 
 Which answers count and who wins: [Relay API](https://docs.endline.trade/developers/relay-api#a-trade).

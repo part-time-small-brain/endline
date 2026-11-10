@@ -44,7 +44,7 @@ Read from the process environment.
 | `HL_ACCOUNT_ADDRESS` | Optional `0x…` account whose positions are hedged. Set it when `HL_PRIVATE_KEY` is an API (agent) wallet: positions live on the main account, not the agent's own address. Default: the key's address. The account must hold only this bot's hedges: every position on it counts as one, and a coin with no option market (no spot price) fails the hedge |
 | `SPREAD_VOL_POINTS` | Vol shock priced into each side, default `2` |
 | `MIN_PREMIUM_USD` | Default `1`. Asks are floored to it, bids below it are refused |
-| `MAX_TRADE_USD` | Max payout (contracts × width) per quote, default `2000` |
+| `MAX_TRADE_USD` | Max payout (contracts × width) per quote, default `2000`, at most `1e9` |
 | `MAX_SERIES_USD` | Max net short/long payout per series, default `5000`. The lister stocks at most this much per series |
 | `MAX_DELTA_USD` | Max net delta per underlying right after a fill, before its hedge, default `50000`. Near expiry a full `MAX_TRADE_USD` trade near the money is up to `MAX_TRADE_USD × spot / width` of delta (~$80k for BTC) and gets refused; demo-size trades fit. Also each hedge order's size limit |
 | `MAX_VEGA_USD` | Max net vega per vol point, default `200` |
@@ -77,7 +77,7 @@ Pricing is Black-76 on Deribit's `underlying_price` and `mark_iv` (`get_book_sum
 - Ask = the highest scenario + 2 × hedge (now and the close at expiry) + carry, at least `MIN_PREMIUM_USD`, rounded up to quote units.
 - Bid = the lowest scenario − hedge, rounded down.
 
-After each Deribit refresh the bot sends the relay its [marks](https://docs.endline.trade/developers/relay-api): the same ask and bid for one whole option, before the $1 minimum, and `σ`, for every series it holds long or short tokens of that passes the checks above that don't depend on the quote (kill switch, width, deadline before the write cutoff, fresh data) and whose ask converts to quote units below the width, ranked by what its tokens there are worth at that bid and ask and cut off under the relay's 64 KB frame limit, so tokens others send it can't push its own series out cheaply. It publishes after every refresh, also one that failed for some underlying, so the others keep their marks.
+After each Deribit refresh the bot sends the relay its [marks](https://docs.endline.trade/developers/relay-api): the same ask and bid for one whole option, before the $1 minimum, and `σ`, plus `max_size`, the most option units that pay out at most `MAX_TRADE_USD`: the same integer limit a quote checks. The ask is lifted so a `max_size` buy at it pays at least `MIN_PREMIUM_USD`, so the app never shows a long shot cheaper than a buy costs. Marks go out for every series it holds long or short tokens of that passes the checks above that don't depend on the quote (kill switch, width, deadline before the write cutoff, fresh data) and whose ask converts to quote units below the width, ranked by what its tokens there are worth at that bid and ask and cut off under the relay's 64 KB frame limit, so tokens others send it can't push its own series out cheaply. It publishes after every refresh, also one that failed for some underlying, so the others keep their marks.
 
 The leg comes from the SDK's `buyDiffs`/`sellDiffs`. The nonce is versioned, uses the verifier's `current_salt` and the same deadline.
 

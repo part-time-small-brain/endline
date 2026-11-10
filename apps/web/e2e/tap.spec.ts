@@ -42,7 +42,7 @@ test("Tap persists across reload and puts every Up cell above the spot line and 
 test("a tap asks for a wallet first, then confirms exactly that cell at the chosen stake", async ({ page }) => {
   await openTap(page);
   await page.getByRole("radio", { name: "$10", exact: true }).click();
-  await expect(page.getByText("Each tap opens a firm quote for one option at about $10; you confirm it before anything is bought.")).toBeVisible();
+  await expect(page.getByText("Each tap opens a firm quote at about $10, less on a long shot that would pay out more than one trade may; you confirm it before anything is bought.")).toBeVisible();
   const cell = cells(page).filter({ hasNotText: "—" }).nth(5);
   const label = (await cell.getAttribute("aria-label")) ?? "";
   const [, side, price] = /^(Up|Down) · BTC ends (?:above|below) (\$[\d,]+) ·/.exec(label) ?? [];

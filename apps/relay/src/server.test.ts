@@ -308,11 +308,11 @@ describe("market maker socket", () => {
       expect(response.headers.get("access-control-allow-origin")).toBe("*");
       return response.json();
     };
-    a.send(JSON.stringify({ method: "marks", params: [{ series_id: SERIES.id, ask: "30000000", bid: "10000000", vol: 0.4 }] }));
-    b.send(JSON.stringify({ method: "marks", params: [{ series_id: SERIES.id, ask: "25000000", bid: "8000000", vol: 0.5 }] }));
-    await expect.poll(marks).toEqual([{ series_id: SERIES.id, ask: "25000000", bid: "10000000", vol: 0.5 }]);
+    a.send(JSON.stringify({ method: "marks", params: [{ series_id: SERIES.id, ask: "30000000", bid: "10000000", max_size: "7", vol: 0.4 }] }));
+    b.send(JSON.stringify({ method: "marks", params: [{ series_id: SERIES.id, ask: "25000000", bid: "8000000", max_size: "9", vol: 0.5 }] }));
+    await expect.poll(marks).toEqual([{ series_id: SERIES.id, ask: "25000000", bid: "10000000", max_size: "9", vol: 0.5 }]);
     b.close();
-    await expect.poll(marks).toEqual([{ series_id: SERIES.id, ask: "30000000", bid: "10000000", vol: 0.4 }]);
+    await expect.poll(marks).toEqual([{ series_id: SERIES.id, ask: "30000000", bid: "10000000", max_size: "7", vol: 0.4 }]);
     a.close();
     await expect.poll(marks).toEqual([]);
   });

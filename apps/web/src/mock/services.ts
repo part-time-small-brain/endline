@@ -91,6 +91,7 @@ export function createMockServices(config: Config): Services {
       const series = world.series.find((s) => s.id === request.series_id);
       if (!series || !quotable(series)) throw new Error("series is not quotable");
       const mark = markOf(series);
+      if (request.side === "buy" && BigInt(request.size) > BigInt(mark?.max_size ?? 0)) throw new Error("more than the market maker sells");
       const perContract = BigInt((request.side === "buy" ? mark?.ask : mark?.bid) ?? 0);
       const jittered = (perContract * BigInt(Math.round(9_850 + Math.random() * 180))) / 10_000n;
       const size = BigInt(request.size);

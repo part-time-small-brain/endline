@@ -156,11 +156,12 @@ export const Leaderboard = z.object({
 });
 export type Leaderboard = z.infer<typeof Leaderboard>;
 
-// ask and bid: quote units per one terms.unit of option, before the MM's minimum premium
+// ask and bid: quote units per one terms.unit of option, before the MM's minimum premium, which a max_size buy at ask covers
 export const Mark = z.object({
   series_id: z.string(),
   ask: Amount,
   bid: Amount.optional(),
+  max_size: Amount,
   vol: z.number().positive().max(10),
 });
 export type Mark = z.infer<typeof Mark>;

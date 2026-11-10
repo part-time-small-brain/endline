@@ -22,7 +22,7 @@ const series = (strike: number, expiry = E): Series => ({
   expiry,
   underlying_decimals: 8,
 });
-const mark = (s: Series, ask = 400n * USD): Mark => ({ series_id: s.id, ask: ask.toString(), vol: 0.4 });
+const mark = (s: Series, ask = 400n * USD): Mark => ({ series_id: s.id, ask: ask.toString(), max_size: "100000000", vol: 0.4 });
 const at = (sec: number) => vi.setSystemTime(sec * 1000);
 
 function setup(list = DAYS.flatMap((day) => [series(81_000, day), series(82_000, day)]), maxCalls?: number) {

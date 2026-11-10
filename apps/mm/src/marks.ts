@@ -1,8 +1,8 @@
 import { Mark } from "@endline/sdk";
 import type { Settings } from "./config.ts";
-import { longAsset, shortAsset } from "./portfolio.ts";
+import { contracts, longAsset, shortAsset } from "./portfolio.ts";
 import { toQuoteUnits } from "./pricing.ts";
-import { type Desk, priceSeries } from "./quote.ts";
+import { type Desk, maxTradeSize, priceSeries } from "./quote.ts";
 
 // the relay closes a socket whose frame passes 64 KB; the rest is room for the envelope
 const MAX_BYTES = 64_000;
@@ -24,11 +24,12 @@ export function marks(desk: Desk, settings: Settings, now: number): Mark[] {
     if (long === 0n && short === 0n) return [];
     const priced = priceSeries(desk, series, settings, now);
     if (!priced.ok) return [];
-    const ask = units(priced.price.ask, true);
+    const maxSize = maxTradeSize(book, series, settings);
+    const ask = units(Math.max(priced.price.ask, settings.minPremiumUsd / contracts(series, maxSize)), true);
     const bid = units(priced.price.bid, false) ?? 0n;
     const width = BigInt(series.width);
     if (ask === undefined || ask >= width) return [];
-    const mark = Mark.safeParse({ series_id: series.id, ask: ask.toString(), ...(bid > 0n ? { bid: bid.toString() } : {}), vol: priced.price.vol });
+    const mark = Mark.safeParse({ series_id: series.id, ask: ask.toString(), ...(bid > 0n ? { bid: bid.toString() } : {}), max_size: maxSize.toString(), vol: priced.price.vol });
     if (!mark.success) return [];
     // at most what the tokens are worth, so outranking the MM's own series means giving it that much
     const stake = (long * bid + short * (width - ask)) / 10n ** BigInt(series.underlying_decimals);

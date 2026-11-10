@@ -1,18 +1,20 @@
 import type { ReactNode } from "react";
 import { formatPrice } from "../lib/money.ts";
-import type { GoodCase, Ticket } from "../lib/ticket.ts";
+import { capNote, type GoodCase, type Ticket } from "../lib/ticket.ts";
 import { LABEL } from "./label.ts";
 import { Money } from "./Money.tsx";
 
 interface Props {
   up: boolean;
   ticket: Ticket;
+  budget: bigint;
   quoteDecimals: number;
   symbol: string;
   goodCase: GoodCase | null;
 }
 
-export function Summary({ up, ticket, quoteDecimals, symbol, goodCase }: Props) {
+export function Summary({ up, ticket, budget, quoteDecimals, symbol, goodCase }: Props) {
+  const note = capNote(ticket, budget, quoteDecimals);
   return (
     <div className="flex flex-col gap-3">
       <dl aria-label="Summary" className={`grid rounded-md shadow-[inset_0_0_0_1px_var(--rule)] ${goodCase ? "grid-cols-2" : "grid-cols-1"}`}>
@@ -26,6 +28,7 @@ export function Summary({ up, ticket, quoteDecimals, symbol, goodCase }: Props) 
           </Cell>
         )}
       </dl>
+      {note && <p className="px-1 text-sm text-ink-2">{note}</p>}
       <dl className="flex justify-between gap-3 px-1 font-mono text-[0.6875rem] tracking-[0.08em] text-ink-3 uppercase">
         <div className="flex gap-1.5">
           <dt>Breakeven</dt>

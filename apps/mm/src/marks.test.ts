@@ -23,7 +23,7 @@ describe("marks", () => {
       const mark = seriesMark(desk.market, desk.book, series);
       if (!mark) throw new Error("no fixture market");
       const price = contractPrice(desk.book, series, mark, SETTINGS, NOW);
-      return { series_id: series.id, ask: toQuoteUnits(price.ask, 6, true).toString(), bid: toQuoteUnits(price.bid, 6, false).toString(), vol: mark.vol };
+      return { series_id: series.id, ask: toQuoteUnits(price.ask, 6, true).toString(), bid: toQuoteUnits(price.bid, 6, false).toString(), max_size: String(10n ** 8n), vol: mark.vol };
     };
     expect(published).toHaveLength(3);
     expect(published).toContainEqual(expected(PUT));
@@ -44,6 +44,42 @@ describe("marks", () => {
     for (const size of [1_000_000n, 2_500_000n, 4_000_000n]) expect(Number(premium(size))).toBeCloseTo(Number((size * ask) / 10n ** 8n), -1);
     expect(premium(60_000n)).toBe(1_000_000n);
     expect((60_000n * ask) / 10n ** 8n).toBeLessThan(1_000_000n);
+  });
+
+  it("offer as max_size the most one trade may pay out, which decide fills but not a unit more, at any cent cap", () => {
+    for (const maxTradeUsd of [7, 50.5, 333.33, 2_000]) {
+      const settings = { ...SETTINGS, maxTradeUsd, maxSeriesUsd: 1e12, maxDeltaUsd: 1e12, maxVegaUsd: 1e12 };
+      const { desk } = testDesk(1_800, [[long(PUT), 10n ** 10n]]);
+      const maxSize = BigInt(marks(desk, settings, NOW).find((m) => m.series_id === PUT.id)?.max_size ?? 0);
+      expect(maxSize).toBe((BigInt(Math.round(maxTradeUsd * 100)) * 10n ** 4n * 10n ** 8n) / 2_000_000_000n);
+      const reason = (side: "buy" | "sell", size: bigint) => {
+        const d = decide(quoteEvent(PUT, side, size), desk, settings, NOW);
+        return d.ok ? "ok" : d.reason;
+      };
+      expect(reason("buy", maxSize)).toBe("ok");
+      expect(reason("buy", maxSize + 1n)).toBe("over trade cap");
+      expect(reason("sell", maxSize)).toBe("ok");
+      expect(reason("sell", maxSize + 1n)).toBe("over trade cap");
+    }
+  });
+
+  it("lift a long shot's ask so a max_size buy at it pays the $1 minimum decide charges, not less", () => {
+    const settings = { ...SETTINGS, maxTradeUsd: 10 };
+    const { desk } = testDesk(60);
+    const far = put(60_000_000_000n);
+    desk.book.series.set(far.id, far);
+    hold(desk, [far]);
+    const mark = marks(desk, settings, NOW).find((m) => m.series_id === far.id);
+    const priced = seriesMark(desk.market, desk.book, far);
+    if (!mark || !priced) throw new Error("no mark");
+    const maxSize = BigInt(mark.max_size);
+    expect((contractPrice(desk.book, far, priced, settings, NOW).ask * Number(maxSize)) / 1e8).toBeLessThan(1);
+    const d = decide(quoteEvent(far, "buy", maxSize), desk, settings, NOW);
+    if (!d.ok) throw new Error(d.reason);
+    const cost = (maxSize * BigInt(mark.ask) + 10n ** 8n - 1n) / 10n ** 8n;
+    expect(d.premium).toBe(1_000_000n);
+    expect(cost - d.premium).toBeGreaterThanOrEqual(0n);
+    expect(cost - d.premium).toBeLessThanOrEqual(1n);
   });
 
   it("leave out series past the quoting window, at a width nobody lists, without market data, or that the MM holds neither side of", () => {
@@ -74,7 +110,7 @@ describe("marks", () => {
     };
     const published = marks(desk, SETTINGS, NOW);
     expect(published.map((m) => m.series_id).sort()).toEqual([DEMO_PUT.id, PUT.id].sort());
-    expect(() => MmMessage.parse({ method: "marks", params: [{ series_id: CALL.id, ask: "1", vol: 11 }] })).toThrow();
+    expect(() => MmMessage.parse({ method: "marks", params: [{ series_id: CALL.id, ask: "1", max_size: "1", vol: 11 }] })).toThrow();
   });
 
   it("rank by what the MM's tokens are worth and stop under the relay's 64 KB frame, so dust gifts in many long-id series can't crowd its own out", () => {

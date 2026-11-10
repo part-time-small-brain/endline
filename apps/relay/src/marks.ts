@@ -21,7 +21,7 @@ export class Marks {
     for (const mark of fresh.flatMap((m) => m.marks)) {
       const seen = best.get(mark.series_id);
       const cheapest = seen && BigInt(seen.ask) <= BigInt(mark.ask) ? seen : mark;
-      best.set(mark.series_id, { series_id: mark.series_id, ask: cheapest.ask, bid: higher(seen?.bid, mark.bid), vol: cheapest.vol });
+      best.set(mark.series_id, { series_id: mark.series_id, ask: cheapest.ask, bid: higher(seen?.bid, mark.bid), max_size: cheapest.max_size, vol: cheapest.vol });
     }
     return [...best.values()];
   }

@@ -1,6 +1,6 @@
 import { longPayout } from "@endline/sdk";
 import { describe, expect, it } from "vitest";
-import { goodCase, payoutMultiple, type Ticket, ticket } from "./ticket.ts";
+import { capNote, goodCase, payoutMultiple, type Ticket, ticket } from "./ticket.ts";
 
 const BTC = 10n ** 8n;
 const USD = 10n ** 6n;
@@ -17,6 +17,7 @@ const ticketOf = (kind: "call" | "put", strike: bigint, width: bigint, size: big
   terms: { kind, strike, width, unit: BTC },
   size,
   cost,
+  capped: false,
   breakeven: null,
   cashOut: 0n,
 });
@@ -56,16 +57,19 @@ describe("goodCase", () => {
 
 describe("ticket", () => {
   const series = { id: "BTC-X", underlying: "BTC", kind: "call" as const, strike: (81_000n * USD).toString(), width: (2_000n * USD).toString(), expiry: 1_800_000_000, underlying_decimals: 8 };
-  const mark = (ask: bigint, bid?: bigint) => ({ series_id: series.id, ask: ask.toString(), ...(bid === undefined ? {} : { bid: bid.toString() }), vol: 0.4 });
+  const mark = (ask: bigint, bid?: bigint, maxSize = 10n ** 30n) => ({ series_id: series.id, ask: ask.toString(), ...(bid === undefined ? {} : { bid: bid.toString() }), max_size: maxSize.toString(), vol: 0.4 });
 
-  it("sizes the budget at the market maker's ask and costs size × ask, rounded up, never over the budget", () => {
+  it("sizes the budget at the market maker's ask, up to what it sells, and costs size × ask, rounded up, never over the budget", () => {
     const next = random(7);
     for (let i = 0; i < 400; i++) {
       const ask = next(2_000n * USD - 1n);
       const bid = next(ask);
       const budget = next(500n * USD);
-      const t = ticket(series, budget, mark(ask, bid));
-      expect(t.size).toBe((budget * BTC) / ask);
+      const most = next(BTC);
+      const t = ticket(series, budget, mark(ask, bid, most));
+      expect(t.size).toBeLessThanOrEqual(most);
+      expect(t.capped || (t.size + 1n) * ask > budget * BTC).toBe(true);
+      expect(!t.capped || t.size === most).toBe(true);
       expect(t.cost).toBe((t.size * ask + BTC - 1n) / BTC);
       expect(t.cost).toBeLessThanOrEqual(budget);
       expect(t.cashOut).toBe((t.size * bid) / BTC);
@@ -77,6 +81,13 @@ describe("ticket", () => {
     expect(ticket(series, 25n * USD, mark(2_000n * USD)).size).toBe(0n);
     expect(ticket(series, 25n * USD, mark(2_000n * USD - 1n)).size).toBeGreaterThan(0n);
     expect(ticket(series, 25n * USD, mark(650n * USD)).cashOut).toBe(0n);
+  });
+
+  it("buys only what one trade may pay out, so a long shot costs less than the budget", () => {
+    const capped = ticket(series, 100n * USD, mark(40n * USD, undefined, BTC));
+    expect(capped).toMatchObject({ size: BTC, cost: 40n * USD, capped: true });
+    expect(payoutMultiple(capped)).toBe(500n);
+    expect(ticket(series, 40n * USD, mark(40n * USD, undefined, BTC))).toMatchObject({ size: BTC, capped: false });
   });
 });
 
@@ -92,5 +103,16 @@ describe("payoutMultiple", () => {
     }
     expect(payoutMultiple(ticketOf("call", 81_000n * USD, 2_000n * USD, 0n, 0n))).toBeUndefined();
     expect(payoutMultiple(ticketOf("call", 81_000n * USD, 2_000n * USD, BTC, 0n))).toBeUndefined();
+  });
+});
+
+describe("capNote", () => {
+  const series = { id: "BTC-X", underlying: "BTC", kind: "call" as const, strike: (81_000n * USD).toString(), width: (2_000n * USD).toString(), expiry: 1_800_000_000, underlying_decimals: 8 };
+  const capped = (budget: bigint, ask: bigint) => capNote(ticket(series, budget, { series_id: series.id, ask: ask.toString(), max_size: BTC.toString(), vol: 0.4 }), budget, 6);
+
+  it("says why a capped ticket costs less than the stake, and stays quiet when it doesn't or the cost reads as the stake", () => {
+    expect(capped(100n * USD, 40n * USD)).toBe("One trade pays out at most $2,000, so this costs $40.");
+    expect(capped(25n * USD, 40n * USD)).toBeUndefined();
+    expect(capped(100n * USD, 100n * USD - 1n)).toBeUndefined();
   });
 });
