@@ -10,7 +10,7 @@ The firm price you sign is all that leaves your balance for a buy, spread includ
 | Other cost | Paid by |
 |---|---|
 | NEAR Intents fee, currently 0.0001% of each amount given up ([formula](./developers/sdk.mdx#why-trade-legs-arent-mirror-images)) | Market maker. You pay exactly the quoted price and receive exactly your size |
-| Gas for trades and collects | Our relay. You don't need NEAR |
+| Gas for trades and collects of $1 or more | Our relay. You don't need NEAR |
 | NEAR wallet setup and deposits | You, as a normal NEAR transaction |
 | Cross-chain deposits | You, at 1Click's fee for the route |
 
@@ -39,4 +39,4 @@ It stops quoting at the sell-back cutoff, on stale data, at a risk limit or when
 
 ## Sizes
 
-The smallest buy is the asset's [minimum size](./developers/contract.mdx#testnet-underlyings) in the contract, so every option can be collected for free. You can sell back anything you hold that is worth the $1 minimum price.
+The smallest buy is the asset's [minimum size](./developers/contract.mdx#testnet-underlyings) in the contract, so the relay will collect any of your options. It pays the gas when the win is $1 or more; smaller wins are [collected from a NEAR wallet](./collecting.mdx), which pays it. You can sell back anything you hold that is worth the $1 minimum price.

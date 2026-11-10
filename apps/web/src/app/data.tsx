@@ -99,7 +99,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     listing,
     listingError: relayListing.error ?? contract.error,
     quoteDecimals: contract.data?.quoteDecimals ?? 6,
-    market: market.data,
+    market: market.error ? undefined : market.data,
     marketError: market.error,
     marks: marks.error ? undefined : marksById,
     marksError: marks.error,

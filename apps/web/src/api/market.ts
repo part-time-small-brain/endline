@@ -7,6 +7,7 @@ export interface MarketSnapshot {
 export type PricePoint = [ms: number, price: number];
 
 const CHART_STEP_MS = 300_000;
+const DERIBIT_TIMEOUT_MS = 5_000;
 
 export function chartPoints(points: PricePoint[]): PricePoint[] {
   const bucket = (ms: number) => Math.floor(ms / CHART_STEP_MS);
@@ -22,7 +23,7 @@ const Index = z.object({ result: z.object({ index_price: z.number().positive() }
 const IndexChart = z.object({ result: z.array(z.tuple([z.number(), z.number().positive()])) });
 
 async function index(name: string): Promise<number> {
-  const response = await fetch(`https://www.deribit.com/api/v2/public/get_index_price?index_name=${name}`);
+  const response = await fetch(`https://www.deribit.com/api/v2/public/get_index_price?index_name=${name}`, { signal: AbortSignal.timeout(DERIBIT_TIMEOUT_MS) });
   return Index.parse(await response.json()).result.index_price;
 }
 
@@ -38,7 +39,7 @@ export function deribitMarket(): Market {
       return { spot: Object.fromEntries(rows) };
     },
     async history(underlying) {
-      const response = await fetch(`https://www.deribit.com/api/v2/public/get_index_chart_data?index_name=${underlying.toLowerCase()}_usd&range=1d`);
+      const response = await fetch(`https://www.deribit.com/api/v2/public/get_index_chart_data?index_name=${underlying.toLowerCase()}_usd&range=1d`, { signal: AbortSignal.timeout(DERIBIT_TIMEOUT_MS) });
       return IndexChart.parse(await response.json()).result;
     },
   };
