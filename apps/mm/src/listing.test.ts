@@ -132,7 +132,7 @@ describe("planWrites", () => {
   it("writes $500 of max payout in USDC for calls and puts", () => {
     const call = daily(BTC, "call");
     const put = daily(ETH, "put");
-    expect(planWrites([call, put], [BTC, ETH], MAINNET, new Map(), rich)).toEqual([
+    expect(planWrites([call, put], [BTC, ETH], MAINNET, new Map(), rich, 100)).toEqual([
       { id: call.id, collateral: 500_000_000n },
       { id: put.id, collateral: 500_000_000n },
     ]);
@@ -147,7 +147,7 @@ describe("planWrites", () => {
       const unit = 10n ** BigInt(m.decimals);
       const target = (500_000_000n * unit) / t.width;
       for (const held of [0n, 1n, 7n, target / 3n, target - m.minWrite]) {
-        const [w] = planWrites([t], [m], MAINNET, new Map([[t.id, held]]), rich);
+        const [w] = planWrites([t], [m], MAINNET, new Map([[t.id, held]]), rich, 100);
         if (!w) throw new Error(`no write at ${held}`);
         const minted = (w.collateral * unit) / t.width;
         expect(minted).toBeGreaterThanOrEqual(target - held);
@@ -158,26 +158,34 @@ describe("planWrites", () => {
 
   it("tops up only what was sold and skips series at or above target or short by less than min_write", () => {
     const call = daily(BTC, "call");
-    expect(planWrites([call], [BTC], MAINNET, new Map([[call.id, 20_000_000n]]), rich)).toEqual([{ id: call.id, collateral: 100_000_000n }]);
-    expect(planWrites([call], [BTC], MAINNET, new Map([[call.id, 25_000_000n]]), rich)).toEqual([]);
-    expect(planWrites([call], [BTC], MAINNET, new Map([[call.id, 30_000_000n]]), rich)).toEqual([]);
-    expect(planWrites([call], [BTC], MAINNET, new Map([[call.id, 24_999_001n]]), rich)).toEqual([]);
+    expect(planWrites([call], [BTC], MAINNET, new Map([[call.id, 20_000_000n]]), rich, 100)).toEqual([{ id: call.id, collateral: 100_000_000n }]);
+    expect(planWrites([call], [BTC], MAINNET, new Map([[call.id, 25_000_000n]]), rich, 100)).toEqual([]);
+    expect(planWrites([call], [BTC], MAINNET, new Map([[call.id, 30_000_000n]]), rich, 100)).toEqual([]);
+    expect(planWrites([call], [BTC], MAINNET, new Map([[call.id, 24_999_001n]]), rich, 100)).toEqual([]);
   });
 
   it("keeps $500 back, shares what's left nearest-first and never overspends", () => {
     const [a, b, c] = targets(MAINNET, [BTC], now, 5_000);
-    expect(planWrites([a!, b!, c!], [BTC], MAINNET, new Map(), new Map([[USDC, reserve + 510_000_000n]]))).toEqual([
+    expect(planWrites([a!, b!, c!], [BTC], MAINNET, new Map(), new Map([[USDC, reserve + 510_000_000n]]), 100)).toEqual([
       { id: a!.id, collateral: 500_000_000n },
       { id: b!.id, collateral: 10_000_000n },
     ]);
-    expect(planWrites([a!], [BTC], MAINNET, new Map(), new Map([[USDC, reserve + 99n]]))).toEqual([]);
-    expect(planWrites([a!], [BTC], MAINNET, new Map(), new Map([[USDC, reserve - 1n]]))).toEqual([]);
+    expect(planWrites([a!], [BTC], MAINNET, new Map(), new Map([[USDC, reserve + 99n]]), 100)).toEqual([]);
+    expect(planWrites([a!], [BTC], MAINNET, new Map(), new Map([[USDC, reserve - 1n]]), 100)).toEqual([]);
     const all = targets(MAINNET, [BTC, ETH], now, 5_000);
     const budget = 1_234_567_891n;
-    const writes = planWrites(all, [BTC, ETH], MAINNET, new Map(), new Map([[USDC, reserve + budget]]));
+    const writes = planWrites(all, [BTC, ETH], MAINNET, new Map(), new Map([[USDC, reserve + budget]]), 100);
     expect(writes.reduce((sum, w) => sum + w.collateral, 0n)).toBeLessThanOrEqual(budget);
     expect(writes.map((w) => w.collateral).slice(0, 2)).toEqual([500_000_000n, 500_000_000n]);
     expect(writes).toHaveLength(3);
+  });
+
+  it("keeps a full max-size trade back when that is above $500, so a pending buy leg still settles", () => {
+    const [a] = targets(MAINNET, [BTC], now, 5_000);
+    const tradeReserve = 2_000_000_000n;
+    expect(planWrites([a!], [BTC], MAINNET, new Map(), new Map([[USDC, tradeReserve + 500_000_000n]]), 2_000)).toEqual([{ id: a!.id, collateral: 500_000_000n }]);
+    expect(planWrites([a!], [BTC], MAINNET, new Map(), new Map([[USDC, tradeReserve + 99n]]), 2_000)).toEqual([]);
+    expect(planWrites([a!], [BTC], MAINNET, new Map(), new Map([[USDC, tradeReserve - 1n]]), 2_000)).toEqual([]);
   });
 });
 

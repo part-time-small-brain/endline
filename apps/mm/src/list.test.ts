@@ -47,7 +47,7 @@ it("redeems shorts of a series that expired a second short of the claim window a
   chain.series = [{ id: "BTC-P", underlying: "BTC", kind: "put", strike: "1", expiry: EXPIRY, underlying_decimals: 8, width: "1" }];
   chain.held = { [SHORT]: 5n };
 
-  await listCommand({ optionsId: "opt.testnet", accountId: "mm.testnet", settings: { maxSeriesUsd: 1 } } as Config, true);
+  await listCommand({ optionsId: "opt.testnet", accountId: "mm.testnet", settings: { maxSeriesUsd: 1, maxTradeUsd: 1 } } as Config, true);
 
   expect(chain.submitted).toEqual([closeOptions("opt.testnet", "redeem", { [SHORT]: 5n })]);
 });
@@ -57,7 +57,7 @@ it("exercises its own unpaired long once the price is final and pays it, not bef
   chain.series = [{ id: "BTC-P", underlying: "BTC", kind: "put", strike: "2000", expiry: EXPIRY, underlying_decimals: 8, width: "1000" }];
   const long = intentsAssetId("opt.testnet", "BTC-P");
   chain.held = { [long]: 100_000_000n };
-  const config = { optionsId: "opt.testnet", accountId: "mm.testnet", settings: { maxSeriesUsd: 1 } } as Config;
+  const config = { optionsId: "opt.testnet", accountId: "mm.testnet", settings: { maxSeriesUsd: 1, maxTradeUsd: 1 } } as Config;
 
   chain.submitted = [];
   vi.spyOn(Date, "now").mockReturnValue((EXPIRY + 3_599) * 1000);
@@ -83,7 +83,7 @@ it("deletes, 20 at a time, the series a week past their end that the contract sa
   chain.held = {};
   chain.deleted = [];
 
-  await listCommand({ optionsId: "opt.testnet", accountId: "mm.testnet", settings: { maxSeriesUsd: 1 } } as Config, true);
+  await listCommand({ optionsId: "opt.testnet", accountId: "mm.testnet", settings: { maxSeriesUsd: 1, maxTradeUsd: 1 } } as Config, true);
 
   expect(chain.deleted).toEqual([old.slice(1, 21).map((s) => s.id), old.slice(21).map((s) => s.id)]);
 });
@@ -96,7 +96,7 @@ it("finishes the pass and logs it when the contract can't say what's deletable",
   chain.viewDown = true;
   chain.deleted = [];
 
-  await listCommand({ optionsId: "opt.testnet", accountId: "mm.testnet", settings: { maxSeriesUsd: 1 } } as Config, true);
+  await listCommand({ optionsId: "opt.testnet", accountId: "mm.testnet", settings: { maxSeriesUsd: 1, maxTradeUsd: 1 } } as Config, true);
 
   chain.viewDown = false;
   expect(chain.deleted).toEqual([]);
@@ -113,7 +113,7 @@ it("writes each new series right after creating it, so a fresh contract gets pri
   chain.wanted = [target(1n), target(2n), target(3n)];
   chain.actions = [];
 
-  await listCommand({ optionsId: "opt.testnet", accountId: "mm.testnet", settings: { maxSeriesUsd: 1 } } as Config, true);
+  await listCommand({ optionsId: "opt.testnet", accountId: "mm.testnet", settings: { maxSeriesUsd: 1, maxTradeUsd: 1 } } as Config, true);
 
   chain.paused = true;
   chain.wanted = undefined;

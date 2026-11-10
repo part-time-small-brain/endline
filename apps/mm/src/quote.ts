@@ -76,26 +76,31 @@ export function decide(ev: QuoteEvent, desk: Desk, settings: Settings, now: numb
     if (delta < 0n && inventory.available(asset) < -delta) return reject("insufficient inventory");
   }
 
-  const after = inventory.confirmed();
+  const before = inventory.confirmed();
+  const after = new Map(before);
   for (const [asset, delta] of Object.entries(diff)) after.set(asset, (after.get(asset) ?? 0n) + delta);
   const pending = inventory.pending().map((d) => new Map(Object.entries(d)));
   // any pending leg may fill or not, so each cap must hold with every leg that pushes its way
-  const over = (base: number, legs: number[], cap: number) =>
-    [Math.max, Math.min].some((pick) => Math.abs(legs.reduce((sum, leg) => sum + pick(leg, 0), base)) > cap);
+  const over = (base: number, without: number, legs: number[], cap: number) =>
+    [Math.max, Math.min].some((pick) => {
+      const pushed = legs.reduce((sum, leg) => sum + pick(leg, 0), 0);
+      return Math.abs(base + pushed) > cap && Math.abs(base + pushed) > Math.abs(without + pushed);
+    });
   const netShortUsd = (h: Map<string, bigint>) => contracts(series, (h.get(shortAsset(book, series.id)) ?? 0n) - (h.get(longAsset(book, series.id)) ?? 0n)) * width;
-  if (over(netShortUsd(after), pending.map(netShortUsd), settings.maxSeriesUsd)) return reject("over series cap");
+  if (over(netShortUsd(after), netShortUsd(before), pending.map(netShortUsd), settings.maxSeriesUsd)) return reject("over series cap");
 
-  let exposures, legExposures;
+  let exposures, exposuresBefore, legExposures;
   try {
     exposures = exposure(book, after, markOf, now);
+    exposuresBefore = exposure(book, before, markOf, now);
     legExposures = pending.map((h) => exposure(book, h, markOf, now));
   } catch {
     return reject("no market data for inventory");
   }
   const deltaUsd = (e: typeof exposures) => (e.get(series.underlying)?.delta ?? 0) * mark.forward;
-  if (over(deltaUsd(exposures), legExposures.map(deltaUsd), settings.maxDeltaUsd)) return reject("over delta cap");
+  if (over(deltaUsd(exposures), deltaUsd(exposuresBefore), legExposures.map(deltaUsd), settings.maxDeltaUsd)) return reject("over delta cap");
   const vega = (e: typeof exposures) => [...e.values()].reduce((sum, x) => sum + x.vega, 0);
-  if (over(vega(exposures), legExposures.map(vega), settings.maxVegaUsd)) return reject("over vega cap");
+  if (over(vega(exposures), vega(exposuresBefore), legExposures.map(vega), settings.maxVegaUsd)) return reject("over vega cap");
 
   return { ok: true, premium, diff, deadlineMs };
 }
