@@ -42,7 +42,7 @@ Read from the process environment.
 | `NETWORK_ID` | `mainnet` or `testnet`, every command but `settle`. Picks `deploy/<NETWORK_ID>.json`, the only source of `rpc_url`, `intents_id` (the verifier; the monitor watches its NEAR) and `options_id`. No file (mainnet today): the command won't start. The monitor also uses it in the printed `near` commands |
 | `SPREAD_VOL_POINTS` | Vol shock priced into each side, default `2` |
 | `MIN_PREMIUM_USD` | Default `1`. Asks are floored to it, bids below it are refused |
-| `MAX_TRADE_USD` | Max payout (contracts × width) per quote, default `2000`, at most `1e9` |
+| `MAX_TRADE_USD` | Max payout (contracts × width) per quote, default `2000`, at most `1e9`. The lister reads it too, to keep that much USDC free: set it the same for both |
 | `MAX_SERIES_USD` | Max net short/long payout per series, default `5000`. The lister stocks at most this much per series |
 | `MAX_DELTA_USD` | Max net delta per underlying after a fill, default `50000`. Near expiry a full `MAX_TRADE_USD` trade near the money is up to `MAX_TRADE_USD × spot / width` of delta (~$80k for BTC) and gets refused; demo-size trades fit |
 | `MAX_VEGA_USD` | Max net vega per vol point, default `200` |
@@ -65,7 +65,7 @@ On every relay `quote` event the bot refuses unless all of these hold:
 - the quote deadline (now + 25 s) is before `expiry − timing.write_cutoff_sec`;
 - the Deribit data is fresh;
 - the premium is below the most the size can pay (`floor(size·W/unit)`), which the $1 minimum can otherwise exceed;
-- size, series, delta and vega caps hold with every outstanding quote counted as filled, or the trade brings that exposure closer to zero;
+- the size cap holds; series, delta and vega caps hold with every outstanding quote counted as filled, or, whichever pending legs fill, the trade leaves that exposure no farther from zero;
 - the MM's intents balance covers the gross leg after reserving it for every outstanding quote.
 
 Pricing is Black-76 on Deribit's `underlying_price` and `mark_iv` (`get_book_summary_by_currency` and `get_index_price` per underlying every 2 s). A capped series is two options: long at the strike `K`, short at the cap (`K + W` for Up, `K − W` for Down), each with its own vol, `σ` at `K` and `σcap` at the cap. Vols come from the nearest Deribit expiry, interpolated in log-moneyness (a listed strike gets its own vol); the forward is the Deribit index unless that expiry is listed.
@@ -95,7 +95,7 @@ SIGINT/SIGTERM closes the relay socket and stops all timers; already-signed quot
 
 ## Market lister
 
-`list` uses the same env as `write` (MM account and key; `MAX_SERIES_USD` caps the per-series target). Every 10 min (`--once`: one pass, then exit), and on start, it reads the contract's config, underlyings and series, the Deribit index per underlying, and the MM's intents balances, then acts. One log line per action; a failed read or transaction is logged and retried next pass. The MM pays its own gas; actions are 3 s apart (RPC rate limits).
+`list` uses the same env as `write` (MM account and key; `MAX_SERIES_USD` caps the per-series target; `MAX_TRADE_USD` sets the USDC it keeps free). Every 10 min (`--once`: one pass, then exit), and on start, it reads the contract's config, underlyings and series, the Deribit index per underlying, and the MM's intents balances, then acts. One log line per action; a failed read or transaction is logged and retried next pass. The MM pays its own gas; actions are 3 s apart (RPC rate limits).
 
 | Step | What |
 |---|---|
