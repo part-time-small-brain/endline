@@ -35,6 +35,18 @@ services:
     build: { context: .., dockerfile: deploy/Dockerfile, target: web }
     restart: unless-stopped
     depends_on: [relay]
+  logs:
+    image: amir20/dozzle:v11.4.2@sha256:08cd5230e21e364241f3dcf26191f293166f7835654eb7e41168b9c685f0947b
+    restart: unless-stopped
+    environment:
+      DOZZLE_FILTER: label=com.docker.compose.project=endline
+      DOZZLE_ENABLE_ACTIONS: "true"
+      DOZZLE_NO_ANALYTICS: "true"
+      DOZZLE_AUTH_PROVIDER: forward-proxy
+      DOZZLE_AUTH_HEADER_USER: Cf-Access-Authenticated-User-Email
+      DOZZLE_AUTH_HEADER_EMAIL: Cf-Access-Authenticated-User-Email
+      DOZZLE_AUTH_HEADER_NAME: Cf-Access-Authenticated-User-Email
+    volumes: [/var/run/docker.sock:/var/run/docker.sock:ro]
   tunnel:
     image: cloudflare/cloudflared:2026.10.5@sha256:1b1d34d0a9c0bfca9de72db8460d328db3f19edd2b96169114e3e893a97bbe53
     restart: unless-stopped
