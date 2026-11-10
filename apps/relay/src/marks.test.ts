@@ -14,6 +14,21 @@ describe("marks", () => {
     ]);
   });
 
+  it("serve the size of the market maker whose ask wins, and take the lowest ask from those that can sell", () => {
+    const marks = new Marks();
+    marks.set("a", [mark("S1", "100", "90", 0.3), { ...mark("S2", "300", undefined, 0.5), max_size: "7" }], 0);
+    marks.set("b", [{ ...mark("S1", "200", "50", 0.5), max_size: "9" }, { ...mark("S2", "250", undefined, 0.6), max_size: "4" }], 0);
+    expect(marks.best(0)).toEqual([
+      { series_id: "S1", ask: "200", bid: "90", max_size: "9", vol: 0.5 },
+      { series_id: "S2", ask: "250", max_size: "4", vol: 0.6 },
+    ]);
+    marks.drop("b");
+    expect(marks.best(0)).toEqual([
+      { series_id: "S1", ask: "100", bid: "90", vol: 0.3 },
+      { series_id: "S2", ask: "300", max_size: "7", vol: 0.5 },
+    ]);
+  });
+
   it("compare amounts as integers, not strings", () => {
     const marks = new Marks();
     marks.set("a", [mark("S1", "90", "9", 0.4)], 0);

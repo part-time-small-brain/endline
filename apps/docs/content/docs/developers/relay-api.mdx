@@ -11,7 +11,7 @@ The relay runs the RFQ auction, settles trades with `intents.near::execute_inten
 |---|---|
 | `GET /health` | `{ok, market_makers}` |
 | `GET /series` | `{quote_asset, quote_decimals, series: [Series + option_asset + quotable]}`. `quotable` is false from `expiry − write_cutoff_sec`, and for a width other than the lister's (`listedWidth` in the SDK). Only series that expired less than 7 days ago or later (`CLAIM_WINDOW_SEC`, also the auto-collect deadline) |
-| `GET /marks` | `[{series_id, ask, bid?, vol}]`: per series, the lowest ask (with that market maker's `vol`) and highest bid across connected market makers, for one whole option in quote units, before the $1 minimum. Marks older than 10 s are dropped |
+| `GET /marks` | `[{series_id, ask, bid?, max_size?, vol}]`: per series, the lowest ask (with that market maker's `vol` and `max_size`) and highest bid across connected market makers, for one whole option in quote units, before the $1 minimum. `max_size` is the most option units one buy gets; an ask without it can't be bought, and loses to any ask with it. Marks older than 10 s are dropped |
 | `POST /quote` | `QuoteRequest` → `Quote` |
 | `POST /publish` | `{quote_id, signed}` → `StatusUpdate` (200 settled, 422 failed) |
 | `GET /status/:quote_id` | `StatusUpdate`. `expired` from `sign_by_ms`; forgotten after an hour (then 404) |
@@ -89,7 +89,7 @@ Not exposed on the hosted relay (`api.endline.trade`). To connect a market maker
 |---|---|
 | Relay → MM | `{"method":"quote","params":QuoteEvent}`. `side` is the user's side. Answers after `deadline_ms` are dropped |
 | MM → relay | `{"method":"quote_response","params":{quote_id, premium, signed}}`. One answer per quote per connection |
-| MM → relay | `{"method":"marks","params":[{series_id, ask, bid?, vol}]}`. Its current price per series it holds and would quote, replacing its previous marks; dropped 10 s after receipt or when it disconnects |
+| MM → relay | `{"method":"marks","params":[{series_id, ask, bid?, max_size?, vol}]}`. Its current price per series it holds and would quote, and the most it sells in one buy, replacing its previous marks; dropped 10 s after receipt or when it disconnects |
 | Relay → MM | `{"method":"quote_status","params":StatusUpdate}` to the winner: `settled` with `tx_hash`, `failed` with `reason`, or `expired` |
 
 An answer counts only if its `token_diff` is exactly the expected fee-exact market maker leg for that premium, its deadline is 20 to 60 s out with a versioned nonce, and `simulate_intents([mm])` leaves exactly the user's leg open.

@@ -3,6 +3,9 @@ import type { Mark } from "@endline/sdk";
 export const MARK_TTL_MS = 10_000;
 
 const higher = (a: string | undefined, b: string | undefined) => (a === undefined || (b !== undefined && BigInt(b) > BigInt(a)) ? b : a);
+const sells = (m: Mark) => m.max_size !== undefined;
+// the lowest ask among market makers that can sell, so one that can't never hides one that can
+const better = (a: Mark, b: Mark) => (sells(a) === sells(b) ? BigInt(a.ask) <= BigInt(b.ask) : sells(a));
 
 export class Marks {
   private byMm = new Map<string, { receivedAt: number; marks: Mark[] }>();
@@ -20,8 +23,8 @@ export class Marks {
     const fresh = [...this.byMm.values()].filter((m) => now - m.receivedAt <= MARK_TTL_MS);
     for (const mark of fresh.flatMap((m) => m.marks)) {
       const seen = best.get(mark.series_id);
-      const cheapest = seen && BigInt(seen.ask) <= BigInt(mark.ask) ? seen : mark;
-      best.set(mark.series_id, { series_id: mark.series_id, ask: cheapest.ask, bid: higher(seen?.bid, mark.bid), vol: cheapest.vol });
+      const cheapest = seen && better(seen, mark) ? seen : mark;
+      best.set(mark.series_id, { series_id: mark.series_id, ask: cheapest.ask, bid: higher(seen?.bid, mark.bid), max_size: cheapest.max_size, vol: cheapest.vol });
     }
     return [...best.values()];
   }
