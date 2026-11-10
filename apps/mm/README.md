@@ -120,7 +120,7 @@ Burn, redeem and exercise cover series that expired up to 7 days ago, so the MM'
 | `reserve <account>` | `amount − storage_usage × 10^19` yocto below 2 NEAR, for the options contract, `intents_id`, `RELAYER_ACCOUNT_ID` and `MM_ACCOUNT_ID` each | |
 | `uptime` | `HEALTH_URL` set and it doesn't answer `200` with `{"ok":true}` within 5 s | The URL and the error |
 | `quotes` | `/health` answers with `market_makers: 0`: no MM connected, so nobody gets a quote. Stays open while `uptime` is | |
-| `priced` | An MM is connected but `/marks` next to `HEALTH_URL` is empty: nothing in the app has a price (lister failing, no USDC or NEAR, no Deribit data). Stays open while `uptime` is or `/marks` can't be read | |
+| `priced` | An MM is connected but `/marks` next to `HEALTH_URL` is empty: nothing in the app has a price (lister failing, no USDC or NEAR, no Deribit data). Stays open while `uptime` or `quotes` is, or `/marks` can't be read | |
 | `pending oracle <account> <active_at>`, `pending wasm <sha256> <active_at>`, `pending owner <account>` | Each entry of `get_pending_oracle_changes` and `get_config.pending_owner_id`. Resolves once it takes effect or is withdrawn. `pending` alone: the views can't be read and no `pending` alert is open (open ones stay open). | What changes and when: `active_at` as a date, the owner on `accept_owner` |
 
 Reference price per `(underlying, expiry)`, from the underlying's Deribit index:

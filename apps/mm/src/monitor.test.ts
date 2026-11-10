@@ -280,18 +280,20 @@ it("alerts no market maker on its own, keeps it open while the stack is down, an
   ]);
 });
 
-it("alerts a connected market maker that prices nothing, holds it through an outage and a bad /marks read, and resolves it once marks come back", async () => {
+it("alerts a connected market maker that prices nothing, holds it through an outage, a disconnect and a bad /marks read, and resolves it once marks come back", async () => {
   const empty = async () => Response.json([]);
   const priced = async () => Response.json([{ series_id: "x" }]);
   const { posted, run } = stack(
-    [healthy(1), async () => new Response("", { status: 502 }), healthy(1), healthy(1)],
-    [empty, priced, async () => new Response("", { status: 500 }), priced],
+    [healthy(1), async () => new Response("", { status: 502 }), healthy(0), healthy(1), healthy(1)],
+    [empty, priced, priced, async () => new Response("", { status: 500 }), priced],
   );
   await run();
   expect(posted).toEqual([
-    "ALERT http://web/marks: a market maker is connected but prices nothing. Check the lister's log and the MM's USDC and NEAR",
+    "ALERT http://web/marks: a market maker is connected but prices nothing. Check the lister's log, Deribit, and the MM's USDC and NEAR",
     "ALERT http://web/health: down: Error: HTTP 502",
+    "ALERT http://web/health: no market maker connected, nobody gets a quote. Check the mm service",
     "RESOLVED uptime",
+    "RESOLVED quotes",
     "RESOLVED priced",
   ]);
 });

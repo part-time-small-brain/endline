@@ -78,15 +78,16 @@ async function check(chain: ChainReader, config: MonitorConfig, final: Set<strin
 }
 
 async function healthAlerts(url: string, open: ReadonlySet<string>): Promise<Alert[]> {
+  const priced = open.has("priced") ? [{ key: "priced", text: "" }] : [];
   try {
     const res = await fetch(url, { signal: AbortSignal.timeout(HTTP_TIMEOUT_MS) });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const health = Health.safeParse(await res.json());
     if (!health.success) throw new Error("no ok: true in the body");
-    if (health.data.market_makers === 0) return [{ key: "quotes", text: `${url}: no market maker connected, nobody gets a quote. Check the mm service` }];
+    if (health.data.market_makers === 0) return [{ key: "quotes", text: `${url}: no market maker connected, nobody gets a quote. Check the mm service` }, ...priced];
   } catch (e) {
-    const held = ["quotes", "priced"].filter((key) => open.has(key)).map((key) => ({ key, text: "" }));
-    return [{ key: "uptime", text: `${url}: down: ${e}` }, ...held];
+    const quotes = open.has("quotes") ? [{ key: "quotes", text: "" }] : [];
+    return [{ key: "uptime", text: `${url}: down: ${e}` }, ...quotes, ...priced];
   }
   return pricedAlerts(new URL("/marks", url).toString(), open);
 }
@@ -96,7 +97,7 @@ async function pricedAlerts(url: string, open: ReadonlySet<string>): Promise<Ale
     const res = await fetch(url, { signal: AbortSignal.timeout(HTTP_TIMEOUT_MS) });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const marks = Marks.parse(await res.json());
-    return marks.length > 0 ? [] : [{ key: "priced", text: `${url}: a market maker is connected but prices nothing. Check the lister's log and the MM's USDC and NEAR` }];
+    return marks.length > 0 ? [] : [{ key: "priced", text: `${url}: a market maker is connected but prices nothing. Check the lister's log, Deribit, and the MM's USDC and NEAR` }];
   } catch (e) {
     console.error(`monitor: ${url}: ${e}`);
     return open.has("priced") ? [{ key: "priced", text: "" }] : [];
