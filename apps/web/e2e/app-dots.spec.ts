@@ -89,8 +89,8 @@ test("turning on reduced motion hides the wash at once and the dots still glow",
   await expect.poll(() => washOpacity(page)).toBeGreaterThan(0.1);
   await page.emulateMedia({ reducedMotion: "reduce" });
   await expect(wash(page)).toBeHidden();
-  await page.mouse.move(120, 520);
-  await expect.poll(() => lit(page, around(120, 520))).toBe("up");
+  await page.mouse.move(500, 500);
+  await expect.poll(() => lit(page, around(500, 500))).toBe("up");
 });
 
 test("Positions glows too", async ({ page }) => {
@@ -177,7 +177,7 @@ test("market stats keep their text clear of the glow", async ({ page }) => {
   expect(await onScreen(page, timer)).toBe("none");
 });
 
-test("market stat boxes stay below the header at every width", async ({ page }) => {
+test("market stat boxes stay below the header on phones and desktops", async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem("trade-mode", "pro"));
   await page.goto("/app");
   await settle(handleOf(page));
