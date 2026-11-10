@@ -15,7 +15,7 @@ export interface Contract extends SettlementTerms {
   networkId: string;
 }
 
-export interface ExpiryState {
+interface ExpiryState {
   underlying: string;
   expiry: number;
   settlement: ProposedSettlement | null;

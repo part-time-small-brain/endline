@@ -17,7 +17,7 @@ const SERIES_PAGE = 200;
 const SettlementTermsView = ConfigView.extend({ owner_id: z.string(), timing: z.object({ oracle_window_sec: z.number().int().min(0) }) });
 const SettlementView = Settlement.extend({ proposed_by: z.string() });
 const ChainSeries = Series.extend({ created_by: z.string().optional() });
-export type ChainSeries = z.infer<typeof ChainSeries>;
+type ChainSeries = z.infer<typeof ChainSeries>;
 const PendingOwnerView = z.object({ pending_owner_id: z.string().nullable() });
 const PendingOracleChangesView = z.object({
   oracles: z.array(z.tuple([z.string(), z.number().int()])),

@@ -5,6 +5,7 @@ x-app: &app
   platform: linux/amd64
   build: { context: .., dockerfile: deploy/Dockerfile, target: app }
   restart: unless-stopped
+  labels: [dozzle=on]
 
 services:
   relay:
@@ -34,17 +35,31 @@ services:
     platform: linux/amd64
     build: { context: .., dockerfile: deploy/Dockerfile, target: web }
     restart: unless-stopped
+    labels: [dozzle=on]
     depends_on: [relay]
+  logs:
+    image: amir20/dozzle:v11.4.2@sha256:08cd5230e21e364241f3dcf26191f293166f7835654eb7e41168b9c685f0947b
+    restart: unless-stopped
+    environment:
+      DOZZLE_FILTER: label=dozzle=on
+      DOZZLE_ENABLE_ACTIONS: "true"
+      DOZZLE_NO_ANALYTICS: "true"
+      DOZZLE_AUTH_PROVIDER: forward-proxy
+      DOZZLE_AUTH_HEADER_USER: Cf-Access-Authenticated-User-Email
+      DOZZLE_AUTH_HEADER_EMAIL: Cf-Access-Authenticated-User-Email
+    volumes: [/var/run/docker.sock:/var/run/docker.sock:ro]
+    networks: [ops]
   tunnel:
     image: cloudflare/cloudflared:2026.10.5@sha256:1b1d34d0a9c0bfca9de72db8460d328db3f19edd2b96169114e3e893a97bbe53
     restart: unless-stopped
     command: tunnel --no-autoupdate run
     environment: [TUNNEL_TOKEN]
     depends_on: [web]
-    networks: { default: { ipv4_address: 10.86.86.86 } }
+    networks: { default: { ipv4_address: 10.86.86.86 }, ops: {} }
 
 networks:
   default: { ipam: { config: [{ subnet: 10.86.86.0/24, ip_range: 10.86.86.128/25 }] } }
+  ops: {}
 
 volumes:
   relay-data: {}
