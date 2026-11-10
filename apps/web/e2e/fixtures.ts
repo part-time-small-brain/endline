@@ -158,6 +158,33 @@ export async function connectDemo(page: Page) {
   await expect(page.getByRole("button", { name: /^Buy (Up|Down)/ })).toBeVisible();
 }
 
+export function canvasPixels(canvas: Locator, x: number, y: number, width: number, height: number) {
+  return canvas.evaluate(
+    (element: HTMLCanvasElement, area) => {
+      const box = element.getBoundingClientRect();
+      const scale = element.width / box.width;
+      const copy = document.createElement("canvas");
+      copy.width = area.width * scale;
+      copy.height = area.height * scale;
+      const ctx = copy.getContext("2d", { willReadFrequently: true }) as CanvasRenderingContext2D;
+      ctx.drawImage(element, (area.x - box.left) * scale, (area.y - box.top) * scale, copy.width, copy.height, 0, 0, copy.width, copy.height);
+      return Array.from(ctx.getImageData(0, 0, copy.width, copy.height).data);
+    },
+    { x, y, width, height },
+  );
+}
+
+export function tintOf(data: number[]) {
+  let up = 0;
+  let down = 0;
+  for (let i = 0; i < data.length; i += 4) {
+    const [r = 0, g = 0, , a = 0] = data.slice(i, i + 4);
+    if (a > 64 && g - r > 60) up++;
+    if (a > 64 && r - g > 60) down++;
+  }
+  return up && down ? "mixed" : up ? "up" : down ? "down" : "none";
+}
+
 export async function openPopover(page: Page, label: string) {
   const expanded = page.getByRole("button", { expanded: true });
   if (await expanded.count()) await page.keyboard.press("Escape");

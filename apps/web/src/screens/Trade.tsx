@@ -1,6 +1,7 @@
 import { capPrice } from "@endline/sdk";
 import type { PositionView } from "../app/usePositions.ts";
 import { useTicket } from "../app/useTicket.ts";
+import { AppDots } from "../components/AppDots.tsx";
 import { Brackets } from "../components/Brackets.tsx";
 import { Button } from "../components/Button.tsx";
 import { Notice } from "../components/Notice.tsx";
@@ -38,7 +39,6 @@ export function Trade({ mode, nowSec, views, onConnect, onAddFunds, onQuote }: P
     spotNumber, spot, history, usdOf, payoutAt, up, strikes, choices,
     series, current, vol, reference, sides, first, empty, expiries, notice,
   } = state;
-  if (notice) return <Centered {...notice} />;
   const action = !wallet ? (
     <Button size="lg" onClick={onConnect}>
       Connect wallet
@@ -55,7 +55,10 @@ export function Trade({ mode, nowSec, views, onConnect, onAddFunds, onQuote }: P
 
   return (
     <>
-      {mode === "tap" ? (
+      <AppDots up={mode === "tap" || up} />
+      {notice ? (
+        <Centered {...notice} />
+      ) : mode === "tap" ? (
         <Tap state={state} nowSec={nowSec} views={views} onConnect={onConnect} onAddFunds={onAddFunds} onQuote={onQuote} />
       ) : mode === "lite" ? (
         <div className="mx-auto w-full max-w-2xl flex-1 px-4 pt-3 lg:px-6 lg:pt-6">
