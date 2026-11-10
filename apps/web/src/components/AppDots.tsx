@@ -1,9 +1,9 @@
-import { useReducedMotion } from "motion/react";
 import { useEffect, useRef } from "react";
 import { useTheme } from "../hooks/useTheme.ts";
 import { pull } from "../lib/dots.ts";
 
 const REACH = 160;
+const RADII = { x: REACH, y: REACH };
 const EASE = 0.22;
 const DOT = 1.1;
 const DOT_ALPHA = 0.9;
@@ -16,7 +16,6 @@ export function AppDots({ up }: { up: boolean }) {
   const washRef = useRef<HTMLDivElement>(null);
   const repaint = useRef<() => void>(undefined);
   const theme = useTheme();
-  const still = useReducedMotion() === true;
 
   useEffect(() => {
     const canvas = ref.current;
@@ -45,7 +44,7 @@ export function AppDots({ up }: { up: boolean }) {
         const first = (at: number) => Math.max(0, Math.ceil((at - REACH) / gap - 0.5));
         for (let row = first(y); (row + 0.5) * gap < y + REACH; row++) {
           for (let col = first(x); (col + 0.5) * gap < x + REACH; col++) {
-            const { strength } = pull((col + 0.5) * gap - x, (row + 0.5) * gap - y, { x: REACH, y: REACH }, 0);
+            const { strength } = pull((col + 0.5) * gap - x, (row + 0.5) * gap - y, RADII, 0);
             if (strength > 0) target.set(row * ROW_STRIDE + col, strength);
           }
         }
@@ -55,7 +54,7 @@ export function AppDots({ up }: { up: boolean }) {
       shown += ((cursor ? 1 : 0) - shown) * EASE;
       let moving = Math.abs((cursor ? 1 : 0) - shown) > 0.005;
       if (cursor) wash.style.transform = `translate(${cursor.x - WASH / 2}px, ${cursor.y - WASH / 2}px)`;
-      wash.style.opacity = still ? "0" : String(WASH_ALPHA * shown);
+      wash.style.opacity = String(WASH_ALPHA * shown);
 
       ctx.clearRect(0, 0, width, height);
       ctx.fillStyle = color;
@@ -119,7 +118,7 @@ export function AppDots({ up }: { up: boolean }) {
       document.removeEventListener("pointerout", out);
       repaint.current = undefined;
     };
-  }, [still]);
+  }, []);
 
   useEffect(() => repaint.current?.(), [up, theme]);
 
@@ -130,7 +129,7 @@ export function AppDots({ up }: { up: boolean }) {
         ref={washRef}
         data-side={side}
         aria-hidden="true"
-        className="pointer-events-none fixed top-0 left-0 -z-10 rounded-full bg-[radial-gradient(closest-side,var(--side-glow),transparent)] opacity-0"
+        className="pointer-events-none fixed top-0 left-0 -z-10 rounded-full bg-[radial-gradient(closest-side,var(--side-glow),transparent)] opacity-0 motion-reduce:hidden"
         style={{ width: WASH, height: WASH }}
       />
       <canvas ref={ref} data-side={side} aria-hidden="true" className="pointer-events-none fixed inset-0 -z-10 size-full" />

@@ -52,7 +52,7 @@ export function MarketStats({ symbol, spot, change, expiry, nowSec, quoteDecimal
 
 function Stat({ label, value, className = "" }: { label: ReactNode; value: ReactNode; className?: string }) {
   return (
-    <div className={`-m-2 min-w-0 rounded-md bg-page p-2 ${className}`}>
+    <div className={`-mx-2 min-w-0 rounded-md bg-page px-2 ${className}`}>
       <p className="flex items-center gap-2 text-xs text-ink-2 lg:text-sm">{label}</p>
       <p className="font-display text-2xl leading-8 font-semibold tracking-[-0.02em] lg:text-4xl lg:leading-10">{value}</p>
     </div>

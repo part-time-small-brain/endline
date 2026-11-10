@@ -4,7 +4,8 @@ import { canvasPixels, expect, handleOf, settle, test, tintOf } from "./fixtures
 type Area = { x: number; y: number; width: number; height: number };
 
 const glow = (page: Page) => page.locator("canvas[data-side]");
-const washOpacity = (page: Page) => page.locator('div[data-side][aria-hidden="true"]').evaluate((wash) => Number(getComputedStyle(wash).opacity));
+const wash = (page: Page) => page.locator('div[data-side][aria-hidden="true"]');
+const washOpacity = (page: Page) => wash(page).evaluate((element) => Number(getComputedStyle(element).opacity));
 const ready = (page: Page) => expect(page.getByLabel("Maximum payout")).toHaveText(/^\$[\d,.]+$/);
 const lit = async (page: Page, area: Area) => tintOf(await canvasPixels(glow(page), area.x, area.y, area.width, area.height));
 const around = (x: number, y: number): Area => ({ x: x - 40, y: y - 40, width: 80, height: 80 });
@@ -80,14 +81,16 @@ test("dots near the mouse glow in the picked side's colour, follow a side or the
   await expect.poll(drawsWhileWaiting).toBe(0);
 });
 
-test("with reduced motion the dots still glow but the wash stays off", async ({ page }) => {
+test("turning on reduced motion hides the wash at once and the dots still glow", async ({ page }) => {
   test.skip(test.info().project.use.isMobile === true, "needs a hovering pointer");
-  await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/app");
   await ready(page);
   await page.mouse.move(100, 500);
-  await expect.poll(() => lit(page, around(100, 500))).toBe("up");
-  expect(await washOpacity(page)).toBe(0);
+  await expect.poll(() => washOpacity(page)).toBeGreaterThan(0.1);
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await expect(wash(page)).toBeHidden();
+  await page.mouse.move(120, 520);
+  await expect.poll(() => lit(page, around(120, 520))).toBe("up");
 });
 
 test("Positions glows too", async ({ page }) => {
@@ -172,4 +175,14 @@ test("market stats keep their text clear of the glow", async ({ page }) => {
   await page.mouse.move(timer.x + timer.width / 2, timer.y + timer.height / 2);
   await expect.poll(() => lit(page, timer)).toBe("up");
   expect(await onScreen(page, timer)).toBe("none");
+});
+
+test("market stat boxes stay below the header at every width", async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem("trade-mode", "pro"));
+  await page.goto("/app");
+  await settle(handleOf(page));
+  const header = await page.getByRole("banner").boundingBox();
+  const box = await page.getByRole("timer").first().locator("xpath=../..").boundingBox();
+  if (!header || !box) throw new Error("no layout");
+  expect(box.y).toBeGreaterThanOrEqual(header.y + header.height);
 });
