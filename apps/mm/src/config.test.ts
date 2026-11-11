@@ -15,13 +15,15 @@ const STALE = { NEAR_RPC_URL: "https://rpc.stale.example", INTENTS_ID: "intents.
 
 describe("config", () => {
   it("turns vol points into a fraction", () => {
-    expect(loadConfig(ENV).settings).toMatchObject({ spreadVol: 0.02 });
+    expect(loadConfig(ENV).settings).toMatchObject({ spreadVol: 0.02, reserveUsd: 500 });
+    expect(loadConfig({ ...ENV, RESERVE_USD: "10" }).settings.reserveUsd).toBe(10);
   });
 
   it.each([
     ["a missing network", { NETWORK_ID: undefined }],
     ["a key without the curve prefix", { MM_PRIVATE_KEY: "1".repeat(64) }],
     ["a negative limit", { MAX_DELTA_USD: "-5" }],
+    ["a zero reserve", { RESERVE_USD: "0" }],
     ["a non-numeric limit", { MAX_VEGA_USD: "lots" }],
     ["a trade cap too big to count in quote units", { MAX_TRADE_USD: "1e10" }],
   ])("refuses %s", (_, override) => {
