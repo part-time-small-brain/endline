@@ -29,6 +29,7 @@ describe("listedWidth", () => {
 
   it("throws on a strike too large for a number instead of looping forever", () => {
     expect(() => isListed({ strike: "9".repeat(310), width: "1" }, 6)).toThrow();
+    expect(() => isListed({ strike: (2n ** 1023n).toString(), width: "1" }, 0)).toThrow();
   });
 });
 

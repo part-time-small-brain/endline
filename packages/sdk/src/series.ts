@@ -40,8 +40,8 @@ export function defaultExpiry(expiries: number[], nowSec: number): number | unde
 }
 
 export function strikeStepCents(price: number): bigint {
-  if (!Number.isFinite(price)) throw new Error(`no strike step for ${price}`);
   const max = price * 100 * STEP_OF_PRICE;
+  if (!Number.isFinite(max)) throw new Error(`no strike step for ${price}`);
   let step = 1n;
   for (let power = 1n; ; power *= 10n) {
     for (const m of [1n, 2n, 5n]) {
