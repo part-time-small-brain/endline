@@ -102,18 +102,18 @@ cat <<EOF
 # 1. Contract account. Its 4.8 NEAR (about 4.3 NEAR code storage, the rest for the settlement and payout records it stores) can't be withdrawn once step 3 deletes its keys
 near --quiet account create-account fund-myself $opt '4.8 NEAR' autogenerate-new-keypair save-to-legacy-keychain sign-as $root $(admin OWNER_PRIVATE_KEY)
 
-# 2. Deploy + init: owner $root, 1 h dispute window, oracle changes wait 1 day, Deribit daily timing
-near contract deploy $opt use-file $(printf %q "$wasm") with-init-call new json-args '{"owner_id":"$root","intents_id":"intents.near","quote_asset":"nep141:$usdc","quote_decimals":6,"dispute_window_sec":3600,"oracle_delay_sec":86400}' prepaid-gas '300.0 Tgas' attached-deposit '0 NEAR' $send
+# 2. Deploy + init: owner $root, 1 h dispute window, oracle changes wait 1 h, Deribit daily timing
+near contract deploy $opt use-file $(printf %q "$wasm") with-init-call new json-args '{"owner_id":"$root","intents_id":"intents.near","quote_asset":"nep141:$usdc","quote_decimals":6,"dispute_window_sec":3600,"oracle_delay_sec":3600}' prepaid-gas '300.0 Tgas' attached-deposit '0 NEAR' $send
 
 # 3. Check the init, then delete every key on $opt (with one, anyone could move all collateral).
-#    get_config must show owner_id $root, pending_owner_id null, dispute_window_sec 3600, oracle_delay_sec 86400, timing.period_sec 86400
+#    get_config must show owner_id $root, pending_owner_id null, dispute_window_sec 3600, oracle_delay_sec 3600, timing.period_sec 86400
 $view $opt get_config json-args '{}' $net now
 near account list-keys $opt $net now
 near account delete-keys $opt public-keys <every key listed above, comma-separated> $send
 near account list-keys $opt $net now
 rm -r ~/.near-credentials/mainnet/$opt.json ~/.near-credentials/mainnet/$opt
 
-# 4. Underlying, oracle account and oracle WASM (owner, 1 yocto). The oracle and WASM are live 24 h later
+# 4. Underlying, oracle account and oracle WASM (owner, 1 yocto). The oracle and WASM are live 1 h later
 near --quiet contract call-function as-transaction $opt add_underlying json-args '{"symbol":"BTC","underlying":{"index":"btc_usd","decimals":8,"min_write":"1000"}}' prepaid-gas '30 Tgas' attached-deposit '1 yoctoNEAR' sign-as $root $(admin OWNER_PRIVATE_KEY)
 near --quiet contract call-function as-transaction $opt add_oracle json-args '{"account_id":"$oracle"}' prepaid-gas '30 Tgas' attached-deposit '1 yoctoNEAR' sign-as $root $(admin OWNER_PRIVATE_KEY)
 near --quiet contract call-function as-transaction $opt set_oracle_wasm json-args '{"oracle_wasm":{"outlayer_id":"outlayer.near","url":"$url","sha256":"$sha"}}' prepaid-gas '30 Tgas' attached-deposit '1 yoctoNEAR' sign-as $root $(admin OWNER_PRIVATE_KEY)

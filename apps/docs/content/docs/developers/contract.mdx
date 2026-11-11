@@ -16,7 +16,7 @@ NEP-245 multi-token contract with per-series collateral accounting. Rust, near-s
 new(owner_id, intents_id, quote_asset, quote_decimals, dispute_window_sec, oracle_delay_sec, timing: Option<Timing>)
 ```
 
-`oracle_delay_sec` (60 s to 7 days, fixed at deploy; 1 day on mainnet, 60 s on testnet) is how long `add_oracle` and `set_oracle_wasm` wait before they take effect. Until then the old oracle set and WASM stay in force, and `get_pending_oracle_changes` shows what is coming. `remove_oracle` is immediate.
+`oracle_delay_sec` (60 s to 7 days, fixed at deploy; 1 h on mainnet, 60 s on testnet) is how long `add_oracle` and `set_oracle_wasm` wait before they take effect. Until then the old oracle set and WASM stay in force, and `get_pending_oracle_changes` shows what is coming. `remove_oracle` is immediate.
 
 `Timing` is fixed at deploy and has no setter.
 
