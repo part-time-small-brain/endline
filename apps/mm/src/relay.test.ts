@@ -61,15 +61,21 @@ describe("relay client", () => {
     expect(quotes).toEqual([]);
   }, 10_000);
 
-  it("drops a relay that stops answering pings and reconnects", async () => {
+  it.each([
+    [true, 1],
+    [false, 2],
+  ])("with a relay that answers pings: %s, connects %i times over two ping rounds", async (autoPong, expected) => {
     vi.useFakeTimers({ toFake: ["setInterval"] });
-    const { url, connections } = relay({ autoPong: false });
+    const { url, connections } = relay({ autoPong });
     const client = new RelayClient(url, "k", { quote: () => {}, status: () => {} }, () => {});
     client.start();
     await expect.poll(() => connections.length).toBe(1);
-    vi.advanceTimersByTime(PING_MS);
-    vi.advanceTimersByTime(PING_MS);
-    await expect.poll(() => connections.length, { timeout: 5_000 }).toBe(2);
+    for (let round = 0; round < 2; round++) {
+      vi.advanceTimersByTime(PING_MS);
+      await new Promise((resolve) => setTimeout(resolve, 200));
+    }
+    await new Promise((resolve) => setTimeout(resolve, 2_500));
+    expect(connections).toHaveLength(expected);
     client.close();
   }, 10_000);
 });
