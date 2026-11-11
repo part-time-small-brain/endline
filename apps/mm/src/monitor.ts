@@ -58,14 +58,13 @@ export async function monitorCommand(config: MonitorConfig, once: boolean): Prom
 
 async function check(chain: ChainReader, config: MonitorConfig, final: Set<string>, open: ReadonlyMap<string, Opened>): Promise<Alert[]> {
   const nowSec = Math.floor(Date.now() / 1000);
-  const accounts = (
-    [
-      ["Options contract", config.optionsId, CONTRACT_RESERVE_YOCTO],
-      ["Intents contract", config.intentsId, ACCOUNT_RESERVE_YOCTO],
-      ["Relayer", config.relayerId, ACCOUNT_RESERVE_YOCTO],
-      ["Market maker", config.mmId, ACCOUNT_RESERVE_YOCTO],
-    ] as [string, string | undefined, bigint][]
-  ).filter((a): a is [string, string, bigint] => a[1] !== undefined);
+  const watched: [string, string | undefined, bigint][] = [
+    ["Options contract", config.optionsId, CONTRACT_RESERVE_YOCTO],
+    ["Intents contract", config.intentsId, ACCOUNT_RESERVE_YOCTO],
+    ["Relayer", config.relayerId, ACCOUNT_RESERVE_YOCTO],
+    ["Market maker", config.mmId, ACCOUNT_RESERVE_YOCTO],
+  ];
+  const accounts = watched.filter((a): a is [string, string, bigint] => a[1] !== undefined);
   const reserves = Promise.all(
     accounts.map(async ([role, id, minYocto]): Promise<Alert | undefined> => {
       try {

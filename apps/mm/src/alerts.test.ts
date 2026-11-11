@@ -42,10 +42,10 @@ describe("settlementAlert", () => {
     );
   });
 
-  it("signs mainnet commands with the owner or oracle admin key from the environment, testnet ones from the keychain", () => {
+  it("signs mainnet commands quietly with the admin key from the environment and deletes near CLI's command log, testnet ones from the keychain", () => {
     const mainnet = { ...CONTRACT, networkId: "mainnet" };
-    expect(check(proposed("90000000000"), 80_705.19, { contract: mainnet })?.text).toMatch(/sign-as owner\.testnet network-config mainnet sign-with-plaintext-private-key "\$OWNER_PRIVATE_KEY" send$/);
-    expect(check(null, 80_000, { nowSec: EXPIRY + 900, contract: mainnet })?.text).toMatch(/sign-as oracle\.testnet network-config mainnet sign-with-plaintext-private-key "\$ORACLE_PRIVATE_KEY" send$/);
+    expect(check(proposed("90000000000"), 80_705.19, { contract: mainnet })?.text).toMatch(/near --quiet contract call-function as-transaction opt6\.near-options-dev\.testnet override_settlement .* sign-as owner\.testnet network-config mainnet sign-with-plaintext-private-key "\$OWNER_PRIVATE_KEY" send; rm -f "\$TMPDIR\/near-cli-rs-final-command\.log"$/);
+    expect(check(null, 80_000, { nowSec: EXPIRY + 900, contract: mainnet })?.text).toMatch(/near --quiet contract call-function as-transaction .* sign-as oracle\.testnet network-config mainnet sign-with-plaintext-private-key "\$ORACLE_PRIVATE_KEY" send; rm -f "\$TMPDIR\/near-cli-rs-final-command\.log"$/);
     expect(check(null, 80_000, { nowSec: EXPIRY + 900 })?.text).toMatch(/network-config testnet sign-with-legacy-keychain send$/);
   });
 

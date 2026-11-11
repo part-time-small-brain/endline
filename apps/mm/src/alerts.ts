@@ -84,7 +84,8 @@ function iso(unixSec: number): string {
   return `${new Date(unixSec * 1000).toISOString().slice(0, 16).replace("T", " ")} UTC`;
 }
 
-function nearCall(c: Contract, method: string, args: object, deposit: string, signer: string, adminKey: string): string {
-  const sign = c.networkId === "mainnet" ? `sign-with-plaintext-private-key "$${adminKey}"` : "sign-with-legacy-keychain";
-  return `near contract call-function as-transaction ${c.optionsId} ${method} json-args '${JSON.stringify(args)}' prepaid-gas '30 Tgas' attached-deposit '${deposit}' sign-as ${signer} network-config ${c.networkId} ${sign} send`;
+function nearCall(c: Contract, method: string, args: object, deposit: string, signer: string, keyVar: string): string {
+  const call = `contract call-function as-transaction ${c.optionsId} ${method} json-args '${JSON.stringify(args)}' prepaid-gas '30 Tgas' attached-deposit '${deposit}' sign-as ${signer} network-config ${c.networkId}`;
+  if (c.networkId !== "mainnet") return `near ${call} sign-with-legacy-keychain send`;
+  return `near --quiet ${call} sign-with-plaintext-private-key "$${keyVar}" send; rm -f "$TMPDIR/near-cli-rs-final-command.log"`;
 }

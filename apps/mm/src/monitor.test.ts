@@ -226,10 +226,10 @@ it("holds the options contract to 0.3 NEAR over storage and the accounts that pa
   chain.nearBalance.mockImplementation(async (accountId: string) => ({ amount: balances[accountId], storageUsage: 0 }));
   await monitorCommand({ ...CONFIG, webhookUrl: undefined }, true);
   expect(log.mock.calls.map(([line]) => String(line)).filter((line) => line.startsWith("ALERT"))).toEqual([expect.stringContaining("ALERT [testnet] Relayer low on NEAR: relayer.testnet: 0.300 NEAR above storage, below the 2.000 NEAR reserve")]);
-  balances["opt.testnet"] = (3n * NEAR) / 10n - 1n;
+  balances["opt.testnet"] = (3n * NEAR) / 10n - NEAR / 1000n;
   log.mockClear();
   await monitorCommand({ ...CONFIG, webhookUrl: undefined }, true);
-  expect(log.mock.calls.map(([line]) => String(line)).filter((line) => line.startsWith("ALERT"))[0]).toContain("Options contract low on NEAR: opt.testnet: 0.300 NEAR above storage, below the 0.300 NEAR reserve");
+  expect(log.mock.calls.map(([line]) => String(line)).filter((line) => line.startsWith("ALERT"))[0]).toContain("Options contract low on NEAR: opt.testnet: 0.299 NEAR above storage, below the 0.300 NEAR reserve");
 });
 
 it("alerts the market maker running out of NEAR for gas once its account is set", async () => {
