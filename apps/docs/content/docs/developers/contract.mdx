@@ -117,13 +117,13 @@ An intents `mt_withdraw` of option tokens to an account with no balance row for 
 - NEP-245 `mt_mint`, `mt_burn`, `mt_transfer` (`standard: "nep245"`, `version: "1.0.0"`).
 - `endline` `1.0.0`: `series_created`, `write`, `exercise`, `redeem` and `burn_pair` (each with its USDC `payout`), `settlement_proposed`, `settlement_overridden`, `payout_failed` (`owner_id`, `asset`, `amount`: now claimable), `delivery_failed` (`owner_id`, `token_ids`, `amounts`: now in `get_undelivered`, resend with `retry_delivery`), `series_deleted` (`series_id`, `created_by`, `refund`, `dust`: the rounding left in the series, which the contract keeps), `storage_refund_failed` (`account_id`, `amount`: the NEAR stays in the contract).
 
-## Testnet underlyings
+## Underlyings
 
 | Underlying | Deribit index | Option decimals | Minimum write |
 |---|---|---|---|
 | BTC | `btc_usd` | 8 | 0.00001 BTC |
 
-Collateral and payouts: USDC, `nep141:usdc.near-options-dev.testnet`, 6 decimals.
+Collateral and payouts: USDC, 6 decimals. Mainnet: `nep141:17208628f84f5d6ad33f0da3bbbeb27ffcb398eac501a31bd6ad2011e36133a1`. Testnet: `nep141:usdc.near-options-dev.testnet`.
 
 ## Not built yet
 
