@@ -1,6 +1,6 @@
 {
 	servers {
-		trusted_proxies static 10.86.86.86/32
+		trusted_proxies static {$TUNNEL_IP}/32
 		client_ip_headers CF-Connecting-IP
 	}
 }

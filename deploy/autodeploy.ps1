@@ -1,6 +1,9 @@
+param([ValidateSet('testnet', 'mainnet')][string]$Network = 'testnet', [string]$Ref = 'main')
+
 $Repo = Split-Path -Parent $PSScriptRoot
-$Log = Join-Path (Split-Path -Parent $Repo) "endline-deploy.log"
+$Log = Join-Path (Split-Path -Parent $Repo) "endline-$Network-deploy.log"
 Set-Location $Repo
+$env:NETWORK_ID = $Network
 
 function Log($m) { "$(Get-Date -Format s) $m" | Add-Content $Log }
 
@@ -12,16 +15,16 @@ function Run {
 }
 
 try {
-  Run git fetch --quiet origin main | Out-Null
-  $remote = Run git rev-parse origin/main
+  Run git fetch --quiet origin $Ref | Out-Null
+  $remote = Run git rev-parse "origin/$Ref"
   $deployed = git rev-parse -q --verify deployed
   if ($deployed -ne $remote) {
     Run git reset --hard --quiet $remote | Out-Null
     $server = -not $deployed -or (Run git diff --name-only --no-renames $deployed $remote | Where-Object { $_ -notmatch '^(apps/web/|apps/docs/)|\.md$' })
     if ($server) {
       Push-Location deploy
-      Run docker compose build | Out-Null
-      Run docker compose up -d --remove-orphans | Out-Null
+      Run docker compose --env-file ".env.$Network" build | Out-Null
+      Run docker compose --env-file ".env.$Network" up -d --remove-orphans | Out-Null
       Pop-Location
       Log "deployed $remote"
     } else {
