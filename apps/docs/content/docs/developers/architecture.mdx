@@ -68,14 +68,15 @@ Testnet ids are in `deploy/testnet.json`. RPC: `https://rpc.testnet.fastnear.com
 
 ## Keys on mainnet
 
-One account per role (`scripts/mainnet-plan.sh` creates them). Only three keys go on the server.
+One account per role (`scripts/mainnet-plan.sh` creates them). Only three keys go on the server; they are generated there and stored in Infisical, so they never pass through a laptop.
 
 | Key | Kept | Can do | If it leaks |
 |---|---|---|---|
 | Owner | Ledger, `44'/397'/0'/0'/1'` | Everything in [who can do what](./security.mdx#who-can-do-what) | Any price still in its dispute window, with no delay, and the contract itself, since ownership moves at once. It can't withdraw collateral, but with positions of its own a forced price moves collateral between holders |
 | Relayer function-call key | Server | `execute_intents` on `intents.near`, gas paid by the relayer | The relayer's NEAR, as gas |
-| Relayer full-access key | Offline | Anything on the relayer account | Nothing on the server to leak |
+| Relayer full-access key | Ledger, `44'/397'/0'/0'/3'` | Anything on the relayer account | Nothing on the server to leak |
 | MM key | Server | The MM account's full-access key: signs its intents, pays its gas, attaches NEAR to `create_series` | The MM's whole intents balance and its NEAR: keep only working capital there, topped up from a wallet that never touches the server. Rotating it also needs `remove_public_key` on `intents.near` |
+| MM backup key | Ledger, `44'/397'/0'/0'/4'` | Full access on the MM account: registers or rotates the server key, here and with `add_public_key` / `remove_public_key` on `intents.near` | Same as the MM key |
 | Settler key | Server | `request_settlement`, which attaches 0.01 NEAR, so it can't be a function-call key | The settler's NEAR (about 1) |
 | Oracle key | Ledger, `44'/397'/0'/0'/2'` (same device as the owner) | `propose_settlement` once OutLayer's window passed, for a human to use | A wrong price the owner can override inside the dispute window |
 
