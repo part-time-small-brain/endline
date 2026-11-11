@@ -58,3 +58,15 @@ describe("balances", () => {
     expect([...balances]).toEqual(assets.map((a, i) => [a, BigInt(i)]));
   });
 });
+
+describe("view", () => {
+  it("gives up on an RPC call that never answers, so a stalled node can't freeze a loop", async () => {
+    vi.useFakeTimers();
+    vi.spyOn(JsonRpcProvider.prototype, "callFunction").mockReturnValue(new Promise(() => {}));
+    const read = new ChainReader("http://rpc", "opt.testnet").series();
+    const outcome = expect(read).rejects.toThrow(/RPC/);
+    await vi.advanceTimersByTimeAsync(15_000);
+    await outcome;
+    vi.useRealTimers();
+  });
+});

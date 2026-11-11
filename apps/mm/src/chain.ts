@@ -10,6 +10,7 @@ const Underlyings = z.array(
   z.tuple([z.string(), z.object({ index: z.string(), decimals: z.number().int().min(0).max(24), min_write: z.string().regex(/^[0-9]+$/).transform(BigInt) })]),
 );
 const BALANCE_PAGE = 200;
+const RPC_TIMEOUT_MS = 15_000;
 const Balances = z.array(z.string().regex(/^[0-9]+$/).transform(BigInt));
 const Salt = z.string().regex(/^[0-9a-f]{8}$/);
 const Fee = z.number().int().min(0).max(999_999);
@@ -72,7 +73,11 @@ export class ChainReader {
   }
 
   protected async view(contractId: string, method: string, args: Record<string, unknown> = {}): Promise<unknown> {
-    return this.provider.callFunction({ contractId, method, args });
+    let timer: NodeJS.Timeout | undefined;
+    const stalled = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => reject(new Error(`RPC ${method} took over ${RPC_TIMEOUT_MS} ms`)), RPC_TIMEOUT_MS);
+    });
+    return Promise.race([this.provider.callFunction({ contractId, method, args }), stalled]).finally(() => clearTimeout(timer));
   }
 
   async contractConfig(): Promise<ContractConfig> {
