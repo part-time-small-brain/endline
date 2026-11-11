@@ -50,7 +50,7 @@ echo "preflight ok. Contract $(git -C "$repo" rev-parse --short HEAD), wasm sha2
 
 net="network-config mainnet"
 send="$net sign-with-legacy-keychain send"
-ledger="$net sign-with-ledger usb send"
+ledger="$net sign-with-ledger --seed-phrase-hd-path \"44'/397'/0'/0'/1'\" usb send"
 oracle_key="use-ledger --seed-phrase-hd-path \"44'/397'/0'/0'/2'\" usb"
 call="near contract call-function as-transaction"
 view="near contract call-function as-read-only"
@@ -65,7 +65,9 @@ for spec in "$relayer:3" "$mm:3" "$settler:1" "$oracle:0.5"; do
     [ "$account" = "$oracle" ] && key="$oracle_key"
     echo "near account create-account fund-myself $account '$near NEAR' $key sign-as $root $ledger"
   else
-    echo "# $account exists: needs ~$near NEAR and its key in ~/.near-credentials/mainnet/$account.json"
+    where="in ~/.near-credentials/mainnet/$account.json"
+    [ "$account" = "$oracle" ] && where="on the Ledger at 44'/397'/0'/0'/2'"
+    echo "# $account exists: needs ~$near NEAR and its key $where"
   fi
 done
 echo "# The relay only sends execute_intents: its RELAYER_PRIVATE_KEY is this function-call key, never the full-access one"

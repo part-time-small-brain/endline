@@ -42,6 +42,13 @@ describe("settlementAlert", () => {
     );
   });
 
+  it("signs mainnet commands on the Ledger, owner and oracle on their own paths, and testnet ones from the keychain", () => {
+    const mainnet = { ...CONTRACT, networkId: "mainnet" };
+    expect(check(proposed("90000000000"), 80_705.19, { contract: mainnet })?.text).toMatch(/sign-as owner\.testnet network-config mainnet sign-with-ledger --seed-phrase-hd-path "44'\/397'\/0'\/0'\/1'" usb send$/);
+    expect(check(null, 80_000, { nowSec: EXPIRY + 900, contract: mainnet })?.text).toMatch(/sign-as oracle\.testnet network-config mainnet sign-with-ledger --seed-phrase-hd-path "44'\/397'\/0'\/0'\/2'" usb send$/);
+    expect(check(null, 80_000, { nowSec: EXPIRY + 900 })?.text).toMatch(/network-config testnet sign-with-legacy-keychain send$/);
+  });
+
   it("stays silent once the price is final, however wrong", () => {
     expect(check(proposed("1"), 80_000, { nowSec: FINAL_AT })).toBeUndefined();
     expect(check(proposed("1"), undefined, { nowSec: FINAL_AT + 1 })).toBeUndefined();
