@@ -72,11 +72,41 @@ pnpm --filter @endline/mm start positions           # market maker balances, gre
 
 ## Docker
 
-`deploy/` has the Dockerfile and compose file for the hosted testnet stack: `web` (Caddy serving the relay's public routes), `relay`, `mm`, `lister`, `monitor`, `proposer`, `logs` and a Cloudflare tunnel. The landing, the app and these docs are static sites on Cloudflare Pages. Each container reads only its own variables from `deploy/.env` (template: `deploy/env.example`); the image carries `deploy/*.json` and `NETWORK_ID` picks one. The `proposer` needs its own `ORACLE_ACCOUNT_ID` and `ORACLE_PRIVATE_KEY` and won't start without them. Caddy takes the client IP from `CF-Connecting-IP` only on requests from the tunnel container (`10.86.86.86`) and ignores it from anyone else. `deploy/autodeploy.ps1` is the hosting box's scheduled task: it pulls `main` and redeploys when server files change. `logs` is [Dozzle](https://dozzle.dev): read-only live logs for the services labelled `dozzle=on` (not the tunnel or itself). It reaches Docker only through `docker`, a socket proxy on an internal network shared with Dozzle alone, which allows reads (containers, system info, events, version) and nothing else, so a Dozzle bug or a forged Access header can't stop, create or exec into a container. Reads still include each container's inspect output with its env (keys included) and its files, so the Access app stays the guard for those. The proxy ends idle log streams after 10 minutes, so a quiet service can show as stopped until the page is reloaded. Restart a service with `docker compose -f deploy/compose.yaml restart <service>` on the host. It sits on its own `ops` network with the tunnel only, publishes no port, and takes the user from Access's `Cf-Access-Authenticated-User-Email` header; its hostname and Access app (with the tunnel checking the Access token) live in the Zero Trust dashboard.
+`deploy/` has the Dockerfile and compose file. The hosting box runs it once per network as the compose project `endline-<NETWORK_ID>`, each from its own checkout with its own env file (`deploy/.env.<network>`, template: `deploy/env.example`), images (`endline-app:<network>`), subnet, relay volume, Cloudflare tunnel and [secrets](#secrets). Mainnet runs once `deploy/mainnet.json` exists. The landing, the app and these docs are static sites on Cloudflare Pages.
+
+| | testnet | mainnet |
+|---|---|---|
+| Checkout follows | `main` | `mainnet`, moved by a maintainer to a reviewed `main` commit |
+| `COMPOSE_PROFILES` | `proposer,ops` | `settler` |
+| `SUBNET` | `10.86.86` | `10.86.87` |
+
+- Every stack runs `web` (Caddy serving the relay's public routes), `relay`, `mm`, `lister`, `monitor` and `tunnel`. Profiles add the testnet `proposer`, the mainnet `settler` and, once per host, `logs` and `docker`. Dropping a profile leaves its containers running: `docker compose --env-file deploy/.env.<network> --profile <profile> rm -sf`.
+- Each container reads only its own variables and secrets; the image carries `deploy/*.json` and `NETWORK_ID` picks one. The `proposer` needs its own `ORACLE_ACCOUNT_ID` and `ORACLE_PRIVATE_KEY` and won't start without them.
+- Caddy takes the client IP from `CF-Connecting-IP` only on requests from its own stack's tunnel container (`<SUBNET>.86`) and ignores it from anyone else.
+- `deploy/autodeploy.ps1 -Network <network>` is a scheduled task per checkout: it pulls the network's branch and redeploys that stack when server files change. Testnet holds a commit that changes `deploy/compose.yaml` or `deploy/autodeploy.ps1` (they run on the host, next to the mainnet keys) and logs it until someone deploys it by hand.
+- `logs` is [Dozzle](https://dozzle.dev): read-only live logs for the services labelled `dozzle=on` (not the tunnel or itself) in both stacks, prefixed with the project name. It reaches Docker only through `docker`, a socket proxy on an internal network shared with Dozzle alone, which allows reads (containers, system info, events, version) and nothing else, so a Dozzle bug or a forged Access header can't stop, create or exec into a container. Reads still include every container's files, mainnet's `/run/secrets` included, so the Access app stays the guard for those. The proxy ends idle log streams after 10 minutes, so a quiet service can show as stopped until the page is reloaded. It sits on its own `ops` network with the tunnel only, publishes no port, and takes the user from Access's `Cf-Access-Authenticated-User-Email` header; its hostname and Access app (with the tunnel checking the Access token) live in the Zero Trust dashboard.
+- Restart a service with `docker compose -f deploy/compose.yaml --env-file deploy/.env.<network> restart <service>` on the host.
 
 ```bash
-docker compose -f deploy/compose.yaml --env-file deploy/.env build
+docker compose -f deploy/compose.yaml --env-file deploy/.env.testnet build
 ```
+
+### Secrets
+
+Keys live in the Infisical project `endline`, one environment per network. The Infisical agent on the box (config: `deploy/infisical/agent-config.yaml`, read-only machine identity) checks every 5 minutes and writes each one to `SECRETS_ROOT/<NETWORK_ID>/<NAME>`. Compose mounts the file at `/run/secrets/<NAME>` and sets `<NAME>_FILE`, so `docker inspect` shows a path, never a value. The relay, market maker and tunnel read `<NAME>_FILE`; the relay and market maker also take `<NAME>` when run by hand, and refuse both. An empty file counts as unset.
+
+| Secret | Used by | Notes |
+|---|---|---|
+| `RELAYER_PRIVATE_KEY` | relay | Testnet: full access (the faucet needs it). Mainnet: function-call key for `execute_intents` |
+| `MM_PRIVATE_KEY` | mm, lister | |
+| `MM_API_KEY` | mm, relay | 16+ chars. The relay reads the same file as `MM_API_KEYS` |
+| `ORACLE_PRIVATE_KEY` | proposer | Testnet only |
+| `SETTLER_PRIVATE_KEY` | settler | Mainnet only |
+| `TUNNEL_TOKEN` | tunnel | Zero Trust > Networks > Tunnels, one tunnel per network |
+| `ALERT_WEBHOOK_URL` | monitor | Optional. Slack or Discord incoming webhook, or `https://api.telegram.org/bot<token>/sendMessage?chat_id=<chat id>` |
+| `ONECLICK_JWT` | relay | Optional. 1Click Partner Portal JWT, sent on `/deposit-quote` so users skip the +0.25% unauthenticated fee |
+
+To add or rotate one: change it in Infisical, wait up to 5 minutes for the file to update, then `docker compose -f deploy/compose.yaml --env-file deploy/.env.<network> restart <services>` on the host, every service in its Used by column. The agent never restarts anything, so a bad edit only lands on the next restart. `docker compose up -d` doesn't notice a changed file.
 
 ## These docs
 

@@ -1,7 +1,7 @@
-name: endline
+name: endline-${NETWORK_ID:?}
 
 x-app: &app
-  image: endline-app
+  image: endline-app:${NETWORK_ID:?}
   platform: linux/amd64
   build: { context: .., dockerfile: deploy/Dockerfile, target: app }
   restart: unless-stopped
@@ -11,31 +11,44 @@ services:
   relay:
     <<: *app
     command: pnpm --filter @endline/relay start
-    environment: [NETWORK_ID, RELAYER_ACCOUNT_ID, RELAYER_PRIVATE_KEY, MM_API_KEYS, FAUCET, ONECLICK_JWT, APP_ORIGINS, PORT=8787, DATA_DIR=/data, TRUST_PROXY=true]
+    environment: [NETWORK_ID, RELAYER_ACCOUNT_ID, RELAYER_PRIVATE_KEY_FILE=/run/secrets/RELAYER_PRIVATE_KEY, MM_API_KEYS_FILE=/run/secrets/MM_API_KEY, FAUCET, ONECLICK_JWT_FILE=/run/secrets/ONECLICK_JWT, APP_ORIGINS, PORT=8787, DATA_DIR=/data, TRUST_PROXY=true]
+    secrets: [RELAYER_PRIVATE_KEY, MM_API_KEY, ONECLICK_JWT]
     volumes: [relay-data:/data]
   mm:
     <<: *app
     command: pnpm --filter @endline/mm start
-    environment: [NETWORK_ID, MM_ACCOUNT_ID, MM_PRIVATE_KEY, MM_API_KEY, ALERT_WEBHOOK_URL, RELAY_WS_URL=ws://relay:8787/mm]
+    environment: [NETWORK_ID, MM_ACCOUNT_ID, MM_PRIVATE_KEY_FILE=/run/secrets/MM_PRIVATE_KEY, MM_API_KEY_FILE=/run/secrets/MM_API_KEY, RELAY_WS_URL=ws://relay:8787/mm]
+    secrets: [MM_PRIVATE_KEY, MM_API_KEY]
     depends_on: [relay]
   lister:
     <<: *app
     command: pnpm --filter @endline/mm start list
-    environment: [NETWORK_ID, MM_ACCOUNT_ID, MM_PRIVATE_KEY]
+    environment: [NETWORK_ID, MM_ACCOUNT_ID, MM_PRIVATE_KEY_FILE=/run/secrets/MM_PRIVATE_KEY]
+    secrets: [MM_PRIVATE_KEY]
   monitor:
     <<: *app
     command: pnpm --filter @endline/mm start monitor
-    environment: [NETWORK_ID, RELAYER_ACCOUNT_ID, MM_ACCOUNT_ID, ALERT_WEBHOOK_URL, "HEALTH_URL=${HEALTH_URL:-http://web/health}"]
+    environment: [NETWORK_ID, RELAYER_ACCOUNT_ID, MM_ACCOUNT_ID, ALERT_WEBHOOK_URL_FILE=/run/secrets/ALERT_WEBHOOK_URL, "HEALTH_URL=${HEALTH_URL:-http://web/health}"]
+    secrets: [ALERT_WEBHOOK_URL]
   proposer:
     <<: *app
     command: pnpm --filter @endline/mm start propose
-    environment: [NETWORK_ID, ORACLE_ACCOUNT_ID, ORACLE_PRIVATE_KEY]
+    environment: [NETWORK_ID, ORACLE_ACCOUNT_ID, ORACLE_PRIVATE_KEY_FILE=/run/secrets/ORACLE_PRIVATE_KEY]
+    secrets: [ORACLE_PRIVATE_KEY]
+    profiles: [proposer]
+  settler:
+    <<: *app
+    command: pnpm --filter @endline/mm start settle
+    environment: [SETTLER_ACCOUNT_ID, SETTLER_PRIVATE_KEY_FILE=/run/secrets/SETTLER_PRIVATE_KEY]
+    secrets: [SETTLER_PRIVATE_KEY]
+    profiles: [settler]
   web:
-    image: endline-web
+    image: endline-web:${NETWORK_ID:?}
     platform: linux/amd64
     build: { context: .., dockerfile: deploy/Dockerfile, target: web }
     restart: unless-stopped
     labels: [dozzle=on]
+    environment: ["TUNNEL_IP=${SUBNET:?}.86"]
     depends_on: [relay]
   logs:
     image: amir20/dozzle:v11.4.2@sha256:08cd5230e21e364241f3dcf26191f293166f7835654eb7e41168b9c685f0947b
@@ -49,24 +62,37 @@ services:
       DOZZLE_AUTH_HEADER_EMAIL: Cf-Access-Authenticated-User-Email
     depends_on: [docker]
     networks: [ops, socket]
+    profiles: [ops]
   docker:
     image: tecnativa/docker-socket-proxy:v0.5.0@sha256:1f5038b54f06c3e18422902cf00ba21803d1c97805aae032e5e6673d532d3459
     restart: unless-stopped
     environment: [CONTAINERS=1, INFO=1]
     volumes: [/var/run/docker.sock:/var/run/docker.sock:ro]
     networks: [socket]
+    profiles: [ops]
   tunnel:
     image: cloudflare/cloudflared:2026.10.5@sha256:1b1d34d0a9c0bfca9de72db8460d328db3f19edd2b96169114e3e893a97bbe53
     restart: unless-stopped
     command: tunnel --no-autoupdate run
-    environment: [TUNNEL_TOKEN]
+    environment: [TUNNEL_TOKEN_FILE=/run/secrets/TUNNEL_TOKEN]
+    secrets: [TUNNEL_TOKEN]
     depends_on: [web]
-    networks: { default: { ipv4_address: 10.86.86.86 }, ops: {} }
+    networks: { default: { ipv4_address: "${SUBNET:?}.86" }, ops: {} }
 
 networks:
-  default: { ipam: { config: [{ subnet: 10.86.86.0/24, ip_range: 10.86.86.128/25 }] } }
+  default: { ipam: { config: [{ subnet: "${SUBNET:?}.0/24", ip_range: "${SUBNET:?}.128/25" }] } }
   ops: {}
   socket: { internal: true }
 
 volumes:
   relay-data: {}
+
+secrets:
+  RELAYER_PRIVATE_KEY: { file: "${SECRETS_ROOT:?}/${NETWORK_ID:?}/RELAYER_PRIVATE_KEY" }
+  MM_PRIVATE_KEY: { file: "${SECRETS_ROOT:?}/${NETWORK_ID:?}/MM_PRIVATE_KEY" }
+  MM_API_KEY: { file: "${SECRETS_ROOT:?}/${NETWORK_ID:?}/MM_API_KEY" }
+  SETTLER_PRIVATE_KEY: { file: "${SECRETS_ROOT:?}/${NETWORK_ID:?}/SETTLER_PRIVATE_KEY" }
+  ORACLE_PRIVATE_KEY: { file: "${SECRETS_ROOT:?}/${NETWORK_ID:?}/ORACLE_PRIVATE_KEY" }
+  TUNNEL_TOKEN: { file: "${SECRETS_ROOT:?}/${NETWORK_ID:?}/TUNNEL_TOKEN" }
+  ALERT_WEBHOOK_URL: { file: "${SECRETS_ROOT:?}/${NETWORK_ID:?}/ALERT_WEBHOOK_URL" }
+  ONECLICK_JWT: { file: "${SECRETS_ROOT:?}/${NETWORK_ID:?}/ONECLICK_JWT" }

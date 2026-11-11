@@ -31,7 +31,7 @@ The RPC and contract ids come from `deploy/<NETWORK_ID>.json`. `buy` and `sell` 
 
 ## Env
 
-Read from the process environment.
+Read from the process environment. `MM_PRIVATE_KEY`, `MM_API_KEY`, `ALERT_WEBHOOK_URL`, `ORACLE_PRIVATE_KEY` and `SETTLER_PRIVATE_KEY` can come from a file instead: set `<NAME>_FILE` to its path, not both ([Secrets](https://docs.endline.trade/developers/running-locally#secrets)).
 
 | Var | Meaning |
 |---|---|
