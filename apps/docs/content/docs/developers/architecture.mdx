@@ -58,7 +58,8 @@ The official NEAR Intents quote bus needs a partner key and KYC for market maker
 | Options contract | Coming soon | `opt6.near-options-dev.testnet` |
 | Collateral | Native USDC | Mock USDC (6 decimals) |
 | Expiries | Daily 08:00 UTC (Deribit's grid) | Contract grid every minute; the lister lists the next 4 daily 08:00 UTC ends plus one 4-hourly end |
-| Write and sell-back cutoff | 30 min before the end | 60 s before |
+| Write cutoff | 30 min before the end | 60 s before |
+| Sell-back and quotes stop | 30 min before the end | 30 min before (the oracle's averaging window) |
 | Dispute window | 1 h | 2 min |
 | Funding | 1Click from any chain | 100 test USDC a day from Add funds (relay `POST /faucet`) |
 | Oracle | `outlayer.near` | `outlayer.testnet`. Manual oracle: `oracle.near-options-dev.testnet`, driven by the proposer |
