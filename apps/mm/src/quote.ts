@@ -7,6 +7,7 @@ import { type Book, contracts, exposure, longAsset, type SeriesMark, seriesMark,
 import { type ContractPrice, contractPrice, premiumUsd, toQuoteUnits } from "./pricing.ts";
 
 export const QUOTE_TTL_MS = 25_000;
+export const MAX_BALANCE_AGE_MS = 30_000;
 
 export interface Desk {
   book: Book;
@@ -54,6 +55,7 @@ export function decide(ev: QuoteEvent, desk: Desk, settings: Settings, now: numb
   if (ev.option_asset !== longAsset(book, series.id) || ev.quote_asset !== book.quoteAsset) return reject("unsupported assets");
   if (!termsMatch(ev, series)) return reject("terms differ from contract");
   if (BigInt(ev.fee_pips) !== desk.intents.fee) return reject("fee differs from intents");
+  if (now - inventory.fetchedAt() > MAX_BALANCE_AGE_MS) return reject("stale balances");
   const priced = priceSeries(desk, series, settings, now);
   if (!priced.ok) return priced;
   const { mark, price } = priced;

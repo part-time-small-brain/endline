@@ -3,9 +3,9 @@ import { KeyPair } from "near-api-js";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { loadConfig } from "./config.ts";
 import { CALL, DEMO_PUT, long, NOW, PAIRS, PUT, quoteEvent, SETTINGS, short, testDesk, USDC } from "./fixtures/desk.ts";
-import { CHAIN_LAG_MS } from "./inventory.ts";
+import { CHAIN_LAG_MS, Inventory } from "./inventory.ts";
 import { exposure, seriesMark } from "./portfolio.ts";
-import { decide, type Desk, QUOTE_TTL_MS } from "./quote.ts";
+import { decide, type Desk, MAX_BALANCE_AGE_MS, QUOTE_TTL_MS } from "./quote.ts";
 import { Quoter } from "./quoter.ts";
 import { nep413Signer } from "./signer.ts";
 
@@ -74,7 +74,10 @@ describe("quote refusals", () => {
   ])("stops quoting once a deadline would reach expiry minus the contract's %i s write cutoff", (cutoff, series) => {
     const { desk } = testDesk(cutoff);
     const lastOk = series.expiry * 1000 - cutoff * 1000 - QUOTE_TTL_MS - 1;
-    const at = (now: number) => decide(quoteEvent(series, "buy", size, { deadline_ms: now + 1_000 }), desk, { ...SETTINGS, maxDataAgeMs: Infinity }, now);
+    const at = (now: number) => {
+      desk.inventory.setBalances(desk.inventory.confirmed(), now);
+      return decide(quoteEvent(series, "buy", size, { deadline_ms: now + 1_000 }), desk, { ...SETTINGS, maxDataAgeMs: Infinity }, now);
+    };
     expect(at(lastOk)).toMatchObject({ ok: true });
     expect(at(lastOk + 1)).toEqual({ ok: false, reason: "too close to expiry" });
   });
@@ -86,6 +89,17 @@ describe("quote refusals", () => {
       ok: false,
       reason: "stale market data",
     });
+  });
+
+  it("refuses while the last balance read is too old, so a failing refresh can't leave it quoting on frozen inventory", () => {
+    const { desk } = testDesk();
+    const readAgo = (age: number) => {
+      const inventory = new Inventory();
+      inventory.setBalances(desk.inventory.confirmed(), NOW - age);
+      return decide(quoteEvent(PUT, "buy", size), { ...desk, inventory }, SETTINGS, NOW);
+    };
+    expect(readAgo(MAX_BALANCE_AGE_MS)).toMatchObject({ ok: true });
+    expect(readAgo(MAX_BALANCE_AGE_MS + 1)).toEqual({ ok: false, reason: "stale balances" });
   });
 
   it.each([
