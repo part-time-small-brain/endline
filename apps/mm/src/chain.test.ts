@@ -1,6 +1,7 @@
-import { JsonRpcProvider } from "near-api-js";
+import { JsonRpcProvider, KeyPair } from "near-api-js";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ChainReader } from "./chain.ts";
+import { Chain, ChainReader } from "./chain.ts";
+import type { Config } from "./config.ts";
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -40,5 +41,20 @@ describe("seriesFrom", () => {
     const { chain, calls } = contract();
     expect(await chain.series()).toEqual(from(0));
     expect(new Set(calls)).toEqual(new Set(["list_series_by_expiry"]));
+  });
+});
+
+describe("balances", () => {
+  it("reads any number of assets in pages the RPC can serve, in order", async () => {
+    const pages: number[] = [];
+    vi.spyOn(JsonRpcProvider.prototype, "callFunction").mockImplementation((async ({ args }: { args: { token_ids: string[] } }) => {
+      pages.push(args.token_ids.length);
+      return args.token_ids.map((id) => id.slice(1));
+    }) as unknown as JsonRpcProvider["callFunction"]);
+    const config = { rpcUrl: "http://rpc", optionsId: "opt.testnet", intentsId: "intents.testnet", accountId: "mm.testnet", privateKey: KeyPair.fromRandom("ed25519").toString() };
+    const assets = Array.from({ length: 450 }, (_, i) => `a${i}`);
+    const balances = await new Chain(config as Config).balances(assets);
+    expect(pages).toEqual([200, 200, 50]);
+    expect([...balances]).toEqual(assets.map((a, i) => [a, BigInt(i)]));
   });
 });

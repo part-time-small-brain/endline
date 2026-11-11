@@ -8,7 +8,6 @@ import { WRITE_TTL_MS } from "./write.ts";
 
 const TICK_MS = 600_000;
 const CREATE_DEPOSIT = 50_000_000_000_000_000_000_000n;
-const BALANCE_PAGE = 200;
 const ACTION_GAP_MS = 3_000;
 const DELETE_BATCH = 20;
 const DELETE_CHECK = 100;
@@ -56,8 +55,7 @@ async function tick(chain: Chain, config: Config): Promise<void> {
   const short = (id: string) => intentsAssetId(config.optionsId, shortTokenId(id));
   const tokenIds = [...new Set([...wanted.map((t) => t.id), ...recent.map((s) => s.id)])];
   const assets = [terms.quoteAsset, ...tokenIds.flatMap((id) => [long(id), short(id)])];
-  const balances = new Map<string, bigint>();
-  for (let i = 0; i < assets.length; i += BALANCE_PAGE) for (const [a, v] of await chain.balances(assets.slice(i, i + BALANCE_PAGE))) balances.set(a, v);
+  const balances = await chain.balances(assets);
   const held = (asset: string) => balances.get(asset) ?? 0n;
 
   const longs = new Map(wanted.map((t) => [t.id, held(long(t.id))]));

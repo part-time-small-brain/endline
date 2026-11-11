@@ -9,6 +9,7 @@ import { nep413Signer, type SignPayload } from "./signer.ts";
 const Underlyings = z.array(
   z.tuple([z.string(), z.object({ index: z.string(), decimals: z.number().int().min(0).max(24), min_write: z.string().regex(/^[0-9]+$/).transform(BigInt) })]),
 );
+const BALANCE_PAGE = 200;
 const Balances = z.array(z.string().regex(/^[0-9]+$/).transform(BigInt));
 const Salt = z.string().regex(/^[0-9a-f]{8}$/);
 const Fee = z.number().int().min(0).max(999_999);
@@ -160,9 +161,14 @@ export class Chain extends ChainReader {
   }
 
   async balances(assets: string[]): Promise<Map<string, bigint>> {
-    const raw = await this.view(this.config.intentsId, "mt_batch_balance_of", { account_id: this.config.accountId, token_ids: assets });
-    const amounts = Balances.length(assets.length).parse(raw);
-    return new Map(assets.map((asset, i) => [asset, amounts[i] ?? 0n]));
+    const balances = new Map<string, bigint>();
+    for (let i = 0; i < assets.length; i += BALANCE_PAGE) {
+      const page = assets.slice(i, i + BALANCE_PAGE);
+      const raw = await this.view(this.config.intentsId, "mt_batch_balance_of", { account_id: this.config.accountId, token_ids: page });
+      const amounts = Balances.length(page.length).parse(raw);
+      page.forEach((asset, j) => balances.set(asset, amounts[j] ?? 0n));
+    }
+    return balances;
   }
 
   async execute(signed: unknown[]): Promise<string> {
