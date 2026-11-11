@@ -9,6 +9,8 @@ import { nep413Signer, type SignPayload } from "./signer.ts";
 const Underlyings = z.array(
   z.tuple([z.string(), z.object({ index: z.string(), decimals: z.number().int().min(0).max(24), min_write: z.string().regex(/^[0-9]+$/).transform(BigInt) })]),
 );
+const BALANCE_PAGE = 200;
+const RPC_TIMEOUT_MS = 15_000;
 const Balances = z.array(z.string().regex(/^[0-9]+$/).transform(BigInt));
 const Salt = z.string().regex(/^[0-9a-f]{8}$/);
 const Fee = z.number().int().min(0).max(999_999);
@@ -59,6 +61,14 @@ export interface IntentsState {
   salt: Uint8Array;
 }
 
+function timed<T>(read: Promise<T>, what: string): Promise<T> {
+  let timer: NodeJS.Timeout | undefined;
+  const stalled = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`RPC ${what} took over ${RPC_TIMEOUT_MS} ms`)), RPC_TIMEOUT_MS);
+  });
+  return Promise.race([read, stalled]).finally(() => clearTimeout(timer));
+}
+
 export class ChainReader {
   protected readonly provider: JsonRpcProvider;
 
@@ -67,11 +77,11 @@ export class ChainReader {
   }
 
   networkId(): Promise<string> {
-    return this.provider.getNetworkId();
+    return timed(this.provider.getNetworkId(), "network id");
   }
 
   protected async view(contractId: string, method: string, args: Record<string, unknown> = {}): Promise<unknown> {
-    return this.provider.callFunction({ contractId, method, args });
+    return timed(this.provider.callFunction({ contractId, method, args }), method);
   }
 
   async contractConfig(): Promise<ContractConfig> {
@@ -139,7 +149,7 @@ export class ChainReader {
   }
 
   async nearBalance(accountId: string): Promise<{ amount: bigint; storageUsage: number }> {
-    const account = await this.provider.viewAccount({ accountId });
+    const account = await timed(this.provider.viewAccount({ accountId }), "view account");
     return { amount: account.amount, storageUsage: account.storage_usage };
   }
 }
@@ -160,9 +170,14 @@ export class Chain extends ChainReader {
   }
 
   async balances(assets: string[]): Promise<Map<string, bigint>> {
-    const raw = await this.view(this.config.intentsId, "mt_batch_balance_of", { account_id: this.config.accountId, token_ids: assets });
-    const amounts = Balances.length(assets.length).parse(raw);
-    return new Map(assets.map((asset, i) => [asset, amounts[i] ?? 0n]));
+    const balances = new Map<string, bigint>();
+    for (let i = 0; i < assets.length; i += BALANCE_PAGE) {
+      const page = assets.slice(i, i + BALANCE_PAGE);
+      const raw = await this.view(this.config.intentsId, "mt_batch_balance_of", { account_id: this.config.accountId, token_ids: page });
+      const amounts = Balances.length(page.length).parse(raw);
+      page.forEach((asset, j) => balances.set(asset, amounts[j] ?? 0n));
+    }
+    return balances;
   }
 
   async execute(signed: unknown[]): Promise<string> {

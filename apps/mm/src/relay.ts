@@ -2,6 +2,8 @@ import { MmMessage, type Mark, type QuoteEvent, type QuoteResponse, RelayMessage
 import WebSocket from "ws";
 
 const RECONNECT_MS = 2_000;
+const MAX_MESSAGE_BYTES = 64 * 1024;
+export const PING_MS = 15_000;
 
 interface RelayHandlers {
   quote: (event: QuoteEvent) => void;
@@ -21,11 +23,19 @@ export class RelayClient {
 
   start(): void {
     if (this.closed) return;
-    const ws = new WebSocket(this.url, { headers: { authorization: `Bearer ${this.apiKey}` } });
+    const ws = new WebSocket(this.url, { headers: { authorization: `Bearer ${this.apiKey}` }, maxPayload: MAX_MESSAGE_BYTES });
+    let answered = true;
+    const ping = setInterval(() => {
+      if (!answered) return ws.terminate();
+      answered = false;
+      if (ws.readyState === WebSocket.OPEN) ws.ping();
+    }, PING_MS);
+    ws.on("pong", () => (answered = true));
     ws.on("open", () => this.log("relay connected"));
     ws.on("message", (data) => this.receive(data.toString()));
     ws.on("error", (e) => this.log(`relay error: ${e.message}`));
     ws.on("close", () => {
+      clearInterval(ping);
       this.log("relay disconnected");
       setTimeout(() => this.start(), RECONNECT_MS);
     });

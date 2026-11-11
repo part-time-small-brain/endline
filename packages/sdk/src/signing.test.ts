@@ -1,7 +1,7 @@
 import { createIntentSignerNEP413, createIntentSignerViem } from "@defuse-protocol/intents-sdk";
 import { describe, expect, it } from "vitest";
 import { payload, sessionPayload, tokenDiff } from "./intents.ts";
-import { readPayload, SignedPayload, toSign, type Unsigned } from "./signing.ts";
+import { readPayload, SignedPayload, toSign, Unsigned } from "./signing.ts";
 
 const B64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
@@ -55,6 +55,22 @@ describe("what the wallet signs", () => {
       { ...nep, payload: { ...nep.payload, nonce: sameBytesNonce } },
     ];
     for (const variant of variants) expect(() => readPayload(variant)).toThrow();
+  });
+
+  it("refuses a nonce that isn't 32 bytes, which would shift the NEP-413 fields after it", () => {
+    const p = intent("alice.near");
+    const nep = toSign("nep413", p) as Extract<Unsigned, { standard: "nep413" }>;
+    for (const nonce of [Buffer.alloc(28, 7).toString("base64"), Buffer.alloc(33, 7).toString("base64")]) {
+      expect(() => readPayload({ standard: "erc191", payload: JSON.stringify({ ...p, nonce }) }), nonce).toThrow();
+      expect(() => readPayload(Unsigned.parse({ ...nep, payload: { ...nep.payload, nonce } })), nonce).toThrow();
+    }
+  });
+
+  it("refuses a deadline not written the way toISOString writes it, such as one padded to any length", () => {
+    const p = intent("alice.near");
+    for (const deadline of [p.deadline.replace(".123Z", `.123${"0".repeat(60_000)}Z`), p.deadline.replace(".123Z", "Z"), p.deadline.replace("Z", "+00:00")]) {
+      expect(() => readPayload({ standard: "erc191", payload: JSON.stringify({ ...p, deadline }) }), deadline.slice(0, 40)).toThrow();
+    }
   });
 
   it("refuses intents the verifier would run but we never build", () => {

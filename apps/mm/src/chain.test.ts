@@ -1,8 +1,10 @@
-import { JsonRpcProvider } from "near-api-js";
+import { JsonRpcProvider, KeyPair } from "near-api-js";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ChainReader } from "./chain.ts";
+import { Chain, ChainReader } from "./chain.ts";
+import type { Config } from "./config.ts";
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.restoreAllMocks();
 });
 
@@ -40,5 +42,31 @@ describe("seriesFrom", () => {
     const { chain, calls } = contract();
     expect(await chain.series()).toEqual(from(0));
     expect(new Set(calls)).toEqual(new Set(["list_series_by_expiry"]));
+  });
+});
+
+describe("balances", () => {
+  it("reads any number of assets in pages the RPC can serve, in order", async () => {
+    const pages: number[] = [];
+    vi.spyOn(JsonRpcProvider.prototype, "callFunction").mockImplementation((async ({ args }: { args: { token_ids: string[] } }) => {
+      pages.push(args.token_ids.length);
+      return args.token_ids.map((id) => id.slice(1));
+    }) as unknown as JsonRpcProvider["callFunction"]);
+    const config = { rpcUrl: "http://rpc", optionsId: "opt.testnet", intentsId: "intents.testnet", accountId: "mm.testnet", privateKey: KeyPair.fromRandom("ed25519").toString() };
+    const assets = Array.from({ length: 450 }, (_, i) => `a${i}`);
+    const balances = await new Chain(config as Config).balances(assets);
+    expect(pages).toEqual([200, 200, 50]);
+    expect([...balances]).toEqual(assets.map((a, i) => [a, BigInt(i)]));
+  });
+});
+
+describe("view", () => {
+  it("gives up on an RPC read that never answers, so a stalled node can't freeze a loop", async () => {
+    vi.useFakeTimers();
+    for (const method of ["callFunction", "viewAccount", "getNetworkId"] as const) vi.spyOn(JsonRpcProvider.prototype, method).mockReturnValue(new Promise(() => {}));
+    const chain = new ChainReader("http://rpc", "opt.testnet");
+    const outcomes = [chain.series(), chain.nearBalance("mm.testnet"), chain.networkId()].map((read) => expect(read).rejects.toThrow(/RPC/));
+    await vi.advanceTimersByTimeAsync(15_000);
+    await Promise.all(outcomes);
   });
 });

@@ -383,14 +383,14 @@ describe("auto-collect claims", () => {
       throw new Error("timeout after broadcast");
     });
     await collector.submitClaims();
-    const resend = vi.spyOn(chain, "simulate");
-    await collector.submitClaims();
-    expect(resend).not.toHaveBeenCalled();
     expect(claims.all()).toEqual([landed]);
+    await collector.submitClaims();
+    expect(claims.all()).toEqual([]);
     expect(executed).toHaveLength(2);
   });
 
   it("keeps a final claim through repeated RPC errors until it is sent", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
     const { chain, collector, claims, executed, settle } = setup();
     await collector.claim(claimed([exercise]));
     vi.setSystemTime((FINAL_AT + 60) * 1000);
@@ -400,10 +400,10 @@ describe("auto-collect claims", () => {
     await collector.submitClaims();
     await collector.submitClaims();
     expect(claims.all()).toHaveLength(1);
-    vi.setSystemTime((SERIES.expiry + 31 * 86_400) * 1000);
+    expect(executed).toHaveLength(0);
     await collector.submitClaims();
     expect(claims.all()).toEqual([]);
-    expect(executed).toHaveLength(0);
+    expect(executed).toHaveLength(1);
   });
 
   it("drops a claim that pays nothing at settlement, without sending it", async () => {

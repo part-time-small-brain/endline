@@ -24,7 +24,7 @@ const quote: Quote = {
 const message = (diff: Record<string, string>, overrides: Partial<Payload> = {}): Payload => ({
   signer_id: "alice.near",
   verifying_contract: "intents.near",
-  deadline: new Date(SIGN_BY).toISOString(),
+  deadline: new Date(SIGN_BY + 3_000).toISOString(),
   nonce: "n",
   intents: [{ intent: "token_diff", diff }],
   ...overrides,

@@ -108,7 +108,7 @@ async function quoteFlow(page: Page, open = true, ask = 400) {
       quote_id: quoteId, series_id: request.series_id, side: request.side, size: request.size,
       premium, pay, receive, sign_by_ms: signBy,
       payload: toSign(request.signer.standard, {
-        signer_id: request.signer.signer_id, verifying_contract: testnet.intents_id, deadline: new Date(signBy + 3_000).toISOString(), nonce: "AA==",
+        signer_id: request.signer.signer_id, verifying_contract: testnet.intents_id, deadline: new Date(signBy + 3_000).toISOString(), nonce: `${"A".repeat(43)}=`,
         intents: [{ intent: "token_diff", diff: { [pay.asset]: `-${pay.amount}`, [receive.asset]: receive.amount } }],
       }),
     });

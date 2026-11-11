@@ -21,6 +21,10 @@ export class Inventory {
     }
   }
 
+  fetchedAt(): number {
+    return this.balancesFetchedAt;
+  }
+
   confirmed(): Map<string, bigint> {
     return new Map(this.balances);
   }

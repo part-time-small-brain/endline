@@ -80,12 +80,12 @@ describe("relay", () => {
     const user = readPayload(q.payload);
     expect(user).toMatchObject({ signer_id: USER, verifying_contract: INTENTS });
     expect(user.intents).toEqual([{ intent: "token_diff", diff: { [USDC]: "-15000000", [OPTION]: "1000000" } }]);
-    expect(Date.parse(user.deadline)).toBe(q.sign_by_ms);
+    expect(Date.parse(user.deadline)).toBe(q.sign_by_ms + SIGN_MARGIN_MS);
 
     const update = await relay.publish({ quote_id: q.quote_id, signed: sign(q) });
     expect(update).toEqual({ quote_id: q.quote_id, status: "settled", tx_hash: "tx1" });
     const [mmLeg] = executed[0] ?? [];
-    expect(Date.parse(readPayload(mmLeg!).deadline) - SIGN_MARGIN_MS).toBe(q.sign_by_ms);
+    expect(readPayload(mmLeg!).deadline).toBe(user.deadline);
     expect(statuses).toEqual([update]);
     expect(fills.byAccount(USER)).toMatchObject([{ quote_id: q.quote_id, premium: "15000000", tx_hash: "tx1" }]);
     expect(fills.byAccount("bob.test")).toEqual([]);

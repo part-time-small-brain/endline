@@ -35,7 +35,6 @@ function readExercise(signed: SignedPayload, config: Settings): Exercise | undef
     const [intent, ...extra] = intents;
     const deadlineMs = Date.parse(deadline);
     if (verifying_contract !== config.intents_id || intent?.intent !== "transfer" || extra.length > 0) return undefined;
-    if (!Number.isFinite(deadlineMs) || new Date(deadlineMs).toISOString() !== deadline) return undefined;
     const tokens = Object.fromEntries(Object.entries(intent.tokens).map(([asset, amount]) => [asset, BigInt(amount)]));
     return isDeepStrictEqual(intent, exerciseOptions(config.options_id, tokens)) ? { signerId: signer_id, nonce, deadlineMs, tokens } : undefined;
   } catch {
@@ -157,7 +156,7 @@ export class Collector {
           console.error("execute_intents errored, settling by the relayer's transactions", key, error);
           const txHash = await ranTx(this.chain, signed, error, key);
           if (txHash !== undefined) return txHash;
-        } else if (await this.simulate(signed).then(() => true, () => false)) this.submitted.delete(key);
+        } else this.submitted.delete(key);
         throw error;
       });
     } finally {

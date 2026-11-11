@@ -25,7 +25,7 @@ export class Unsettled extends Error {
   }
 }
 
-type TxStatus = "succeeded" | "failed" | "unknown";
+type TxStatus = "succeeded" | "failed" | "pending" | "unknown";
 
 class HashingSigner extends KeyPairSigner {
   readonly txHashes: string[] = [];
@@ -64,7 +64,8 @@ export async function ranTx(chain: Chain, signed: SignedPayload, error: unknown,
       if (ran !== undefined) return ran;
       const unread = statuses.find((status) => status.status === "rejected");
       if (unread) throw unread.reason;
-      if (past || statuses.every((status) => status.status === "fulfilled" && status.value === "failed")) return undefined;
+      const pending = statuses.some((status) => status.status === "fulfilled" && status.value === "pending");
+      if ((past && !pending) || statuses.every((status) => status.status === "fulfilled" && status.value === "failed")) return undefined;
     } catch (readError) {
       if (!logged) console.error("can't read the relayer's transactions yet, still settling", label, readError);
       logged = true;
@@ -174,7 +175,8 @@ export function nearChain(config: Config): NearChain {
         if (error instanceof UnknownTransactionError) return undefined;
         throw error;
       });
-      if (outcome?.final_execution_status !== "FINAL" || typeof outcome.status !== "object") return "unknown";
+      if (outcome === undefined || outcome.final_execution_status === "NONE") return "unknown";
+      if (outcome.final_execution_status !== "FINAL" || typeof outcome.status !== "object") return "pending";
       return "Failure" in outcome.status ? "failed" : "succeeded";
     },
     finalTimeMs: async () => Number(BigInt((await provider.viewBlock({ finality: "final" })).header.timestamp_nanosec) / 1_000_000n),

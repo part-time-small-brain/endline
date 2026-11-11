@@ -7,6 +7,7 @@ import { type Book, contracts, exposure, longAsset, type SeriesMark, seriesMark,
 import { type ContractPrice, contractPrice, premiumUsd, toQuoteUnits } from "./pricing.ts";
 
 export const QUOTE_TTL_MS = 25_000;
+export const MAX_BALANCE_AGE_MS = 30_000;
 
 export interface Desk {
   book: Book;
@@ -42,6 +43,7 @@ export function priceSeries(desk: Desk, series: Series, settings: Settings, now:
   const mark = seriesMark(desk.market, book, series);
   if (!mark) return reject("no market data");
   if (now - mark.at > settings.maxDataAgeMs) return reject("stale market data");
+  if (now - desk.inventory.fetchedAt() > MAX_BALANCE_AGE_MS) return reject("stale balances");
   return { ok: true, mark, price: contractPrice(book, series, mark, settings, now) };
 }
 

@@ -61,7 +61,7 @@ describe("execute", () => {
 });
 
 describe("txStatus", () => {
-  it("reads the relayer's transaction at final, and only a transaction the node never saw is unknown", async () => {
+  it("reads the relayer's transaction at final, one included but not final is pending, and one not yet included is unknown", async () => {
     const view = vi.spyOn(JsonRpcProvider.prototype, "viewTransactionStatus");
     const chain = nearChain(config);
     view.mockResolvedValueOnce({ final_execution_status: "FINAL", status: { SuccessValue: "" } } as never);
@@ -70,6 +70,8 @@ describe("txStatus", () => {
     view.mockResolvedValueOnce({ final_execution_status: "FINAL", status: { Failure: {} } } as never);
     expect(await chain.txStatus("h")).toBe("failed");
     view.mockResolvedValueOnce({ final_execution_status: "EXECUTED_OPTIMISTIC", status: { SuccessValue: "" } } as never);
+    expect(await chain.txStatus("h")).toBe("pending");
+    view.mockResolvedValueOnce({ final_execution_status: "NONE" } as never);
     expect(await chain.txStatus("h")).toBe("unknown");
     view.mockRejectedValueOnce(new UnknownTransactionError("h"));
     expect(await chain.txStatus("h")).toBe("unknown");
@@ -79,6 +81,7 @@ describe("txStatus", () => {
 });
 
 describe("ranTx", () => {
+  afterEach(() => vi.useRealTimers());
   const expired = session("alice.test", { deadlineMs: Date.now() - 60_000 });
   const chainWith = (txStatus: Chain["txStatus"]) => ({ txStatus, finalTimeMs: async () => Date.now() }) as unknown as Chain;
 
@@ -88,6 +91,15 @@ describe("ranTx", () => {
       return "succeeded";
     });
     expect(await ranTx(chain, expired, new Unsettled(["a", "b"], new Error("timeout")), "t")).toBe("b");
+  });
+
+  it("waits for a seen transaction to become final, even past the deadline", async () => {
+    vi.useFakeTimers();
+    const reads: Awaited<ReturnType<Chain["txStatus"]>>[] = ["pending", "pending", "succeeded"];
+    const chain = chainWith(async () => reads.shift() ?? "unknown");
+    const outcome = ranTx(chain, expired, new Unsettled(["a"], new Error("timeout")), "t");
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(await outcome).toBe("a");
   });
 
   it("never decides failed on a read error, even past the deadline", async () => {
@@ -104,7 +116,6 @@ describe("ranTx", () => {
     await vi.advanceTimersByTimeAsync(3_000);
     expect(await outcome).toBeUndefined();
     expect(reads).toBe(2);
-    vi.useRealTimers();
   });
 });
 

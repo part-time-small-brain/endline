@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseBookSummary, parseInstrument } from "./deribit.ts";
+import { CLOCK_SKEW_MS, parseBookSummary, parseInstrument } from "./deribit.ts";
 import book from "./fixtures/deribit-book-summary-btc.json" with { type: "json" };
 import { NOW, SPOT } from "./fixtures/desk.ts";
 import { markFor, smileOf } from "./surface.ts";
@@ -40,14 +40,37 @@ describe("vol surface", () => {
   });
 
   it("interpolates a missing strike inside a listed expiry at that expiry's forward", () => {
-    const m = markFor(smile, undefined, { underlying: "BTC", expiry: NOV27, strike: 79_000 });
+    const m = markFor(smile, spot, { underlying: "BTC", expiry: NOV27, strike: 79_000 });
     expect(m?.vol).toBeGreaterThan(volOf("BTC-27NOV26-80000-P"));
     expect(m?.vol).toBeLessThan(volOf("BTC-27NOV26-78000-P"));
   });
 
-  it("gives nothing for another underlying, or a demo expiry without a spot price", () => {
+  it("gives nothing for another underlying", () => {
     expect(markFor(smile, spot, { underlying: "ETH", expiry: NOV27, strike: 3_000 })).toBeUndefined();
-    expect(markFor(smile, undefined, { underlying: "BTC", expiry: DEMO, strike: 80_000 })).toBeUndefined();
+  });
+
+  it("ages a row by Deribit's own timestamp past a few seconds of clock difference, so a frozen feed goes stale, and drops a row without one", () => {
+    const [row] = book.result;
+    const name = row!.instrument_name;
+    expect(parseBookSummary([{ ...row, creation_timestamp: NOW - CLOCK_SKEW_MS }], NOW).get(name)?.at).toBe(NOW);
+    expect(parseBookSummary([{ ...row, creation_timestamp: NOW - 60_000 }], NOW).get(name)?.at).toBe(NOW - 60_000 + CLOCK_SKEW_MS);
+    expect(parseBookSummary([{ ...row, creation_timestamp: undefined }], NOW).has(name)).toBe(false);
+  });
+
+  it("gives nothing when the smile's forward is far from the index, allowing the basis a later expiry carries", () => {
+    const target = { underlying: "BTC", expiry: NOV27, strike: 80_000 };
+    expect(markFor(smile, spot, target)).toBeDefined();
+    expect(markFor(smile, { ...spot, price: SPOT * 0.8 }, target)).toBeUndefined();
+    expect(markFor(smile, { ...spot, price: SPOT * 1.25 }, target)).toBeUndefined();
+    expect(markFor(smile, { ...spot, price: SPOT * 0.8 }, { ...target, expiry: DEMO })).toBeUndefined();
+    const far = Math.floor(NOW / 1000) + 180 * 86_400;
+    const farSmile = (forward: number) => [{ underlying: "BTC", expiry: far, strike: 80_000, mark: { vol: 0.5, forward, at: NOW } }];
+    expect(markFor(farSmile(SPOT * 1.2), spot, { ...target, expiry: far })).toBeDefined();
+    expect(markFor(farSmile(SPOT * 1.6), spot, { ...target, expiry: far })).toBeUndefined();
+  });
+
+  it("gives nothing without an index to check the forward against", () => {
+    expect(markFor(smile, undefined, { underlying: "BTC", expiry: NOV27, strike: 80_000 })).toBeUndefined();
   });
 
   it("inherits the oldest timestamp so staleness can't be laundered through the spot", () => {

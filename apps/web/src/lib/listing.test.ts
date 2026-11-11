@@ -36,6 +36,15 @@ describe("verifiedListing", () => {
     expect(verifiedListing(listing([minute, { ...minute, expiry: expiry + 30 }]), contract).series).toEqual([minute]);
   });
 
+  it("drops a series moved by a century, which its two-digit year can't show", () => {
+    const shifted = (years: number) => {
+      const date = new Date(EXPIRY * 1000);
+      date.setUTCFullYear(date.getUTCFullYear() + years);
+      return { ...genuine, expiry: date.getTime() / 1000 };
+    };
+    expect(verifiedListing(listing([genuine, shifted(100), shifted(-100)]), contract).series).toEqual([genuine]);
+  });
+
   it("rebuilds ids with the contract's USDC decimals, whatever the relay says", () => {
     expect(verifiedListing({ ...listing([genuine]), quote_decimals: 5 }, contract).series).toEqual([genuine]);
     expect(verifiedListing(listing([genuine]), { ...contract, quoteDecimals: 5 }).series).toEqual([]);
