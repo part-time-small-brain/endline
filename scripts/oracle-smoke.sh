@@ -11,8 +11,8 @@ cargo build -p oracle --target wasm32-wasip2 --release --manifest-path "$root/Ca
 hash="$(shasum -a 256 "$wasm" | cut -d' ' -f1)"
 
 jwt="${PINATA_JWT:?set PINATA_JWT}"
-cid="$(curl -sf https://uploads.pinata.cloud/v3/files \
-  -H "Authorization: Bearer $jwt" \
+cid="$(printf 'Authorization: Bearer %s\n' "$jwt" | curl -sf https://uploads.pinata.cloud/v3/files \
+  -H @- \
   -F network=public -F name="oracle-$hash.wasm" -F file=@"$wasm" \
   | python3 -c 'import json,sys; print(json.load(sys.stdin)["data"]["cid"])')"
 url="https://gateway.pinata.cloud/ipfs/$cid"
