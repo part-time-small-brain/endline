@@ -7,7 +7,6 @@ const DAILY_EXPIRIES = 4;
 const SHORT_EVERY_SEC = 4 * 3_600;
 const SHORT_LEAD_SEC = 5_400;
 const STOCK_USD = 500;
-const RESERVE_USD = 500;
 const MAX_CLOSE_TOKENS = 10;
 const KINDS: OptionKind[] = ["call", "put"];
 
@@ -86,9 +85,9 @@ export function targets(terms: ListingTerms, markets: Market[], nowSec: number, 
   return list.sort((a, b) => rank(a) - rank(b) || a.expiry - b.expiry || a.distance - b.distance).map(({ distance, ...t }) => t);
 }
 
-export function planWrites(targets: Target[], markets: Market[], terms: ListingTerms, longs: Map<string, bigint>, balances: Map<string, bigint>, maxTradeUsd: number): Write[] {
+export function planWrites(targets: Target[], markets: Market[], terms: ListingTerms, longs: Map<string, bigint>, balances: Map<string, bigint>, maxTradeUsd: number, reserveUsd: number): Write[] {
   const usdUnits = (usd: number) => BigInt(Math.floor(usd * 10 ** terms.quoteDecimals));
-  let free = (balances.get(terms.quoteAsset) ?? 0n) - usdUnits(Math.max(RESERVE_USD, maxTradeUsd));
+  let free = (balances.get(terms.quoteAsset) ?? 0n) - usdUnits(Math.max(reserveUsd, maxTradeUsd));
   const writes: Write[] = [];
   for (const t of targets) {
     const m = markets.find((x) => x.symbol === t.underlying);

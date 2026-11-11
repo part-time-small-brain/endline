@@ -37,6 +37,7 @@ export const SETTINGS: Settings = {
   maxSeriesUsd: 5_000,
   maxDeltaUsd: 2_000,
   maxVegaUsd: 200,
+  reserveUsd: 500,
   maxDataAgeMs: 10_000,
 };
 

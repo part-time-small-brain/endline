@@ -15,6 +15,7 @@ const Env = z.object({
   MAX_SERIES_USD: positive(5_000),
   MAX_DELTA_USD: positive(50_000),
   MAX_VEGA_USD: positive(200),
+  RESERVE_USD: positive(500),
 });
 
 const MonitorEnv = Env.pick({ NETWORK_ID: true }).extend({
@@ -64,6 +65,7 @@ export function loadConfig(env: Record<string, string | undefined>) {
       maxSeriesUsd: e.MAX_SERIES_USD,
       maxDeltaUsd: e.MAX_DELTA_USD,
       maxVegaUsd: e.MAX_VEGA_USD,
+      reserveUsd: e.RESERVE_USD,
       maxDataAgeMs: 10_000,
     },
   };
