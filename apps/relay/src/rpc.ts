@@ -175,7 +175,7 @@ export function nearChain(config: Config): NearChain {
         if (error instanceof UnknownTransactionError) return undefined;
         throw error;
       });
-      if (outcome === undefined) return "unknown";
+      if (outcome === undefined || outcome.final_execution_status === "NONE") return "unknown";
       if (outcome.final_execution_status !== "FINAL" || typeof outcome.status !== "object") return "pending";
       return "Failure" in outcome.status ? "failed" : "succeeded";
     },

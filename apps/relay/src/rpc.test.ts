@@ -61,7 +61,7 @@ describe("execute", () => {
 });
 
 describe("txStatus", () => {
-  it("reads the relayer's transaction at final, one seen but not final is pending, and only one the node never saw is unknown", async () => {
+  it("reads the relayer's transaction at final, one included but not final is pending, and one not yet included is unknown", async () => {
     const view = vi.spyOn(JsonRpcProvider.prototype, "viewTransactionStatus");
     const chain = nearChain(config);
     view.mockResolvedValueOnce({ final_execution_status: "FINAL", status: { SuccessValue: "" } } as never);
@@ -71,6 +71,8 @@ describe("txStatus", () => {
     expect(await chain.txStatus("h")).toBe("failed");
     view.mockResolvedValueOnce({ final_execution_status: "EXECUTED_OPTIMISTIC", status: { SuccessValue: "" } } as never);
     expect(await chain.txStatus("h")).toBe("pending");
+    view.mockResolvedValueOnce({ final_execution_status: "NONE" } as never);
+    expect(await chain.txStatus("h")).toBe("unknown");
     view.mockRejectedValueOnce(new UnknownTransactionError("h"));
     expect(await chain.txStatus("h")).toBe("unknown");
     view.mockRejectedValueOnce(new TransactionTimeoutError());
@@ -79,6 +81,7 @@ describe("txStatus", () => {
 });
 
 describe("ranTx", () => {
+  afterEach(() => vi.useRealTimers());
   const expired = session("alice.test", { deadlineMs: Date.now() - 60_000 });
   const chainWith = (txStatus: Chain["txStatus"]) => ({ txStatus, finalTimeMs: async () => Date.now() }) as unknown as Chain;
 
@@ -97,7 +100,6 @@ describe("ranTx", () => {
     const outcome = ranTx(chain, expired, new Unsettled(["a"], new Error("timeout")), "t");
     await vi.advanceTimersByTimeAsync(10_000);
     expect(await outcome).toBe("a");
-    vi.useRealTimers();
   });
 
   it("never decides failed on a read error, even past the deadline", async () => {
