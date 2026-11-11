@@ -4,6 +4,8 @@ const MAX_DEV_BPS = 20;
 const MIN_RESERVE_YOCTO = 2n * 10n ** 24n;
 const YOCTO_PER_BYTE = 10n ** 19n;
 const KRAKEN_HISTORY_SEC = 11 * 3_600;
+const OWNER_LEDGER_PATH = "44'/397'/0'/0'/1'";
+const ORACLE_LEDGER_PATH = "44'/397'/0'/0'/2'";
 
 // the testnet proposer may only propose from the window's end, so give it a few minutes
 export const MISSING_GRACE_SEC = 300;
@@ -32,7 +34,7 @@ export function settlementAlert(c: Contract, s: ExpiryState, nowSec: number): Al
   const reference = s.reference === undefined ? "no Deribit reference" : `Deribit ${s.reference.toFixed(2)}`;
   if (!s.settlement) {
     if (nowSec < s.expiry + c.oracleWindowSec + MISSING_GRACE_SEC) return undefined;
-    const propose = nearCall(c, "propose_settlement", args, "1 yoctoNEAR", c.oracles[0] ?? "<oracle>");
+    const propose = nearCall(c, "propose_settlement", args, "1 yoctoNEAR", c.oracles[0] ?? "<oracle>", ORACLE_LEDGER_PATH);
     const example = (7_478_491n * 10n ** BigInt(c.quoteDecimals)) / 100n;
     const how = `Run the pinned WASM before ${iso(s.expiry + KRAKEN_HISTORY_SEC)}, Kraken keeps only 12 h of candles. Price in quote units, ${c.quoteDecimals} decimals ($74,784.91 = ${example})`;
     return { key: `missing ${s.underlying} ${s.expiry}`, title: `No settlement price for ${name}`, text: `${name}: no settlement after the oracle window, ${reference}. ${how}. Propose: ${propose}` };
@@ -42,7 +44,7 @@ export function settlementAlert(c: Contract, s: ExpiryState, nowSec: number): Al
   const off = s.reference === undefined ? undefined : bps(proposed, s.reference);
   if (off !== undefined && off <= MAX_DEV_BPS) return undefined;
   const gap = off === undefined ? "" : ` (${off.toFixed(0)} bps off)`;
-  const override = nearCall(c, "override_settlement", args, "1 yoctoNEAR", c.ownerId);
+  const override = nearCall(c, "override_settlement", args, "1 yoctoNEAR", c.ownerId, OWNER_LEDGER_PATH);
   return {
     key: `settle ${s.underlying} ${s.expiry}`,
     title: off === undefined ? `Can't check the settlement price for ${name}` : `Settlement price for ${name} looks wrong`,
@@ -85,6 +87,7 @@ function iso(unixSec: number): string {
   return `${new Date(unixSec * 1000).toISOString().slice(0, 16).replace("T", " ")} UTC`;
 }
 
-function nearCall(c: Contract, method: string, args: object, deposit: string, signer: string): string {
-  return `near contract call-function as-transaction ${c.optionsId} ${method} json-args '${JSON.stringify(args)}' prepaid-gas '30 Tgas' attached-deposit '${deposit}' sign-as ${signer} network-config ${c.networkId} sign-with-legacy-keychain send`;
+function nearCall(c: Contract, method: string, args: object, deposit: string, signer: string, ledgerPath: string): string {
+  const sign = c.networkId === "mainnet" ? `sign-with-ledger --seed-phrase-hd-path "${ledgerPath}" usb` : "sign-with-legacy-keychain";
+  return `near contract call-function as-transaction ${c.optionsId} ${method} json-args '${JSON.stringify(args)}' prepaid-gas '30 Tgas' attached-deposit '${deposit}' sign-as ${signer} network-config ${c.networkId} ${sign} send`;
 }

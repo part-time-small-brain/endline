@@ -40,7 +40,6 @@ decimals() {
 [[ $url == https://* && $url != *[\'\"\ ]* ]] || fail "ORACLE_WASM_URL must be https:// without quotes or spaces"
 [[ $sha =~ ^[0-9a-f]{64}$ ]] || fail "ORACLE_WASM_SHA256 must be 64 lowercase hex chars"
 [ -z "$(git -C "$repo" status --porcelain -- contracts/options Cargo.toml Cargo.lock)" ] || fail "contracts/options, Cargo.toml or Cargo.lock has uncommitted changes"
-[ -e "$HOME/.near-credentials/mainnet/$root.json" ] || [ -d "$HOME/.near-credentials/mainnet/$root" ] || fail "import $root into the legacy keychain (~/.near-credentials/mainnet)"
 [ "$(curl -sfL "$url" | shasum -a 256 | cut -d' ' -f1)" = "$sha" ] || fail "$url does not serve sha256 $sha"
 balance="$(near_balance "$root")"
 [ "$balance" -ge 17 ] || fail "$root has $balance NEAR, needs 17"
@@ -51,17 +50,24 @@ echo "preflight ok. Contract $(git -C "$repo" rev-parse --short HEAD), wasm sha2
 
 net="network-config mainnet"
 send="$net sign-with-legacy-keychain send"
+ledger="$net sign-with-ledger --seed-phrase-hd-path \"44'/397'/0'/0'/1'\" usb send"
+oracle_key="use-ledger --seed-phrase-hd-path \"44'/397'/0'/0'/2'\" usb"
 call="near contract call-function as-transaction"
 view="near contract call-function as-read-only"
-echo "# 0. One account per role, each with its own full-access key in your keychain. Only three keys go on the server:"
-echo "#    the relay's function-call key (below), MM_PRIVATE_KEY and SETTLER_PRIVATE_KEY. The relayer's and oracle's full-access keys stay offline"
+echo "# 0. One account per role. $root signs on the Ledger (default path 44'/397'/0'/0'/1'), $oracle gets the Ledger key at 44'/397'/0'/0'/2',"
+echo "#    the others a full-access key in your keychain. Only three keys go on the server: the relay's function-call key (below),"
+echo "#    MM_PRIVATE_KEY and SETTLER_PRIVATE_KEY. The relayer's full-access key stays offline"
 for spec in "$relayer:3" "$mm:3" "$settler:1" "$oracle:0.5"; do
   account="${spec%%:*}"
   near="${spec##*:}"
   if [ "$(near_balance "$account")" -eq -1 ]; then
-    echo "near account create-account fund-myself $account '$near NEAR' autogenerate-new-keypair save-to-legacy-keychain sign-as $root $send"
+    key="autogenerate-new-keypair save-to-legacy-keychain"
+    [ "$account" = "$oracle" ] && key="$oracle_key"
+    echo "near account create-account fund-myself $account '$near NEAR' $key sign-as $root $ledger"
   else
-    echo "# $account exists: needs ~$near NEAR and its key in ~/.near-credentials/mainnet/$account.json"
+    where="in ~/.near-credentials/mainnet/$account.json"
+    [ "$account" = "$oracle" ] && where="on the Ledger at 44'/397'/0'/0'/2'"
+    echo "# $account exists: needs ~$near NEAR and its key $where"
   fi
 done
 echo "# The relay only sends execute_intents: its RELAYER_PRIVATE_KEY is this function-call key, never the full-access one"
@@ -69,7 +75,7 @@ echo "near account add-key $relayer grant-function-call-access --allowance unlim
 cat <<EOF
 
 # 1. Contract account. Its 8 NEAR (code storage, 2 NEAR reserve, series storage) can't be withdrawn once step 3 deletes its keys
-near account create-account fund-myself $opt '8 NEAR' autogenerate-new-keypair save-to-legacy-keychain sign-as $root $send
+near account create-account fund-myself $opt '8 NEAR' autogenerate-new-keypair save-to-legacy-keychain sign-as $root $ledger
 
 # 2. Deploy + init: owner $root, 1 h dispute window, oracle changes wait 1 day, Deribit daily timing
 near contract deploy $opt use-file $(printf %q "$wasm") with-init-call new json-args '{"owner_id":"$root","intents_id":"intents.near","quote_asset":"nep141:$usdc","quote_decimals":6,"dispute_window_sec":3600,"oracle_delay_sec":86400}' prepaid-gas '300.0 Tgas' attached-deposit '0 NEAR' $send
@@ -81,9 +87,9 @@ near account list-keys $opt $net now
 near account delete-keys $opt public-keys <every key listed above, comma-separated> $send
 
 # 4. Underlying, oracle account and oracle WASM (owner, 1 yocto). The oracle and WASM are live 24 h later
-$call $opt add_underlying json-args '{"symbol":"BTC","underlying":{"index":"btc_usd","decimals":8,"min_write":"1000"}}' prepaid-gas '30 Tgas' attached-deposit '1 yoctoNEAR' sign-as $root $send
-$call $opt add_oracle json-args '{"account_id":"$oracle"}' prepaid-gas '30 Tgas' attached-deposit '1 yoctoNEAR' sign-as $root $send
-$call $opt set_oracle_wasm json-args '{"oracle_wasm":{"outlayer_id":"outlayer.near","url":"$url","sha256":"$sha"}}' prepaid-gas '30 Tgas' attached-deposit '1 yoctoNEAR' sign-as $root $send
+$call $opt add_underlying json-args '{"symbol":"BTC","underlying":{"index":"btc_usd","decimals":8,"min_write":"1000"}}' prepaid-gas '30 Tgas' attached-deposit '1 yoctoNEAR' sign-as $root $ledger
+$call $opt add_oracle json-args '{"account_id":"$oracle"}' prepaid-gas '30 Tgas' attached-deposit '1 yoctoNEAR' sign-as $root $ledger
+$call $opt set_oracle_wasm json-args '{"oracle_wasm":{"outlayer_id":"outlayer.near","url":"$url","sha256":"$sha"}}' prepaid-gas '30 Tgas' attached-deposit '1 yoctoNEAR' sign-as $root $ledger
 
 # 5. MM: register its key on intents (public_key from ~/.near-credentials/mainnet/$mm.json), then fund its intents balance with USDC:
 #    a near-intents.org / 1Click deposit to $mm, or ft_transfer_call if $mm holds USDC on NEAR.
