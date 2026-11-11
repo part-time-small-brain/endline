@@ -35,6 +35,10 @@ export function twapPoints(points: [number, number][], expiry: number, untilMs =
   return points.filter(([ms]) => ms > (expiry - TWAP_WINDOW_SEC) * 1000 && ms <= end).map(([, price]) => price);
 }
 
+export function quotableUntil(expiry: number, writeCutoffSec: number): number {
+  return expiry - Math.max(writeCutoffSec, TWAP_WINDOW_SEC);
+}
+
 export function defaultExpiry(expiries: number[], nowSec: number): number | undefined {
   return expiries.find((expiry) => expiry - nowSec >= DEFAULT_LEAD_SEC) ?? expiries[0];
 }

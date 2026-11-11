@@ -10,7 +10,7 @@ The relay runs the RFQ auction, settles trades with `intents.near::execute_inten
 | Route | Body → answer |
 |---|---|
 | `GET /health` | `{ok, market_makers}` |
-| `GET /series` | `{quote_asset, quote_decimals, series: [Series + option_asset + quotable]}`. `quotable` is false from `expiry − write_cutoff_sec`, and for a width other than the lister's (`listedWidth` in the SDK). Only series that expired less than 7 days ago or later (`CLAIM_WINDOW_SEC`, also the auto-collect deadline) |
+| `GET /series` | `{quote_asset, quote_decimals, series: [Series + option_asset + quotable]}`. `quotable` is false from `expiry − max(write_cutoff_sec, 30 min)` (`quotableUntil` in the SDK), and for a width other than the lister's (`listedWidth` in the SDK). Only series that expired less than 7 days ago or later (`CLAIM_WINDOW_SEC`, also the auto-collect deadline) |
 | `GET /marks` | `[{series_id, ask, bid?, max_size, vol}]`: per series, the lowest ask (with that market maker's `vol` and `max_size`) and highest bid across connected market makers, for one whole option in quote units, before the $1 minimum, except that a `max_size` buy at the ask always covers it. `max_size` is the most option units one trade may be, from the market maker's cap on one trade's payout. Marks older than 10 s are dropped |
 | `POST /quote` | `QuoteRequest` → `Quote` |
 | `POST /publish` | `{quote_id, signed}` → `StatusUpdate` (200 settled, 422 failed) |

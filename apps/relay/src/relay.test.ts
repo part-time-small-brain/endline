@@ -2,7 +2,7 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { randomBytes } from "node:crypto";
-import { payload, type Quote, type QuoteEvent, type QuoteRequest, readPayload, type SignedPayload, tokenDiff, type Unsigned } from "@endline/sdk";
+import { payload, type Quote, type QuoteEvent, type QuoteRequest, readPayload, type SignedPayload, TWAP_WINDOW_SEC, tokenDiff, type Unsigned } from "@endline/sdk";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Auctions, MAX_WAIT_MS } from "./auction.ts";
 import { checkBid } from "./bid.ts";
@@ -256,6 +256,19 @@ describe("relay", () => {
     const request = { ...buy, session: session(USER) };
     await expect(quote(request)).resolves.toBeDefined();
     vi.setSystemTime(cutoffMs);
+    expect(await httpStatus(quote(request))).toBe(409);
+  });
+
+  it("stops quoting and listing as quotable once the oracle's 30-minute averaging window opens, even with a shorter contract cutoff", async () => {
+    const { relay, quote, chain } = setup();
+    const contract = await chain.contractConfig();
+    vi.spyOn(chain, "contractConfig").mockResolvedValue({ ...contract, timing: { write_cutoff_sec: 60 } });
+    const windowMs = (SERIES.expiry - TWAP_WINDOW_SEC) * 1000;
+    vi.setSystemTime(windowMs - 60_000);
+    const request = { ...buy, session: session(USER) };
+    await expect(quote(request)).resolves.toBeDefined();
+    vi.setSystemTime(windowMs);
+    expect((await relay.series()).series.find((s) => s.id === SERIES.id)?.quotable).toBe(false);
     expect(await httpStatus(quote(request))).toBe(409);
   });
 
