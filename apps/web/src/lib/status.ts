@@ -1,3 +1,5 @@
+import { quotableUntil } from "@endline/sdk";
+
 export type SeriesStatus = "active" | "close_only" | "awaiting_price" | "proposed" | "final";
 export type PositionStatus = "active" | "closed" | "settling" | "collect" | "paid" | "expired";
 
@@ -7,7 +9,7 @@ export interface SettlementView {
 }
 
 export function seriesStatus(expiry: number, cutoffSec: number, settlement: SettlementView | null, nowSec: number): SeriesStatus {
-  if (nowSec < expiry - cutoffSec) return "active";
+  if (nowSec < quotableUntil(expiry, cutoffSec)) return "active";
   if (nowSec < expiry) return "close_only";
   if (!settlement) return "awaiting_price";
   return nowSec < settlement.finalAt ? "proposed" : "final";

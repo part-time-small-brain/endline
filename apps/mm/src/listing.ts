@@ -1,4 +1,4 @@
-import { CLAIM_WINDOW_SEC, defaultExpiry, EXPIRY_TIME_OF_DAY, listedWidth, longPayout, type OptionKind, SECONDS_PER_DAY, type Series, seriesId, strikeStepCents, termsOf } from "@endline/sdk";
+import { CLAIM_WINDOW_SEC, defaultExpiry, EXPIRY_TIME_OF_DAY, listedWidth, longPayout, type OptionKind, quotableUntil, SECONDS_PER_DAY, type Series, seriesId, strikeStepCents, termsOf } from "@endline/sdk";
 import type { ListingTerms } from "./chain.ts";
 import type { Underlying } from "./market.ts";
 
@@ -42,7 +42,7 @@ interface Close {
 }
 
 export function expiries(t: ListingTerms, nowSec: number): { expiry: number; short: boolean }[] {
-  const ok = (e: number) => e % t.periodSec === t.offsetSec && e - t.writeCutoffSec > nowSec + WRITABLE_MARGIN_SEC && e <= nowSec + t.maxHorizonSec;
+  const ok = (e: number) => e % t.periodSec === t.offsetSec && quotableUntil(e, t.writeCutoffSec) > nowSec + WRITABLE_MARGIN_SEC && e <= nowSec + t.maxHorizonSec;
   const found: { expiry: number; short: boolean }[] = [];
   let e = Math.floor((nowSec - EXPIRY_TIME_OF_DAY) / SECONDS_PER_DAY) * SECONDS_PER_DAY + EXPIRY_TIME_OF_DAY;
   for (; found.length < DAILY_EXPIRIES && e <= nowSec + t.maxHorizonSec; e += SECONDS_PER_DAY) if (ok(e)) found.push({ expiry: e, short: false });
@@ -111,7 +111,7 @@ export const settlementKey = (s: Series) => `${s.underlying} ${s.expiry}`;
 
 export function planBurns(holdings: Holding[], writeCutoffSec: number, nowSec: number): Close[] {
   return holdings
-    .filter((h) => nowSec >= h.series.expiry - writeCutoffSec)
+    .filter((h) => nowSec >= quotableUntil(h.series.expiry, writeCutoffSec))
     .map((h) => ({ id: h.series.id, amount: h.long < h.short ? h.long : h.short }))
     .filter((c) => c.amount > 0n);
 }

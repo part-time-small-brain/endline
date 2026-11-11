@@ -12,6 +12,7 @@ import {
   type Quote,
   type QuoteEvent,
   type QuoteRequest,
+  quotableUntil,
   type RelayMessage,
   type Series,
   type SeriesListing,
@@ -73,7 +74,7 @@ interface RelayDeps {
 }
 
 export const listed = (series: Series, contract: ContractConfig) => isListed(series, contract.quote_decimals);
-export const open = (series: Series, contract: ContractConfig) => Date.now() < (series.expiry - contract.timing.write_cutoff_sec) * 1000;
+export const open = (series: Series, contract: ContractConfig) => Date.now() < quotableUntil(series.expiry, contract.timing.write_cutoff_sec) * 1000;
 
 export class Relay {
   private issued = new Map<string, Issued>();
@@ -104,7 +105,7 @@ export class Relay {
     const series = all.find((s) => s.id === request.series_id);
     if (!series) throw new HttpError(404, "unknown series");
     if (!listed(series, contract)) throw new HttpError(409, "no market maker lists this width at this strike");
-    if (!open(series, contract)) throw new HttpError(409, "series is close-only: past the write cutoff before expiry");
+    if (!open(series, contract)) throw new HttpError(409, "series is close-only: trading stops 30 min before expiry, or at the contract's write cutoff if earlier");
     if (request.side === "buy" && BigInt(request.size) < (await chain.minWrite(series.underlying))) throw new HttpError(400, "size is below the minimum write size");
     const invited = mms.ids();
     if (invited.length === 0) throw new HttpError(503, "no market makers online");

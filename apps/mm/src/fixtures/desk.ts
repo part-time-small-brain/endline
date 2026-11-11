@@ -24,7 +24,7 @@ const btcSeries = (id: string, kind: "call" | "put", strike: number, expiry = NO
 
 export const PUT = btcSeries("BTC-27NOV26-80000_78000-P", "put", 80_000);
 export const CALL = btcSeries("BTC-27NOV26-90000_92000-C", "call", 90_000);
-export const DEMO_PUT = btcSeries("BTC-24OCT26T0712-80000_78000-P", "put", 80_000, Date.UTC(2026, 9, 24, 7, 12) / 1000);
+export const DEMO_PUT = btcSeries("BTC-24OCT26T0742-80000_78000-P", "put", 80_000, Date.UTC(2026, 9, 24, 7, 42) / 1000);
 
 export const long = (s: Series) => intentsAssetId(OPTIONS, s.id);
 export const short = (s: Series) => intentsAssetId(OPTIONS, shortTokenId(s.id));

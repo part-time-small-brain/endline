@@ -1,4 +1,4 @@
-import { defaultExpiry, type ListedSeries, longPayout, type OptionKind } from "@endline/sdk";
+import { defaultExpiry, type ListedSeries, longPayout, type OptionKind, quotableUntil } from "@endline/sdk";
 import { useState } from "react";
 import type { Side } from "../components/trade/DirectionPicker.tsx";
 import { parseBudget, toNumber, toUnits } from "../lib/money.ts";
@@ -20,7 +20,7 @@ export function useTicket(nowSec: number) {
   const { quoteDecimals, balance } = data;
   const unit = 10n ** BigInt(quoteDecimals);
   const cutoff = data.timing?.write_cutoff_sec ?? 0;
-  const open = data.listing?.series.filter((s) => s.quotable && s.expiry - nowSec > cutoff) ?? [];
+  const open = data.listing?.series.filter((s) => s.quotable && nowSec < quotableUntil(s.expiry, cutoff)) ?? [];
   const symbols = [...new Set(open.map((s) => s.underlying))].sort();
 
   const [link] = useState(() => new URLSearchParams(window.location.search));

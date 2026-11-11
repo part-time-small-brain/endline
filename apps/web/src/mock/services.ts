@@ -1,4 +1,4 @@
-import { buyDiffs, type Call, callableAt, callPoints, type Fill, FREE_CALLS_PER_ROUND, intentsAssetId, isListed, longPayout, MIN_RELAYED_PAYOUT_USD, payload, type Quote, nextRound, readPayload, roundOf, type Series, sellDiffs, type Standing, type StatusUpdate, termsOf, tokenDiff, toSign } from "@endline/sdk";
+import { buyDiffs, type Call, callableAt, callPoints, type Fill, FREE_CALLS_PER_ROUND, intentsAssetId, isListed, longPayout, MIN_RELAYED_PAYOUT_USD, payload, type Quote, nextRound, quotableUntil, readPayload, roundOf, type Series, sellDiffs, type Standing, type StatusUpdate, termsOf, tokenDiff, toSign } from "@endline/sdk";
 import { base58 } from "@scure/base";
 import type { Chain } from "../api/chain.ts";
 import type { Market } from "../api/market.ts";
@@ -37,7 +37,7 @@ function relayable(deadline: string) {
 const randomBytes = (n: number) => crypto.getRandomValues(new Uint8Array(n));
 const txHash = () => base58.encode(randomBytes(32));
 const nowSec = () => Math.floor(Date.now() / 1000);
-const quotable = (s: Series) => s.expiry - nowSec() > WRITE_CUTOFF_SEC && isListed(s, QUOTE_DECIMALS);
+const quotable = (s: Series) => nowSec() < quotableUntil(s.expiry, WRITE_CUTOFF_SEC) && isListed(s, QUOTE_DECIMALS);
 
 export function createMockServices(config: Config): Services {
   const world = createWorld();

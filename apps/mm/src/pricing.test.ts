@@ -1,7 +1,7 @@
 import { capped, YEAR_MS } from "@endline/sdk";
 import { describe, expect, it } from "vitest";
 import { SETTINGS, testDesk } from "./fixtures/desk.ts";
-import { contractPrice, premiumUsd, toQuoteUnits } from "./pricing.ts";
+import { contractPrice, premiumUsd, QUOTE_TTL_MS, toQuoteUnits } from "./pricing.ts";
 
 function rng(seed: number) {
   let s = seed;
@@ -13,10 +13,10 @@ function rng(seed: number) {
 
 const BOOK = testDesk().desk.book;
 
-function priceOf(p: { kind: "call" | "put"; forward: number; strike: number; width: number; vol: number; capVol: number; years: number }, settings = SETTINGS) {
+function priceOf(p: { kind: "call" | "put"; forward: number; strike: number; width: number; vol: number; capVol: number; years: number }, settings = SETTINGS, ageMs = 0) {
   const micros = (usd: number) => BigInt(Math.round(usd * 1e6)).toString();
   const series = { id: "x", underlying: "BTC", kind: p.kind, strike: micros(p.strike), width: micros(p.width), expiry: (p.years * YEAR_MS) / 1000, underlying_decimals: 8 };
-  return contractPrice(BOOK, series, { forward: p.forward, vol: p.vol, capVol: p.capVol, at: 0 }, settings, 0);
+  return contractPrice(BOOK, series, { forward: p.forward, vol: p.vol, capVol: p.capVol, at: -ageMs }, settings, 0);
 }
 
 describe("premium", () => {
@@ -46,12 +46,19 @@ describe("premium", () => {
     expect(price.ask - mid.price).toBeLessThan(0.75 * (legsApartFullSpread - mid.price));
   });
 
-  it("charges only the vol spread and carry, nothing for a hedge, on a near-the-money bet with a big delta", () => {
-    const p = { kind: "call", forward: 80_000, strike: 80_000, width: 2_000, vol: 0.4, capVol: 0.4, years: 1 / 365 } as const;
-    const mid = capped(p.kind, p.forward, p.strike, p.width, p.vol, p.capVol, p.years);
-    const price = priceOf(p, { ...SETTINGS, spreadVol: 1e-9, carryQuote: 0 });
-    expect(price.ask - mid.price).toBeCloseTo(0, 4);
-    expect(mid.price - price.bid).toBeCloseTo(0, 4);
+  it("charges each side what a taker gains on average by filling only after the price moved, over the quote's life and the data's age", () => {
+    const settings = { ...SETTINGS, spreadVol: 1e-9, carryQuote: 0 };
+    for (const [minutes, ageMs] of [[35, 0], [35, 10_000], [240, 4_000], [1_440, 0]] as const) {
+      const p = { kind: "call", forward: 80_000, strike: 80_000, width: 2_000, vol: 0.5, capVol: 0.5, years: minutes / 525_600 } as const;
+      const mid = capped(p.kind, p.forward, p.strike, p.width, p.vol, p.capVol, p.years);
+      const staleGain = (Math.abs(mid.delta) * p.forward * p.vol * Math.sqrt((QUOTE_TTL_MS + ageMs) / YEAR_MS)) / Math.sqrt(2 * Math.PI);
+      const price = priceOf(p, settings, ageMs);
+      expect(price.ask - mid.price, `${minutes} min, ${ageMs} ms old`).toBeCloseTo(staleGain, 3);
+      expect(mid.price - price.bid, `${minutes} min, ${ageMs} ms old`).toBeCloseTo(staleGain, 3);
+    }
+    const farOut = { kind: "call", forward: 80_000, strike: 120_000, width: 2_000, vol: 0.5, capVol: 0.5, years: 35 / 525_600 } as const;
+    const mid = capped(farOut.kind, farOut.forward, farOut.strike, farOut.width, farOut.vol, farOut.capVol, farOut.years);
+    expect(priceOf(farOut, settings).ask - mid.price).toBeCloseTo(0, 6);
   });
 
   it("charges carry on the USDC locked, which is the width, not the strike", () => {

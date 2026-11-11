@@ -19,6 +19,12 @@ describe("expiries", () => {
     expect(iso(expiries(MAINNET, lastChance + 1))).toEqual(["2026-10-27T08:00", "2026-10-28T08:00", "2026-10-29T08:00", "2026-10-30T08:00"]);
   });
 
+  it("stops stocking an expiry before the bot's 30-minute stop even where the contract cutoff is 60 s", () => {
+    const lastChance = at("2026-10-26T07:20:00Z") - 1;
+    expect(iso(expiries(TESTNET, lastChance))[0]).toBe("2026-10-26T08:00");
+    expect(iso(expiries(TESTNET, lastChance + 1))[0]).not.toBe("2026-10-26T08:00");
+  });
+
   it("stays at 08:00 UTC across European and US DST changes", () => {
     for (const now of [at("2026-03-28T12:00:00Z"), at("2026-10-24T12:00:00Z"), at("2026-10-31T12:00:00Z")]) {
       const days = expiries(MAINNET, now).map((e) => e.expiry);
@@ -202,7 +208,7 @@ const EXPIRY = at("2026-10-26T08:00:00Z");
 const hold = (s: Series, long: bigint, short: bigint): Holding => ({ series: s, long, short });
 
 describe("recycling", () => {
-  it("burns unsold pairs only from the write cutoff on, and only the paired amount", () => {
+  it("burns unsold pairs only once quoting stops, and only the paired amount", () => {
     const s = series("A", EXPIRY);
     const holdings = [hold(s, 3n, 10n), hold(series("B", EXPIRY), 0n, 10n), hold(series("C", EXPIRY), 5n, 0n), hold(series("D", EXPIRY), 7n, 7n)];
     expect(planBurns(holdings, 1_800, EXPIRY - 1_801)).toEqual([]);
@@ -211,6 +217,8 @@ describe("recycling", () => {
       { id: "D", amount: 7n },
     ]);
     expect(planBurns([], 1_800, EXPIRY)).toEqual([]);
+    expect(planBurns(holdings, 60, EXPIRY - 1_801)).toEqual([]);
+    expect(planBurns(holdings, 60, EXPIRY - 1_800)).toHaveLength(2);
   });
 
   it("redeems only shorts beyond the pairs, only for final prices", () => {

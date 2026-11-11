@@ -8,6 +8,7 @@ export interface ContractPrice {
   vol: number;
 }
 
+export const QUOTE_TTL_MS = 25_000;
 const MIN_VOL = 0.01;
 // each leg's vol moves this share of the spread, in opposite directions: a skew move the net vega doesn't see
 const SKEW_SHOCK = 0.5;
@@ -20,7 +21,9 @@ export function contractPrice(book: Book, series: Series, mark: SeriesMark, s: S
   const shocks = [[1, 1], [-1, -1], [SKEW_SHOCK, -SKEW_SHOCK], [-SKEW_SHOCK, SKEW_SHOCK]] as const;
   const prices = shocks.map(([near, far]) => theo(mark.vol + near * s.spreadVol, mark.capVol + far * s.spreadVol).price);
   const carry = width * s.carryQuote * years;
-  return { ask: Math.max(...prices) + carry, bid: Math.min(...prices), vol: mark.vol };
+  const moveSd = mark.forward * Math.max(mark.vol, MIN_VOL) * Math.sqrt((QUOTE_TTL_MS + Math.max(0, now - mark.at)) / YEAR_MS);
+  const staleGain = (Math.abs(theo(mark.vol, mark.capVol).delta) * moveSd) / Math.sqrt(2 * Math.PI);
+  return { ask: Math.max(...prices) + carry + staleGain, bid: Math.min(...prices) - staleGain, vol: mark.vol };
 }
 
 export function premiumUsd(price: ContractPrice, contracts: number, mmSells: boolean, s: Settings): number | undefined {

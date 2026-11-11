@@ -1,12 +1,11 @@
-import { buyDiffs, type Diff, isListed, maxPayout, type QuoteEvent, type Series, sellDiffs, termsOf } from "@endline/sdk";
+import { buyDiffs, type Diff, isListed, maxPayout, quotableUntil, type QuoteEvent, type Series, sellDiffs, termsOf } from "@endline/sdk";
 import type { IntentsState } from "./chain.ts";
 import type { Settings } from "./config.ts";
 import type { Inventory } from "./inventory.ts";
 import type { Market } from "./market.ts";
 import { type Book, contracts, exposure, longAsset, type SeriesMark, seriesMark, shortAsset, widthUsd } from "./portfolio.ts";
-import { type ContractPrice, contractPrice, premiumUsd, toQuoteUnits } from "./pricing.ts";
+import { type ContractPrice, contractPrice, premiumUsd, QUOTE_TTL_MS, toQuoteUnits } from "./pricing.ts";
 
-export const QUOTE_TTL_MS = 25_000;
 export const MAX_BALANCE_AGE_MS = 30_000;
 
 export interface Desk {
@@ -39,7 +38,7 @@ export function maxTradeSize(book: Book, series: Series, settings: Settings): bi
 export function priceSeries(desk: Desk, series: Series, settings: Settings, now: number): { ok: true; mark: SeriesMark; price: ContractPrice } | { ok: false; reason: string } {
   const { book } = desk;
   if (!isListed(series, book.quoteDecimals)) return reject("width we don't list");
-  if (now + QUOTE_TTL_MS >= (series.expiry - book.writeCutoffSec) * 1000) return reject("too close to expiry");
+  if (now + QUOTE_TTL_MS >= quotableUntil(series.expiry, book.writeCutoffSec) * 1000) return reject("too close to expiry");
   const mark = seriesMark(desk.market, book, series);
   if (!mark) return reject("no market data");
   if (now - mark.at > settings.maxDataAgeMs) return reject("stale market data");
