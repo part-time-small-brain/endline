@@ -35,7 +35,6 @@ function readExercise(signed: SignedPayload, config: Settings): Exercise | undef
     const [intent, ...extra] = intents;
     const deadlineMs = Date.parse(deadline);
     if (verifying_contract !== config.intents_id || intent?.intent !== "transfer" || extra.length > 0) return undefined;
-    if (!Number.isFinite(deadlineMs) || new Date(deadlineMs).toISOString() !== deadline) return undefined;
     const tokens = Object.fromEntries(Object.entries(intent.tokens).map(([asset, amount]) => [asset, BigInt(amount)]));
     return isDeepStrictEqual(intent, exerciseOptions(config.options_id, tokens)) ? { signerId: signer_id, nonce, deadlineMs, tokens } : undefined;
   } catch {
