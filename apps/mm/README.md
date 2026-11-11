@@ -54,7 +54,7 @@ Read from the process environment.
 
 `monitor` needs only `NETWORK_ID` and the monitor vars: no key.
 
-Fixed constants (not env): carry 7 % a year on the USDC locked, max Deribit data age 10 s, quote lifetime 25 s.
+Fixed constants (not env): carry 7 % a year on the USDC locked, max Deribit data age 10 s (by each row's own `creation_timestamp`), quote lifetime 25 s, a listed expiry's forward at most 10 % from the index.
 
 ## How it quotes
 

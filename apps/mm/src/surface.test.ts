@@ -50,6 +50,20 @@ describe("vol surface", () => {
     expect(markFor(smile, undefined, { underlying: "BTC", expiry: DEMO, strike: 80_000 })).toBeUndefined();
   });
 
+  it("ages a row by Deribit's own timestamp, so a frozen feed goes stale, and drops a row without one", () => {
+    const [row] = book.result;
+    const name = row!.instrument_name;
+    expect(parseBookSummary([{ ...row, creation_timestamp: NOW - 60_000 }], NOW).get(name)?.at).toBe(NOW - 60_000);
+    expect(parseBookSummary([{ ...row, creation_timestamp: undefined }], NOW).has(name)).toBe(false);
+  });
+
+  it("gives nothing for a listed expiry whose forward is far from the index", () => {
+    const target = { underlying: "BTC", expiry: NOV27, strike: 80_000 };
+    expect(markFor(smile, spot, target)).toBeDefined();
+    expect(markFor(smile, { ...spot, price: SPOT * 0.8 }, target)).toBeUndefined();
+    expect(markFor(smile, { ...spot, price: SPOT * 1.25 }, target)).toBeUndefined();
+  });
+
   it("inherits the oldest timestamp so staleness can't be laundered through the spot", () => {
     const old = { price: SPOT, at: NOW - 60_000 };
     expect(markFor(smile, old, { underlying: "BTC", expiry: DEMO, strike: 80_000 })?.at).toBe(NOW - 60_000);

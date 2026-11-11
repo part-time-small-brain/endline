@@ -36,6 +36,7 @@ const MarkRow = z.object({
   instrument_name: z.string(),
   mark_iv: z.number().positive(),
   underlying_price: z.number().positive(),
+  creation_timestamp: z.number(),
 });
 
 const IndexPrice = z.object({ index_price: z.number().positive() });
@@ -54,7 +55,7 @@ export function parseBookSummary(result: unknown, at: number): Map<string, Mark>
   const marks = new Map<string, Mark>();
   for (const row of z.array(z.unknown()).parse(result)) {
     const parsed = MarkRow.safeParse(row);
-    if (parsed.success) marks.set(parsed.data.instrument_name, { vol: parsed.data.mark_iv / 100, forward: parsed.data.underlying_price, at });
+    if (parsed.success) marks.set(parsed.data.instrument_name, { vol: parsed.data.mark_iv / 100, forward: parsed.data.underlying_price, at: Math.min(at, parsed.data.creation_timestamp) });
   }
   return marks;
 }

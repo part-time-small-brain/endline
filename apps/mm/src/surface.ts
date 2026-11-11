@@ -1,5 +1,7 @@
 import { type Instrument, type Mark, parseInstrument } from "./deribit.ts";
 
+const MAX_FORWARD_GAP = 0.1;
+
 export interface Spot {
   price: number;
   at: number;
@@ -40,6 +42,7 @@ export function markFor(points: Point[], spot: Spot | undefined, target: Instrum
   const sameExpiry = first.expiry === target.expiry;
   const forward = sameExpiry ? first.mark.forward : spot?.price;
   if (forward === undefined) return undefined;
+  if (spot && Math.abs(forward / spot.price - 1) > MAX_FORWARD_GAP) return undefined;
   const vol = interpolate(
     smile.map((p) => ({ x: Math.log(p.strike / p.mark.forward), vol: p.mark.vol })),
     Math.log(target.strike / forward),
