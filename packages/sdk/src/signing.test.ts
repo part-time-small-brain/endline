@@ -64,6 +64,13 @@ describe("what the wallet signs", () => {
     }
   });
 
+  it("refuses a deadline not written the way toISOString writes it, such as one padded to any length", () => {
+    const p = intent("alice.near");
+    for (const deadline of [p.deadline.replace(".123Z", `.123${"0".repeat(60_000)}Z`), p.deadline.replace(".123Z", "Z"), p.deadline.replace("Z", "+00:00")]) {
+      expect(() => readPayload({ standard: "erc191", payload: JSON.stringify({ ...p, deadline }) }), deadline.slice(0, 40)).toThrow();
+    }
+  });
+
   it("refuses intents the verifier would run but we never build", () => {
     const p = { ...intent("alice.near"), intents: [{ intent: "add_public_key", public_key: "ed25519:x" }] };
     expect(() => readPayload({ standard: "erc191", payload: JSON.stringify(p) })).toThrow();
