@@ -1,3 +1,6 @@
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import testnet from "../../../deploy/testnet.json" with { type: "json" };
 import { loadConfig, loadMonitorConfig, loadProposerConfig, loadRelayConfig, loadSettlerConfig } from "./config.ts";
@@ -53,6 +56,19 @@ describe("config", () => {
     expect(loadConfig({ ...ENV, ...STALE })).toMatchObject(ids);
     expect(loadMonitorConfig({ NETWORK_ID: "testnet", ...STALE })).toMatchObject(ids);
     expect(loadProposerConfig({ NETWORK_ID: "testnet", ORACLE_ACCOUNT_ID: "oracle.testnet", ORACLE_PRIVATE_KEY: KEY, ...STALE })).toMatchObject({ rpcUrl: ids.rpcUrl, optionsId: ids.optionsId });
+  });
+
+  it("reads secrets from <NAME>_FILE, an empty one as unset, and never prints a bad one", () => {
+    const dir = mkdtempSync(join(tmpdir(), "mm-secrets-"));
+    const file = (name: string, content: string) => {
+      writeFileSync(join(dir, name), content);
+      return join(dir, name);
+    };
+    const { MM_PRIVATE_KEY: _, ...rest } = ENV;
+    expect(loadConfig({ ...rest, MM_PRIVATE_KEY_FILE: file("key", `${KEY}\n`) }).privateKey).toBe(KEY);
+    expect(loadMonitorConfig({ NETWORK_ID: "testnet", ALERT_WEBHOOK_URL_FILE: file("hook", "") }).webhookUrl).toBeUndefined();
+    const leaked = "https//hooks.example/secret-token";
+    expect(() => loadMonitorConfig({ NETWORK_ID: "testnet", ALERT_WEBHOOK_URL_FILE: file("bad", leaked) })).toThrow(expect.objectContaining({ message: expect.not.stringContaining("secret-token") }));
   });
 
   it("refuses a network without a deploy file: mainnet, and so settle, until deploy/mainnet.json exists", () => {

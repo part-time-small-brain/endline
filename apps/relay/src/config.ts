@@ -1,5 +1,6 @@
 import { AccountId, type Deployment } from "@endline/sdk";
 import { readDeployment } from "@endline/sdk/deployment";
+import { readSecretFiles } from "@endline/sdk/secrets";
 import { z } from "zod";
 
 const Env = z
@@ -24,10 +25,12 @@ const Env = z
   })
   .refine((env) => env.NETWORK_ID === "testnet" || !env.FAUCET, { path: ["FAUCET"], message: "the faucet runs only on testnet" });
 
+const SECRETS = ["RELAYER_PRIVATE_KEY", "MM_API_KEYS", "ONECLICK_JWT"];
+
 export type Config = z.infer<typeof Env> & Deployment;
 
 export function loadConfig(env: NodeJS.ProcessEnv): Config {
-  const parsed = Env.safeParse(env);
+  const parsed = Env.safeParse(readSecretFiles(env, SECRETS));
   if (!parsed.success) throw new Error(`bad config:\n${z.prettifyError(parsed.error)}`);
   return { ...parsed.data, ...readDeployment(parsed.data.NETWORK_ID) };
 }

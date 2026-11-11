@@ -11,25 +11,30 @@ services:
   relay:
     <<: *app
     command: pnpm --filter @endline/relay start
-    environment: [NETWORK_ID, RELAYER_ACCOUNT_ID, RELAYER_PRIVATE_KEY, MM_API_KEYS, FAUCET, ONECLICK_JWT, APP_ORIGINS, PORT=8787, DATA_DIR=/data, TRUST_PROXY=true]
+    environment: [NETWORK_ID, RELAYER_ACCOUNT_ID, RELAYER_PRIVATE_KEY_FILE=/run/secrets/RELAYER_PRIVATE_KEY, MM_API_KEYS_FILE=/run/secrets/MM_API_KEY, FAUCET, ONECLICK_JWT_FILE=/run/secrets/ONECLICK_JWT, APP_ORIGINS, PORT=8787, DATA_DIR=/data, TRUST_PROXY=true]
+    secrets: [RELAYER_PRIVATE_KEY, MM_API_KEY, ONECLICK_JWT]
     volumes: [relay-data:/data]
   mm:
     <<: *app
     command: pnpm --filter @endline/mm start
-    environment: [NETWORK_ID, MM_ACCOUNT_ID, MM_PRIVATE_KEY, MM_API_KEY, ALERT_WEBHOOK_URL, RELAY_WS_URL=ws://relay:8787/mm]
+    environment: [NETWORK_ID, MM_ACCOUNT_ID, MM_PRIVATE_KEY_FILE=/run/secrets/MM_PRIVATE_KEY, MM_API_KEY_FILE=/run/secrets/MM_API_KEY, ALERT_WEBHOOK_URL_FILE=/run/secrets/ALERT_WEBHOOK_URL, RELAY_WS_URL=ws://relay:8787/mm]
+    secrets: [MM_PRIVATE_KEY, MM_API_KEY, ALERT_WEBHOOK_URL]
     depends_on: [relay]
   lister:
     <<: *app
     command: pnpm --filter @endline/mm start list
-    environment: [NETWORK_ID, MM_ACCOUNT_ID, MM_PRIVATE_KEY]
+    environment: [NETWORK_ID, MM_ACCOUNT_ID, MM_PRIVATE_KEY_FILE=/run/secrets/MM_PRIVATE_KEY]
+    secrets: [MM_PRIVATE_KEY]
   monitor:
     <<: *app
     command: pnpm --filter @endline/mm start monitor
-    environment: [NETWORK_ID, RELAYER_ACCOUNT_ID, MM_ACCOUNT_ID, ALERT_WEBHOOK_URL, "HEALTH_URL=${HEALTH_URL:-http://web/health}"]
+    environment: [NETWORK_ID, RELAYER_ACCOUNT_ID, MM_ACCOUNT_ID, ALERT_WEBHOOK_URL_FILE=/run/secrets/ALERT_WEBHOOK_URL, "HEALTH_URL=${HEALTH_URL:-http://web/health}"]
+    secrets: [ALERT_WEBHOOK_URL]
   proposer:
     <<: *app
     command: pnpm --filter @endline/mm start propose
-    environment: [NETWORK_ID, ORACLE_ACCOUNT_ID, ORACLE_PRIVATE_KEY]
+    environment: [NETWORK_ID, ORACLE_ACCOUNT_ID, ORACLE_PRIVATE_KEY_FILE=/run/secrets/ORACLE_PRIVATE_KEY]
+    secrets: [ORACLE_PRIVATE_KEY]
   web:
     image: endline-web
     platform: linux/amd64
@@ -59,7 +64,8 @@ services:
     image: cloudflare/cloudflared:2026.10.5@sha256:1b1d34d0a9c0bfca9de72db8460d328db3f19edd2b96169114e3e893a97bbe53
     restart: unless-stopped
     command: tunnel --no-autoupdate run
-    environment: [TUNNEL_TOKEN]
+    environment: [TUNNEL_TOKEN_FILE=/run/secrets/TUNNEL_TOKEN]
+    secrets: [TUNNEL_TOKEN]
     depends_on: [web]
     networks: { default: { ipv4_address: 10.86.86.86 }, ops: {} }
 
@@ -70,3 +76,12 @@ networks:
 
 volumes:
   relay-data: {}
+
+secrets:
+  RELAYER_PRIVATE_KEY: { file: "${SECRETS_DIR:?}/RELAYER_PRIVATE_KEY" }
+  MM_PRIVATE_KEY: { file: "${SECRETS_DIR:?}/MM_PRIVATE_KEY" }
+  MM_API_KEY: { file: "${SECRETS_DIR:?}/MM_API_KEY" }
+  ORACLE_PRIVATE_KEY: { file: "${SECRETS_DIR:?}/ORACLE_PRIVATE_KEY" }
+  TUNNEL_TOKEN: { file: "${SECRETS_DIR:?}/TUNNEL_TOKEN" }
+  ALERT_WEBHOOK_URL: { file: "${SECRETS_DIR:?}/ALERT_WEBHOOK_URL" }
+  ONECLICK_JWT: { file: "${SECRETS_DIR:?}/ONECLICK_JWT" }

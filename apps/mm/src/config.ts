@@ -1,5 +1,6 @@
 import { AccountId } from "@endline/sdk";
 import { readDeployment } from "@endline/sdk/deployment";
+import { readSecretFiles } from "@endline/sdk/secrets";
 import { z } from "zod";
 
 const positive = (fallback: number) => z.coerce.number().positive().default(fallback);
@@ -39,12 +40,15 @@ const RelayEnv = z.object({
   MM_API_KEY: z.string().min(16),
 });
 
+const SECRETS = ["MM_PRIVATE_KEY", "MM_API_KEY", "ALERT_WEBHOOK_URL", "ORACLE_PRIVATE_KEY", "SETTLER_PRIVATE_KEY"];
+const secrets = (env: Record<string, string | undefined>) => readSecretFiles(env, SECRETS);
+
 export type Config = ReturnType<typeof loadConfig>;
 export type Settings = Config["settings"];
 export type MonitorConfig = ReturnType<typeof loadMonitorConfig>;
 
 export function loadConfig(env: Record<string, string | undefined>) {
-  const e = Env.parse(env);
+  const e = Env.parse(secrets(env));
   const d = readDeployment(e.NETWORK_ID);
   return {
     accountId: e.MM_ACCOUNT_ID,
@@ -66,12 +70,12 @@ export function loadConfig(env: Record<string, string | undefined>) {
 }
 
 export function loadRelayConfig(env: Record<string, string | undefined>) {
-  const e = RelayEnv.parse(env);
+  const e = RelayEnv.parse(secrets(env));
   return { url: e.RELAY_WS_URL, apiKey: e.MM_API_KEY };
 }
 
 export function loadMonitorConfig(env: Record<string, string | undefined>) {
-  const e = MonitorEnv.parse(env);
+  const e = MonitorEnv.parse(secrets(env));
   const d = readDeployment(e.NETWORK_ID);
   return {
     rpcUrl: d.rpc_url,
@@ -88,7 +92,7 @@ export function loadMonitorConfig(env: Record<string, string | undefined>) {
 export type ProposerConfig = ReturnType<typeof loadProposerConfig>;
 
 export function loadProposerConfig(env: Record<string, string | undefined>) {
-  const e = ProposerEnv.parse(env);
+  const e = ProposerEnv.parse(secrets(env));
   const d = readDeployment(e.NETWORK_ID);
   return { rpcUrl: d.rpc_url, optionsId: d.options_id, oracleAccountId: e.ORACLE_ACCOUNT_ID, oraclePrivateKey: e.ORACLE_PRIVATE_KEY, wasmtime: e.WASMTIME };
 }
@@ -96,7 +100,7 @@ export function loadProposerConfig(env: Record<string, string | undefined>) {
 export type SettlerConfig = ReturnType<typeof loadSettlerConfig>;
 
 export function loadSettlerConfig(env: Record<string, string | undefined>) {
-  const e = SettlerEnv.parse(env);
+  const e = SettlerEnv.parse(secrets(env));
   const d = readDeployment("mainnet");
   return { rpcUrl: d.rpc_url, optionsId: d.options_id, accountId: e.SETTLER_ACCOUNT_ID, privateKey: e.SETTLER_PRIVATE_KEY };
 }
