@@ -4,6 +4,7 @@ import { Chain, ChainReader } from "./chain.ts";
 import type { Config } from "./config.ts";
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.restoreAllMocks();
 });
 
@@ -60,13 +61,12 @@ describe("balances", () => {
 });
 
 describe("view", () => {
-  it("gives up on an RPC call that never answers, so a stalled node can't freeze a loop", async () => {
+  it("gives up on an RPC read that never answers, so a stalled node can't freeze a loop", async () => {
     vi.useFakeTimers();
-    vi.spyOn(JsonRpcProvider.prototype, "callFunction").mockReturnValue(new Promise(() => {}));
-    const read = new ChainReader("http://rpc", "opt.testnet").series();
-    const outcome = expect(read).rejects.toThrow(/RPC/);
+    for (const method of ["callFunction", "viewAccount", "getNetworkId"] as const) vi.spyOn(JsonRpcProvider.prototype, method).mockReturnValue(new Promise(() => {}));
+    const chain = new ChainReader("http://rpc", "opt.testnet");
+    const outcomes = [chain.series(), chain.nearBalance("mm.testnet"), chain.networkId()].map((read) => expect(read).rejects.toThrow(/RPC/));
     await vi.advanceTimersByTimeAsync(15_000);
-    await outcome;
-    vi.useRealTimers();
+    await Promise.all(outcomes);
   });
 });

@@ -61,6 +61,14 @@ export interface IntentsState {
   salt: Uint8Array;
 }
 
+function timed<T>(read: Promise<T>, what: string): Promise<T> {
+  let timer: NodeJS.Timeout | undefined;
+  const stalled = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`RPC ${what} took over ${RPC_TIMEOUT_MS} ms`)), RPC_TIMEOUT_MS);
+  });
+  return Promise.race([read, stalled]).finally(() => clearTimeout(timer));
+}
+
 export class ChainReader {
   protected readonly provider: JsonRpcProvider;
 
@@ -69,15 +77,11 @@ export class ChainReader {
   }
 
   networkId(): Promise<string> {
-    return this.provider.getNetworkId();
+    return timed(this.provider.getNetworkId(), "network id");
   }
 
   protected async view(contractId: string, method: string, args: Record<string, unknown> = {}): Promise<unknown> {
-    let timer: NodeJS.Timeout | undefined;
-    const stalled = new Promise<never>((_, reject) => {
-      timer = setTimeout(() => reject(new Error(`RPC ${method} took over ${RPC_TIMEOUT_MS} ms`)), RPC_TIMEOUT_MS);
-    });
-    return Promise.race([this.provider.callFunction({ contractId, method, args }), stalled]).finally(() => clearTimeout(timer));
+    return timed(this.provider.callFunction({ contractId, method, args }), method);
   }
 
   async contractConfig(): Promise<ContractConfig> {
@@ -145,7 +149,7 @@ export class ChainReader {
   }
 
   async nearBalance(accountId: string): Promise<{ amount: bigint; storageUsage: number }> {
-    const account = await this.provider.viewAccount({ accountId });
+    const account = await timed(this.provider.viewAccount({ accountId }), "view account");
     return { amount: account.amount, storageUsage: account.storage_usage };
   }
 }
