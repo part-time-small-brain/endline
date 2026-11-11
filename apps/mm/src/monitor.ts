@@ -1,12 +1,13 @@
 import { setTimeout as sleep } from "node:timers/promises";
 import { z } from "zod";
-import { type Alert, dedupe, pendingAlerts, reserveAlert, settlementAlert } from "./alerts.ts";
+import { type Alert, dedupe, MISSING_GRACE_SEC, pendingAlerts, reserveAlert, settlementAlert } from "./alerts.ts";
 import { ChainReader } from "./chain.ts";
 import type { MonitorConfig } from "./config.ts";
 import { settlementReferences } from "./deribit.ts";
 
 const TICK_MS = 60_000;
 const HTTP_TIMEOUT_MS = 5_000;
+const BRIEF = new Set(["uptime", "quotes", "priced"]);
 const Health = z.object({ ok: z.literal(true), market_makers: z.number() });
 const Marks = z.array(z.unknown());
 
@@ -21,10 +22,14 @@ export async function monitorCommand(config: MonitorConfig, once: boolean): Prom
   const final = new Set<string>();
   const open = new Map<string, Opened>();
   const net = config.networkId;
+  let seen = new Set<string>();
   for (;;) {
     try {
-      const { fresh, resolved } = dedupe(new Set(open.keys()), await check(chain, config, final, open));
-      for (const alert of fresh) {
+      const alerts = await check(chain, config, final, open);
+      const { fresh, resolved } = dedupe(new Set(open.keys()), alerts);
+      const lasting = fresh.filter((a) => !BRIEF.has(a.key) || seen.has(a.key));
+      seen = new Set(alerts.map((a) => a.key));
+      for (const alert of lasting) {
         const sent = await notify(config.webhookUrl, `ALERT [${net}] ${alert.title}: ${alert.text}`, `🔴 ${net} · ${alert.title}\n${alert.text}`);
         if (!sent) continue;
         open.set(alert.key, { title: alert.title, at: Date.now(), messageId: sent.messageId });
@@ -88,7 +93,7 @@ async function check(chain: ChainReader, config: MonitorConfig, final: Set<strin
       final.add(key);
       continue;
     }
-    if (!settlement && nowSec < expiry + terms.oracleWindowSec) continue;
+    if (!settlement && nowSec < expiry + terms.oracleWindowSec + MISSING_GRACE_SEC) continue;
     const index = indexes.get(underlying);
     const price = index === undefined ? undefined : await reference(index, expiry).catch((e) => {
       console.error(`monitor: deribit ${index}: ${e}`);

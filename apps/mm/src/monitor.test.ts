@@ -27,7 +27,7 @@ const CONFIG = {
   relayerId: "relayer.testnet" as string | undefined,
   mmId: undefined as string | undefined,
   networkId: "testnet" as const,
-  webhookUrl: "https://hooks.example/x",
+  webhookUrl: "https://hooks.example/x" as string | undefined,
   healthUrl: undefined as string | undefined,
 };
 const NEAR = 10n ** 24n;
@@ -310,7 +310,8 @@ it.each([
 });
 
 it("alerts no market maker on its own, keeps it open while the stack is down, and resolves uptime when the relay is back and quotes when an MM connects", async () => {
-  const { posted, run } = stack([healthy(0), async () => new Response("", { status: 502 }), healthy(0), healthy(1)]);
+  const down = async () => new Response("", { status: 502 });
+  const { posted, run } = stack([healthy(0), healthy(0), down, down, healthy(0), healthy(1)]);
   await run();
   expect(posted).toEqual([
     "🔴 testnet · No market maker connected\nhttp://web/health: nobody gets a quote. Check the mm service",
@@ -323,19 +324,26 @@ it("alerts no market maker on its own, keeps it open while the stack is down, an
 it("alerts a connected market maker that prices nothing, holds it through an outage, a disconnect and a bad /marks read, and resolves it once marks come back", async () => {
   const empty = async () => Response.json([]);
   const priced = async () => Response.json([{ series_id: "x" }]);
+  const down = async () => new Response("", { status: 502 });
   const { posted, run } = stack(
-    [healthy(1), async () => new Response("", { status: 502 }), healthy(0), healthy(1), healthy(1)],
-    [empty, priced, priced, async () => new Response("", { status: 500 }), priced],
+    [healthy(1), healthy(1), down, down, healthy(0), healthy(0), healthy(1), healthy(1), healthy(1)],
+    [empty, empty, priced, priced, priced, priced, async () => new Response("", { status: 500 }), priced, priced],
   );
   await run();
   expect(posted).toEqual([
     "🔴 testnet · Market maker prices nothing\nhttp://web/marks: a market maker is connected but prices nothing. Check the lister's log, Deribit, and the MM's USDC and NEAR",
     "🔴 testnet · Relay down\nhttp://web/health: Error: HTTP 502",
-    "🔴 testnet · No market maker connected\nhttp://web/health: nobody gets a quote. Check the mm service",
     "✅ testnet · Resolved: Relay down\nLasted 0 min",
+    "🔴 testnet · No market maker connected\nhttp://web/health: nobody gets a quote. Check the mm service",
     "✅ testnet · Resolved: No market maker connected\nLasted 0 min",
     "✅ testnet · Resolved: Market maker prices nothing\nLasted 0 min",
   ]);
+});
+
+it("stays quiet through a deploy: one check with the relay restarting and one with the market maker not back yet", async () => {
+  const { posted, run } = stack([healthy(1), async () => new Response("", { status: 502 }), healthy(0), healthy(1), healthy(1)]);
+  await run();
+  expect(posted).toEqual([]);
 });
 
 it("alerts the stack down when /health hangs past the 5 s timeout", async () => {
@@ -348,7 +356,7 @@ it("alerts the stack down when /health hangs past the 5 s timeout", async () => 
     return controller.signal;
   });
   vi.stubGlobal("fetch", vi.fn((_url: string, init?: RequestInit) => new Promise((_, reject) => init?.signal?.addEventListener("abort", () => reject(init.signal?.reason)))));
-  await monitorCommand({ ...CONFIG, healthUrl: HEALTH_URL, webhookUrl: undefined }, true);
-  expect(timeout).toHaveBeenCalledExactlyOnceWith(5_000);
+  await ticks(2, { ...CONFIG, healthUrl: HEALTH_URL, webhookUrl: undefined });
+  expect(timeout).toHaveBeenCalledWith(5_000);
   expect(log).toHaveBeenCalledWith("ALERT [testnet] Relay down: http://web/health: TimeoutError: The operation was aborted due to timeout");
 });
