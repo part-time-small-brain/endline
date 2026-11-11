@@ -14,7 +14,7 @@ At startup the relay checks that the RPC is on `NETWORK_ID` and that `options_id
 
 ## Env
 
-Read from the process environment (no `.env` loading).
+Read from the process environment (no `.env` loading). `RELAYER_PRIVATE_KEY`, `MM_API_KEYS` and `ONECLICK_JWT` can come from a file instead: set `<NAME>_FILE` to its path, not both ([Secrets](https://docs.endline.trade/developers/running-locally#secrets)).
 
 | Var | Meaning |
 |---|---|

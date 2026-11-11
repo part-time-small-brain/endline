@@ -40,8 +40,15 @@ describe("secret files", () => {
 
   it("names a bad key without printing it", () => {
     const leaked = "ed25519:0OIl-not-base58";
-    expect(() => loadConfig({ ...rest, MM_API_KEYS, RELAYER_PRIVATE_KEY_FILE: file("bad", leaked) })).toThrow(expect.objectContaining({ message: expect.not.stringContaining(leaked) }));
-    expect(() => loadConfig({ ...rest, MM_API_KEYS, RELAYER_PRIVATE_KEY_FILE: file("bad", leaked) })).toThrow(/RELAYER_PRIVATE_KEY/);
+    const error = (() => {
+      try {
+        loadConfig({ ...rest, MM_API_KEYS, RELAYER_PRIVATE_KEY_FILE: file("bad", leaked) });
+      } catch (e) {
+        return String(e);
+      }
+    })();
+    expect(error).toContain("RELAYER_PRIVATE_KEY");
+    expect(error).not.toContain(leaked);
   });
 });
 
