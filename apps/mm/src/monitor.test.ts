@@ -34,7 +34,7 @@ const NEAR = 10n ** 24n;
 
 beforeEach(() => {
   sleep.mockReset();
-  chain.nearBalance.mockImplementation(async (accountId: string) => ({ amount: accountId === "opt.testnet" ? NEAR : 10n * NEAR, storageUsage: 0 }));
+  chain.nearBalance.mockImplementation(async (accountId: string) => ({ amount: accountId === "opt.testnet" ? NEAR / 10n : 10n * NEAR, storageUsage: 0 }));
   chain.pendingChanges.mockResolvedValue({ oracles: [], oracle_wasm: null, pending_owner_id: null });
   vi.spyOn(Date, "now").mockReturnValue(NOW_SEC * 1000);
   vi.spyOn(console, "error").mockImplementation(() => {});
@@ -69,9 +69,9 @@ it("alerts an unverifiable proposal when Deribit is down and keeps posting after
   const alerts = log.mock.calls.map(([line]) => String(line)).filter((line) => line.startsWith("ALERT"));
   expect(alerts).toHaveLength(2);
   expect(alerts[0]).toContain("no Deribit reference");
-  expect(alerts[1]).toContain("1.000 NEAR above storage");
+  expect(alerts[1]).toContain("0.100 NEAR above storage");
   expect(hooks).toHaveLength(2);
-  const message = "🔴 testnet · Options contract low on NEAR\nopt.testnet: 1.000 NEAR above storage, below the 2.000 NEAR reserve. Top it up";
+  const message = "🔴 testnet · Options contract low on NEAR\nopt.testnet: 0.100 NEAR above storage, below the 0.300 NEAR reserve. Top it up";
   expect(hooks[1]).toEqual({ text: message, content: message });
 });
 
@@ -217,6 +217,19 @@ it("alerts the intents contract below 2 NEAR over storage and the relayer below 
   chain.nearBalance.mockClear();
   expect(await alerts({ ...CONFIG, relayerId: undefined })).toEqual([expect.stringContaining("ALERT [testnet] Intents contract low on NEAR: intents.testnet: ")]);
   expect(chain.nearBalance.mock.calls.map(([id]) => id)).toEqual(["opt.testnet", "intents.testnet"]);
+});
+
+it("holds the options contract to 0.3 NEAR over storage and the accounts that pay gas to 2 NEAR", async () => {
+  const log = vi.spyOn(console, "log").mockImplementation(() => {});
+  chain.series.mockResolvedValue([]);
+  const balances: Record<string, bigint> = { "opt.testnet": (3n * NEAR) / 10n, "intents.testnet": 10n * NEAR, "relayer.testnet": (3n * NEAR) / 10n };
+  chain.nearBalance.mockImplementation(async (accountId: string) => ({ amount: balances[accountId], storageUsage: 0 }));
+  await monitorCommand({ ...CONFIG, webhookUrl: undefined }, true);
+  expect(log.mock.calls.map(([line]) => String(line)).filter((line) => line.startsWith("ALERT"))).toEqual([expect.stringContaining("ALERT [testnet] Relayer low on NEAR: relayer.testnet: 0.300 NEAR above storage, below the 2.000 NEAR reserve")]);
+  balances["opt.testnet"] = (3n * NEAR) / 10n - 1n;
+  log.mockClear();
+  await monitorCommand({ ...CONFIG, webhookUrl: undefined }, true);
+  expect(log.mock.calls.map(([line]) => String(line)).filter((line) => line.startsWith("ALERT"))[0]).toContain("Options contract low on NEAR: opt.testnet: 0.300 NEAR above storage, below the 0.300 NEAR reserve");
 });
 
 it("alerts the market maker running out of NEAR for gas once its account is set", async () => {

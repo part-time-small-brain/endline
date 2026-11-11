@@ -5,6 +5,9 @@ import { ChainReader } from "./chain.ts";
 import type { MonitorConfig } from "./config.ts";
 import { settlementReferences } from "./deribit.ts";
 
+const CONTRACT_RESERVE_YOCTO = 3n * 10n ** 23n;
+const ACCOUNT_RESERVE_YOCTO = 2n * 10n ** 24n;
+
 const TICK_MS = 60_000;
 const HTTP_TIMEOUT_MS = 5_000;
 const BRIEF = new Set(["uptime", "quotes", "priced"]);
@@ -55,17 +58,19 @@ export async function monitorCommand(config: MonitorConfig, once: boolean): Prom
 
 async function check(chain: ChainReader, config: MonitorConfig, final: Set<string>, open: ReadonlyMap<string, Opened>): Promise<Alert[]> {
   const nowSec = Math.floor(Date.now() / 1000);
-  const accounts = [
-    ["Options contract", config.optionsId],
-    ["Intents contract", config.intentsId],
-    ["Relayer", config.relayerId],
-    ["Market maker", config.mmId],
-  ].filter((a): a is [string, string] => a[1] !== undefined);
+  const accounts = (
+    [
+      ["Options contract", config.optionsId, CONTRACT_RESERVE_YOCTO],
+      ["Intents contract", config.intentsId, ACCOUNT_RESERVE_YOCTO],
+      ["Relayer", config.relayerId, ACCOUNT_RESERVE_YOCTO],
+      ["Market maker", config.mmId, ACCOUNT_RESERVE_YOCTO],
+    ] as [string, string | undefined, bigint][]
+  ).filter((a): a is [string, string, bigint] => a[1] !== undefined);
   const reserves = Promise.all(
-    accounts.map(async ([role, id]): Promise<Alert | undefined> => {
+    accounts.map(async ([role, id, minYocto]): Promise<Alert | undefined> => {
       try {
         const { amount, storageUsage } = await chain.nearBalance(id);
-        return reserveAlert(role, id, amount, storageUsage);
+        return reserveAlert(role, id, amount, storageUsage, minYocto);
       } catch (e) {
         return { key: `reserve ${id}`, title: `Can't read ${role.toLowerCase()} NEAR balance`, text: `${id}: can't read balance: ${e}` };
       }
