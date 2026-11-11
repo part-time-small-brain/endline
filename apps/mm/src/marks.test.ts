@@ -4,7 +4,7 @@ import { CALL, DEMO_PUT, long, NOW, PAIRS, PUT, quoteEvent, SETTINGS, short, tes
 import { marks } from "./marks.ts";
 import { seriesMark } from "./portfolio.ts";
 import { contractPrice, toQuoteUnits } from "./pricing.ts";
-import { decide } from "./quote.ts";
+import { decide, MAX_BALANCE_AGE_MS } from "./quote.ts";
 
 const put = (strike: bigint): Series => {
   const width = listedWidth(strike, 6);
@@ -31,6 +31,13 @@ describe("marks", () => {
     const demo = published.find((m) => m.series_id === DEMO_PUT.id);
     expect(BigInt(demo?.ask ?? 0)).toBeGreaterThan(0n);
     expect(demo).not.toHaveProperty("bid");
+  });
+
+  it("publish nothing while the last balance read is too old to quote on", () => {
+    const { desk } = testDesk();
+    const settings = { ...SETTINGS, maxDataAgeMs: Infinity };
+    expect(marks(desk, settings, NOW + MAX_BALANCE_AGE_MS)).not.toEqual([]);
+    expect(marks(desk, settings, NOW + MAX_BALANCE_AGE_MS + 1)).toEqual([]);
   });
 
   it("price a buy at size × the published ask, lifted to the $1 minimum", () => {

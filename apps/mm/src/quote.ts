@@ -43,6 +43,7 @@ export function priceSeries(desk: Desk, series: Series, settings: Settings, now:
   const mark = seriesMark(desk.market, book, series);
   if (!mark) return reject("no market data");
   if (now - mark.at > settings.maxDataAgeMs) return reject("stale market data");
+  if (now - desk.inventory.fetchedAt() > MAX_BALANCE_AGE_MS) return reject("stale balances");
   return { ok: true, mark, price: contractPrice(book, series, mark, settings, now) };
 }
 
@@ -55,7 +56,6 @@ export function decide(ev: QuoteEvent, desk: Desk, settings: Settings, now: numb
   if (ev.option_asset !== longAsset(book, series.id) || ev.quote_asset !== book.quoteAsset) return reject("unsupported assets");
   if (!termsMatch(ev, series)) return reject("terms differ from contract");
   if (BigInt(ev.fee_pips) !== desk.intents.fee) return reject("fee differs from intents");
-  if (now - inventory.fetchedAt() > MAX_BALANCE_AGE_MS) return reject("stale balances");
   const priced = priceSeries(desk, series, settings, now);
   if (!priced.ok) return priced;
   const { mark, price } = priced;
