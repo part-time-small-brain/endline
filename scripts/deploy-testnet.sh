@@ -42,7 +42,7 @@ if exists "$opt"; then
   [ "$build" = capped ] || { echo "$opt runs the uncapped build, which can't be upgraded: deploy to a new account with OPTIONS_ID=…" >&2; exit 1; }
 fi
 
-[ -f "$res/intents.wasm" ] || "$repo/scripts/fetch-sandbox-wasms.sh"
+[ -s "$res/intents.wasm" ] && [ -s "$res/fungible-token.wasm" ] || "$repo/scripts/fetch-sandbox-wasms.sh"
 (cd "$repo/contracts/options" && cargo near build non-reproducible-wasm)
 
 if ! exists "$intents"; then
