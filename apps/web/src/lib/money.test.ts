@@ -63,7 +63,6 @@ describe("formatToken", () => {
 describe("parseUnits", () => {
   it("parses dollars exactly", () => {
     expect(parseUnits("25", 6)).toBe(25_000_000n);
-    expect(parseUnits("1,000.5", 6)).toBe(1_000_500_000n);
     expect(parseUnits(".25", 6)).toBe(250_000n);
   });
 
@@ -73,6 +72,11 @@ describe("parseUnits", () => {
     expect(parseUnits("-5", 6)).toBeNull();
     expect(parseUnits("1e3", 6)).toBeNull();
     expect(parseUnits("0.0000001", 6)).toBeNull();
+  });
+
+  it("rejects commas, since a decimal comma would read as a thousands separator", () => {
+    for (const text of ["12,50", "0,5", "1,000", "1,000.5"]) expect(parseUnits(text, 6), text).toBeNull();
+    expect(parseBudget("9,99", 6)).toBeNull();
   });
 });
 

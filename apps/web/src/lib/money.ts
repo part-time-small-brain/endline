@@ -43,7 +43,7 @@ export function formatToken(value: bigint, decimals: number, maxFraction = 8): s
 }
 
 export function parseUnits(text: string, decimals: number): bigint | null {
-  const match = /^(\d*)(?:\.(\d*))?$/.exec(text.trim().replace(/,/g, ""));
+  const match = /^(\d*)(?:\.(\d*))?$/.exec(text.trim());
   if (!match || (match[1] === "" && !match[2])) return null;
   const fraction = match[2] ?? "";
   if (fraction.length > decimals) return null;
