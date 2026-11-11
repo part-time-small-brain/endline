@@ -26,6 +26,10 @@ describe("listedWidth", () => {
     expect(isListed({ strike: (110_000n * USD).toString(), width: (2_000n * USD).toString() }, 6)).toBe(true);
     expect(isListed({ strike: (110_000n * USD).toString(), width: (2_000n * USD + 10_000n).toString() }, 6)).toBe(false);
   });
+
+  it("throws on a strike too large for a number instead of looping forever", () => {
+    expect(() => isListed({ strike: "9".repeat(310), width: "1" }, 6)).toThrow();
+  });
 });
 
 describe("twapPoints", () => {
