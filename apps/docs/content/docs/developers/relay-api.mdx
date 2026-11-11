@@ -34,7 +34,7 @@ The relay runs the RFQ auction, settles trades with `intents.near::execute_inten
 | Quote | `POST /quote {series_id, side, size, signer: {standard, signer_id}, session}`. `side` is yours: `buy` or `sell` (to close). A buy must be at least the asset's `min_write` |
 | Auction | The relay asks every connected market maker for 300 to 1500 ms, closing early once all have answered. Best price wins (buy: lowest, sell: highest, ties: first answer) |
 | Sign | The `Quote` carries `premium`, `pay`, `receive`, `sign_by_ms` (market maker deadline − 3 s, the last moment to publish) and `payload`, exactly what your wallet signs, with the market maker's deadline so a publish just before `sign_by_ms` can still land |
-| Publish | `POST /publish {quote_id, signed}`, accepted only if byte-for-byte what the relay issued and unused. The relay simulates both halves, then calls `execute_intents([mm, user])`: both fill or neither does. If that call errors, the relay reads every transaction it signed for it at `final`: `settled` with the one that succeeded, `failed` once all of them failed or a final block passes the deadline with none succeeded. Until then the quote stays `settling` |
+| Publish | `POST /publish {quote_id, signed}`, accepted only if byte-for-byte what the relay issued and unused. The relay simulates both halves, then calls `execute_intents([mm, user])`: both fill or neither does. If that call errors, the relay reads every transaction it signed for it at `final`: `settled` with the one that succeeded, `failed` once all of them failed or a final block passes the deadline with none succeeded or still finalising. Until then the quote stays `settling` |
 
 ### Signing `Quote.payload`
 
@@ -76,7 +76,7 @@ Body: `{error}`.
 | `413` | Body over 64 KB |
 | `415` | Faucet request not `application/json` |
 | `422` | Refused by `simulate_intents` |
-| `500` | A collect errored and the relayer's transactions for it failed, or none had succeeded once a final block passed its deadline: it never ran. If the response never arrives (the relay holds it until then, up to the deadline), check the balance before signing again |
+| `500` | A collect errored and the relayer's transactions for it failed, or none had succeeded or was still finalising once a final block passed its deadline: it never ran. If the response never arrives (the relay holds it until then, up to the deadline), check the balance before signing again |
 | `429` | Rate limit (per IP, 10 deposit quotes per minute per IP, or 4 quotes per 25 s per signer), faucet already used in the last 24 h, or 10 free calls used this round (100 per IP) |
 | `502` | Faucet transfer refunded (try again) or of unknown outcome (check your balance; it counts as sent) |
 | `503` | No market maker online, no valid quote, claim queue full, no price for a free call's series right now, or the free-call store full |
