@@ -157,7 +157,7 @@ export class Collector {
           console.error("execute_intents errored, settling by the relayer's transactions", key, error);
           const txHash = await ranTx(this.chain, signed, error, key);
           if (txHash !== undefined) return txHash;
-        } else if (await this.simulate(signed).then(() => true, () => false)) this.submitted.delete(key);
+        } else this.submitted.delete(key);
         throw error;
       });
     } finally {
