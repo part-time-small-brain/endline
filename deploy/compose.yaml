@@ -48,13 +48,13 @@ services:
       DOZZLE_AUTH_HEADER_USER: Cf-Access-Authenticated-User-Email
       DOZZLE_AUTH_HEADER_EMAIL: Cf-Access-Authenticated-User-Email
     depends_on: [docker]
-    networks: [ops]
+    networks: [ops, socket]
   docker:
     image: tecnativa/docker-socket-proxy:v0.5.0@sha256:1f5038b54f06c3e18422902cf00ba21803d1c97805aae032e5e6673d532d3459
     restart: unless-stopped
     environment: [CONTAINERS=1, INFO=1]
     volumes: [/var/run/docker.sock:/var/run/docker.sock:ro]
-    networks: [ops]
+    networks: [socket]
   tunnel:
     image: cloudflare/cloudflared:2026.10.5@sha256:1b1d34d0a9c0bfca9de72db8460d328db3f19edd2b96169114e3e893a97bbe53
     restart: unless-stopped
@@ -66,6 +66,7 @@ services:
 networks:
   default: { ipam: { config: [{ subnet: 10.86.86.0/24, ip_range: 10.86.86.128/25 }] } }
   ops: {}
+  socket: { internal: true }
 
 volumes:
   relay-data: {}
