@@ -105,7 +105,7 @@ export class Relay {
     const series = all.find((s) => s.id === request.series_id);
     if (!series) throw new HttpError(404, "unknown series");
     if (!listed(series, contract)) throw new HttpError(409, "no market maker lists this width at this strike");
-    if (!open(series, contract)) throw new HttpError(409, "series is close-only: past the write cutoff before expiry");
+    if (!open(series, contract)) throw new HttpError(409, "series is close-only: trading stops 30 min before expiry, or at the contract's write cutoff if earlier");
     if (request.side === "buy" && BigInt(request.size) < (await chain.minWrite(series.underlying))) throw new HttpError(400, "size is below the minimum write size");
     const invited = mms.ids();
     if (invited.length === 0) throw new HttpError(503, "no market makers online");
