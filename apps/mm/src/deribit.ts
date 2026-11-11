@@ -3,6 +3,7 @@ import { z } from "zod";
 
 const API = "https://www.deribit.com/api/v2/public";
 const TIMEOUT_MS = 5_000;
+export const CLOCK_SKEW_MS = 5_000;
 
 export interface Mark {
   vol: number;
@@ -55,7 +56,7 @@ export function parseBookSummary(result: unknown, at: number): Map<string, Mark>
   const marks = new Map<string, Mark>();
   for (const row of z.array(z.unknown()).parse(result)) {
     const parsed = MarkRow.safeParse(row);
-    if (parsed.success) marks.set(parsed.data.instrument_name, { vol: parsed.data.mark_iv / 100, forward: parsed.data.underlying_price, at: Math.min(at, parsed.data.creation_timestamp) });
+    if (parsed.success) marks.set(parsed.data.instrument_name, { vol: parsed.data.mark_iv / 100, forward: parsed.data.underlying_price, at: Math.min(at, parsed.data.creation_timestamp + CLOCK_SKEW_MS) });
   }
   return marks;
 }
