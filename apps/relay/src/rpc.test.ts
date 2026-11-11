@@ -116,7 +116,6 @@ describe("ranTx", () => {
     await vi.advanceTimersByTimeAsync(3_000);
     expect(await outcome).toBeUndefined();
     expect(reads).toBe(2);
-    vi.useRealTimers();
   });
 });
 

@@ -61,21 +61,30 @@ describe("relay client", () => {
     expect(quotes).toEqual([]);
   }, 10_000);
 
-  it.each([
-    [true, 1],
-    [false, 2],
-  ])("with a relay that answers pings: %s, connects %i times over two ping rounds", async (autoPong, expected) => {
+  async function pingTwice(autoPong: boolean) {
     vi.useFakeTimers({ toFake: ["setInterval"] });
     const { url, connections } = relay({ autoPong });
-    const client = new RelayClient(url, "k", { quote: () => {}, status: () => {} }, () => {});
+    const logs: string[] = [];
+    const client = new RelayClient(url, "k", { quote: () => {}, status: () => {} }, (line) => logs.push(line));
     client.start();
-    await expect.poll(() => connections.length).toBe(1);
+    await expect.poll(() => logs).toContain("relay connected");
     for (let round = 0; round < 2; round++) {
       vi.advanceTimersByTime(PING_MS);
       await new Promise((resolve) => setTimeout(resolve, 200));
     }
+    return { client, connections };
+  }
+
+  it("keeps a relay that answers pings", async () => {
+    const { client, connections } = await pingTwice(true);
     await new Promise((resolve) => setTimeout(resolve, 2_500));
-    expect(connections).toHaveLength(expected);
+    expect(connections).toHaveLength(1);
+    client.close();
+  }, 10_000);
+
+  it("drops a relay that stops answering pings and reconnects", async () => {
+    const { client, connections } = await pingTwice(false);
+    await expect.poll(() => connections.length, { timeout: 5_000 }).toBe(2);
     client.close();
   }, 10_000);
 });

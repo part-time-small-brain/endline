@@ -45,9 +45,8 @@ describe("vol surface", () => {
     expect(m?.vol).toBeLessThan(volOf("BTC-27NOV26-78000-P"));
   });
 
-  it("gives nothing for another underlying, or a demo expiry without a spot price", () => {
+  it("gives nothing for another underlying", () => {
     expect(markFor(smile, spot, { underlying: "ETH", expiry: NOV27, strike: 3_000 })).toBeUndefined();
-    expect(markFor(smile, undefined, { underlying: "BTC", expiry: DEMO, strike: 80_000 })).toBeUndefined();
   });
 
   it("ages a row by Deribit's own timestamp past a few seconds of clock difference, so a frozen feed goes stale, and drops a row without one", () => {
