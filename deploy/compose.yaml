@@ -41,12 +41,18 @@ services:
     image: amir20/dozzle:v11.4.2@sha256:08cd5230e21e364241f3dcf26191f293166f7835654eb7e41168b9c685f0947b
     restart: unless-stopped
     environment:
+      DOZZLE_REMOTE_HOST: tcp://docker:2375|endline
       DOZZLE_FILTER: label=dozzle=on
-      DOZZLE_ENABLE_ACTIONS: "true"
       DOZZLE_NO_ANALYTICS: "true"
       DOZZLE_AUTH_PROVIDER: forward-proxy
       DOZZLE_AUTH_HEADER_USER: Cf-Access-Authenticated-User-Email
       DOZZLE_AUTH_HEADER_EMAIL: Cf-Access-Authenticated-User-Email
+    depends_on: [docker]
+    networks: [ops]
+  docker:
+    image: tecnativa/docker-socket-proxy:v0.5.0@sha256:1f5038b54f06c3e18422902cf00ba21803d1c97805aae032e5e6673d532d3459
+    restart: unless-stopped
+    environment: [CONTAINERS=1, INFO=1]
     volumes: [/var/run/docker.sock:/var/run/docker.sock:ro]
     networks: [ops]
   tunnel:
