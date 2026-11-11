@@ -11,6 +11,11 @@ describe("seriesStatus", () => {
     expect(seriesStatus(EXPIRY, CUTOFF, null, EXPIRY - 1)).toBe("close_only");
   });
 
+  it("closes cash-out when the averaging window opens even where the contract cutoff is 60 s", () => {
+    expect(seriesStatus(EXPIRY, 60, null, EXPIRY - 1_801)).toBe("active");
+    expect(seriesStatus(EXPIRY, 60, null, EXPIRY - 1_800)).toBe("close_only");
+  });
+
   it("waits for a price from expiry until one is proposed", () => {
     expect(seriesStatus(EXPIRY, CUTOFF, null, EXPIRY)).toBe("awaiting_price");
     expect(seriesStatus(EXPIRY, CUTOFF, null, EXPIRY + 86_400)).toBe("awaiting_price");
