@@ -43,11 +43,11 @@ export function formatToken(value: bigint, decimals: number, maxFraction = 8): s
 }
 
 export function parseUnits(text: string, decimals: number): bigint | null {
-  const match = /^(\d*)(?:\.(\d*))?$/.exec(text.trim());
+  const match = /^(\d*|[1-9]\d{0,2}(?:,\d{3})+)(?:\.(\d*))?$/.exec(text.trim());
   if (!match || (match[1] === "" && !match[2])) return null;
   const fraction = match[2] ?? "";
   if (fraction.length > decimals) return null;
-  return BigInt(match[1] || "0") * 10n ** BigInt(decimals) + BigInt(fraction.padEnd(decimals, "0") || "0");
+  return BigInt(match[1]!.replaceAll(",", "") || "0") * 10n ** BigInt(decimals) + BigInt(fraction.padEnd(decimals, "0") || "0");
 }
 
 const MIN_BUDGET_CENTS = 100n;
