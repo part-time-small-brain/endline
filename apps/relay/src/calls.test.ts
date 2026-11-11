@@ -79,6 +79,8 @@ describe("free calls", () => {
     at(E - 1_800);
     await expect(t.call(series(81_000).id)).rejects.toThrow(/final round/);
     await expect(t.call(series(81_000, NEXT).id)).resolves.toMatchObject({ series_id: series(81_000, NEXT).id });
+    at(E + 3_600);
+    await expect(t.call(series(81_000).id)).rejects.toThrow(/closed/);
   });
 
   it("allows 10 calls a round per account, then 429, and stops a round once it's full", async () => {

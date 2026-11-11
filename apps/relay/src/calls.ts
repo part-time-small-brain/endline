@@ -52,7 +52,7 @@ export class Calls {
     const series = all.find((s) => s.id === series_id);
     if (!series) throw new HttpError(404, "unknown series");
     const callable = (s: Series) => listed(s, contract) && open(s, contract);
-    if (!listed(series, contract)) throw new HttpError(409, "this market is closed");
+    if (!listed(series, contract) || series.expiry <= Date.now() / 1000) throw new HttpError(409, "this market is closed");
     if (!callableAt(series.expiry, Date.now() / 1000)) throw new HttpError(409, "the final round has started: calls close when the averaging window opens");
     if (!open(series, contract)) throw new HttpError(409, "this market is closed");
     const round = roundOf(series.expiry);
