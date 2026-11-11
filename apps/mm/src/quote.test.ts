@@ -5,7 +5,8 @@ import { loadConfig } from "./config.ts";
 import { CALL, DEMO_PUT, long, NOW, PAIRS, PUT, quoteEvent, SETTINGS, short, testDesk, USDC } from "./fixtures/desk.ts";
 import { CHAIN_LAG_MS, Inventory } from "./inventory.ts";
 import { exposure, seriesMark } from "./portfolio.ts";
-import { decide, type Desk, MAX_BALANCE_AGE_MS, QUOTE_TTL_MS } from "./quote.ts";
+import { QUOTE_TTL_MS } from "./pricing.ts";
+import { decide, type Desk, MAX_BALANCE_AGE_MS } from "./quote.ts";
 import { Quoter } from "./quoter.ts";
 import { nep413Signer } from "./signer.ts";
 
@@ -69,11 +70,12 @@ describe("quote refusals", () => {
   const size = 1_000_000n;
 
   it.each([
-    [1_800, PUT],
-    [60, DEMO_PUT],
-  ])("stops quoting once a deadline would reach expiry minus the contract's %i s write cutoff", (cutoff, series) => {
+    [3_600, 3_600, PUT],
+    [1_800, 1_800, PUT],
+    [60, 1_800, DEMO_PUT],
+  ])("with a %i s contract cutoff, stops quoting once a deadline would reach expiry minus %i s, the averaging window at least", (cutoff, stopsAt, series) => {
     const { desk } = testDesk(cutoff);
-    const lastOk = series.expiry * 1000 - cutoff * 1000 - QUOTE_TTL_MS - 1;
+    const lastOk = series.expiry * 1000 - stopsAt * 1000 - QUOTE_TTL_MS - 1;
     const at = (now: number) => {
       desk.inventory.setBalances(desk.inventory.confirmed(), now);
       return decide(quoteEvent(series, "buy", size, { deadline_ms: now + 1_000 }), desk, { ...SETTINGS, maxDataAgeMs: Infinity }, now);

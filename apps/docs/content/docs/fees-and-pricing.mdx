@@ -30,12 +30,12 @@ Our market maker prices each Up or Down as two options, one at the price to beat
 
 | Our market maker today | Value |
 |---|---|
-| Spread | The worst of both options' volatilities moving 2 points, and each moving 1 point the opposite way |
+| Spread | The worst of both options' volatilities moving 2 points, and each moving 1 point the opposite way, plus what the price can move in the quote's 25 s life, which matters most close to expiry |
 | Cost of locked collateral | 7% a year on the USDC locked (the most the option can pay) |
 | Minimum price | $1. It won't buy back options worth less, and won't sell for as much as the option can pay |
 | Largest single trade | $2,000 of max payout |
 
-It stops quoting at the sell-back cutoff, on stale prices or balances, at a risk limit or when out of inventory. Other market makers can set different terms.
+It stops quoting at the sell-back cutoff (never later than 30 minutes before expiry, when the settlement average starts), on stale prices or balances, at a risk limit or when out of inventory. Other market makers can set different terms.
 
 ## Sizes
 

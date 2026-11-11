@@ -94,9 +94,10 @@ describe("marks", () => {
     const other = { ...PUT, id: "BTC-27NOV26-80000_79999d99-P", width: "10000" };
     const unpriced = { ...PUT, id: "ETH-27NOV26-3000_2960-P", underlying: "ETH", strike: "3000000000", width: "40000000" };
     const unheld = { ...PUT, id: "BTC-27NOV26-81000_79000-P", strike: "81000000000" };
-    for (const s of [other, unpriced, unheld]) desk.book.series.set(s.id, s);
-    hold(desk, [other, unpriced]);
-    expect(marks(desk, SETTINGS, NOW).map((m) => m.series_id).sort()).toEqual([CALL.id, PUT.id].sort());
+    const closing = { ...DEMO_PUT, id: "BTC-24OCT26T0712-80000_78000-P", expiry: Date.UTC(2026, 9, 24, 7, 12) / 1000 };
+    for (const s of [other, unpriced, unheld, closing]) desk.book.series.set(s.id, s);
+    hold(desk, [other, unpriced, closing]);
+    expect(marks(desk, SETTINGS, NOW).map((m) => m.series_id).sort()).toEqual([CALL.id, DEMO_PUT.id, PUT.id].sort());
   });
 
   it("skip a series whose price is absurd or at least its width and still publish the rest", () => {
@@ -134,7 +135,7 @@ describe("marks", () => {
 
   it("publish nothing once the market data is stale", () => {
     const { desk } = testDesk();
-    expect(marks(desk, SETTINGS, NOW + SETTINGS.maxDataAgeMs)).toHaveLength(2);
+    expect(marks(desk, SETTINGS, NOW + SETTINGS.maxDataAgeMs)).toHaveLength(3);
     expect(marks(desk, SETTINGS, NOW + SETTINGS.maxDataAgeMs + 1)).toEqual([]);
   });
 });

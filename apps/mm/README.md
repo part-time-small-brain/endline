@@ -62,7 +62,7 @@ On every relay `quote` event the bot refuses unless all of these hold:
 - the auction (`deadline_ms`) is still open;
 - the series exists on the contract with the same terms, the assets are its long token and the contract's `quote_asset`, and `fee_pips` equals the verifier's `fee`;
 - the series' width is the lister's (`listedWidth`), so a third party's copy of a strike at another width is never quoted;
-- the quote deadline (now + 25 s) is before `expiry − timing.write_cutoff_sec`;
+- the quote deadline (now + 25 s) is before `expiry − max(timing.write_cutoff_sec, 30 min)` (`quotableUntil` in the SDK), so it never quotes once the oracle's averaging window opens, even where the contract's cutoff is shorter;
 - the Deribit data is fresh and its forward close to the index;
 - the last balance read is under 30 s old;
 - the premium is below the most the size can pay (`floor(size·W/unit)`), which the $1 minimum can otherwise exceed;
@@ -72,10 +72,11 @@ On every relay `quote` event the bot refuses unless all of these hold:
 Pricing is Black-76 on Deribit's `underlying_price` and `mark_iv` (`get_book_summary_by_currency` and `get_index_price` per underlying every 2 s). A capped series is two options: long at the strike `K`, short at the cap (`K + W` for Up, `K − W` for Down), each with its own vol, `σ` at `K` and `σcap` at the cap. Vols come from the nearest Deribit expiry, interpolated in log-moneyness (a listed strike gets its own vol); the forward is the Deribit index unless that expiry is listed.
 
 - Scenarios: both vols ± spread, and each vol moving spread / 2 the opposite way (σ up, σcap down, and the reverse).
-- Ask = the highest scenario + carry, at least `MIN_PREMIUM_USD`, rounded up to quote units.
-- Bid = the lowest scenario, rounded down.
+- Stale-quote charge: what a taker gains on average by filling only after the price moved, `|Δ| · F · σ · √((25 s + data age) / year) / √(2π)`, on each side. It matters near expiry, where a near-the-money bet's delta is large and the vol spread small.
+- Ask = the highest scenario + carry + the stale-quote charge, at least `MIN_PREMIUM_USD`, rounded up to quote units.
+- Bid = the lowest scenario − the stale-quote charge, rounded down.
 
-After each Deribit refresh the bot sends the relay its [marks](https://docs.endline.trade/developers/relay-api): the same ask and bid for one whole option, before the $1 minimum, and `σ`, plus `max_size`, the most option units that pay out at most `MAX_TRADE_USD`: the same integer limit a quote checks. The ask is lifted so a `max_size` buy at it pays at least `MIN_PREMIUM_USD`, so the app never shows a long shot cheaper than a buy costs. Marks go out for every series it holds long or short tokens of that passes the checks above that don't depend on the quote (width, deadline before the write cutoff, fresh data and balances) and whose ask converts to quote units below the width, ranked by what its tokens there are worth at that bid and ask and cut off under the relay's 64 KB frame limit, so tokens others send it can't push its own series out cheaply. It publishes after every refresh, also one that failed for some underlying, so the others keep their marks.
+After each Deribit refresh the bot sends the relay its [marks](https://docs.endline.trade/developers/relay-api): the same ask and bid for one whole option, before the $1 minimum, and `σ`, plus `max_size`, the most option units that pay out at most `MAX_TRADE_USD`: the same integer limit a quote checks. The ask is lifted so a `max_size` buy at it pays at least `MIN_PREMIUM_USD`, so the app never shows a long shot cheaper than a buy costs. Marks go out for every series it holds long or short tokens of that passes the checks above that don't depend on the quote (width, deadline before `quotableUntil`, fresh data and balances) and whose ask converts to quote units below the width, ranked by what its tokens there are worth at that bid and ask and cut off under the relay's 64 KB frame limit, so tokens others send it can't push its own series out cheaply. It publishes after every refresh, also one that failed for some underlying, so the others keep their marks.
 
 The leg comes from the SDK's `buyDiffs`/`sellDiffs`. The nonce is versioned, uses the verifier's `current_salt` and the same deadline.
 
