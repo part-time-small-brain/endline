@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { SignedPayload, Unsigned } from "./signing.ts";
 
-export const Amount = z.string().regex(/^[1-9][0-9]*$/, "positive integer string");
+export const Amount = z.string().regex(/^[1-9][0-9]{0,38}$/, "positive integer string of at most u128's 39 digits");
 export const AccountId = z.string().min(2).max(64).regex(/^(([a-z\d]+[-_])*[a-z\d]+\.)*([a-z\d]+[-_])*[a-z\d]+$/);
 // the smallest total payout the relay pays gas to collect, in whole quote-asset units
 export const MIN_RELAYED_PAYOUT_USD = 1n;
