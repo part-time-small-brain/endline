@@ -56,15 +56,15 @@ describe("settlementAlert", () => {
     expect(alert?.text).toContain(`"price":"<price>"`);
   });
 
-  it("waits for the full oracle window before asking for a manual proposal", () => {
-    expect(check(null, 80_000, { nowSec: EXPIRY + 599 })).toBeUndefined();
-    const alert = check(null, 80_000, { nowSec: EXPIRY + 600 });
+  it("waits five minutes past the oracle window, the proposer's first chance, before asking for a manual proposal", () => {
+    expect(check(null, 80_000, { nowSec: EXPIRY + 899 })).toBeUndefined();
+    const alert = check(null, 80_000, { nowSec: EXPIRY + 900 });
     expect(alert?.key).toBe(`missing BTC ${EXPIRY}`);
     expect(alert?.text).toContain(`propose_settlement json-args '{"underlying":"BTC","expiry":${EXPIRY},"price":"<price>"}' prepaid-gas '30 Tgas' attached-deposit '1 yoctoNEAR' sign-as oracle.testnet`);
   });
 
   it("tells the proposer the deadline to reproduce the price with all venues, and its units", () => {
-    const text = check(null, 80_000, { nowSec: EXPIRY + 600 })?.text;
+    const text = check(null, 80_000, { nowSec: EXPIRY + 900 })?.text;
     expect(text).toContain(`Run the pinned WASM before ${new Date((EXPIRY + 11 * 3_600) * 1000).toISOString().slice(0, 16).replace("T", " ")} UTC`);
     expect(text).toContain("6 decimals ($74,784.91 = 74784910000)");
   });

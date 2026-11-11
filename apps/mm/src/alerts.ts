@@ -5,6 +5,9 @@ const MIN_RESERVE_YOCTO = 2n * 10n ** 24n;
 const YOCTO_PER_BYTE = 10n ** 19n;
 const KRAKEN_HISTORY_SEC = 11 * 3_600;
 
+// the testnet proposer may only propose from the window's end, so give it a few minutes
+export const MISSING_GRACE_SEC = 300;
+
 export interface Alert {
   key: string;
   title: string;
@@ -28,7 +31,7 @@ export function settlementAlert(c: Contract, s: ExpiryState, nowSec: number): Al
   const args = { underlying: s.underlying, expiry: s.expiry, price: "<price>" };
   const reference = s.reference === undefined ? "no Deribit reference" : `Deribit ${s.reference.toFixed(2)}`;
   if (!s.settlement) {
-    if (nowSec < s.expiry + c.oracleWindowSec) return undefined;
+    if (nowSec < s.expiry + c.oracleWindowSec + MISSING_GRACE_SEC) return undefined;
     const propose = nearCall(c, "propose_settlement", args, "1 yoctoNEAR", c.oracles[0] ?? "<oracle>");
     const example = (7_478_491n * 10n ** BigInt(c.quoteDecimals)) / 100n;
     const how = `Run the pinned WASM before ${iso(s.expiry + KRAKEN_HISTORY_SEC)}, Kraken keeps only 12 h of candles. Price in quote units, ${c.quoteDecimals} decimals ($74,784.91 = ${example})`;
