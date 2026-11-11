@@ -54,7 +54,7 @@ Read from the process environment.
 
 `monitor` needs only `NETWORK_ID` and the monitor vars: no key.
 
-Fixed constants (not env): carry 7 % a year on the USDC locked, max Deribit data age 10 s (by each row's own `creation_timestamp`), quote lifetime 25 s, a listed expiry's forward at most 10 % from the index, no quotes on a balance read older than 30 s.
+Fixed constants (not env): carry 7 % a year on the USDC locked, max Deribit data age 10 s (by each row's own `creation_timestamp`, allowing 5 s of clock difference; the index price carries no timestamp, so its age is our fetch time), quote lifetime 25 s, the nearest Deribit expiry's forward within `ln(F/S)` of 10 % plus 50 % a year to that expiry from the index, no quotes on a balance read older than 30 s.
 
 ## How it quotes
 
@@ -63,7 +63,8 @@ On every relay `quote` event the bot refuses unless all of these hold:
 - the series exists on the contract with the same terms, the assets are its long token and the contract's `quote_asset`, and `fee_pips` equals the verifier's `fee`;
 - the series' width is the lister's (`listedWidth`), so a third party's copy of a strike at another width is never quoted;
 - the quote deadline (now + 25 s) is before `expiry − timing.write_cutoff_sec`;
-- the Deribit data is fresh;
+- the Deribit data is fresh and its forward close to the index;
+- the last balance read is under 30 s old;
 - the premium is below the most the size can pay (`floor(size·W/unit)`), which the $1 minimum can otherwise exceed;
 - the size cap holds; series, delta and vega caps hold with every outstanding quote counted as filled, or, whichever pending legs fill, the trade leaves that exposure no farther from zero;
 - the MM's intents balance covers the gross leg after reserving it for every outstanding quote.
