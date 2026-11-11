@@ -54,7 +54,7 @@ Read from the process environment.
 
 `monitor` needs only `NETWORK_ID` and the monitor vars: no key.
 
-Fixed constants (not env): carry 7 % a year on the USDC locked, max Deribit data age 10 s (by each row's own `creation_timestamp`, allowing 5 s of clock difference; the index price carries no timestamp, so its age is our fetch time), quote lifetime 25 s, the nearest Deribit expiry's forward within `ln(F/S)` of 10 % plus 50 % a year to that expiry from the index, no quotes on a balance read older than 30 s.
+Fixed constants (not env): carry 7 % a year on the USDC locked, max Deribit data age 10 s (by each row's own `creation_timestamp`, allowing 5 s of clock difference; the index price carries no timestamp, so its age is our fetch time), quote lifetime 25 s, `|ln(F/S)|` of the nearest Deribit expiry's forward against the index at most 0.1 + 0.5 × years to that expiry, no quotes on a balance read older than 30 s.
 
 ## How it quotes
 
