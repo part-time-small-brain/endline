@@ -30,7 +30,7 @@ near_balance() {
   query "{\"request_type\":\"view_account\",\"finality\":\"final\",\"account_id\":\"$1\"}" | python3 -c '
 import json, sys
 r = json.load(sys.stdin)
-if "result" in r: print(int(r["result"]["amount"]) // 10**24)
+if "result" in r: print((int(r["result"]["amount"]) - r["result"]["storage_usage"] * 10**19) // 10**24)
 elif "UNKNOWN_ACCOUNT" in json.dumps(r): print(-1)
 else: sys.exit(f"rpc: {r}")'
 }
@@ -45,12 +45,13 @@ decimals() {
 [ -z "$(git -C "$repo" status --porcelain -- contracts/options Cargo.toml Cargo.lock)" ] || fail "contracts/options, Cargo.toml or Cargo.lock has uncommitted changes"
 [ "$(curl -sfL "$url" | shasum -a 256 | cut -d' ' -f1)" = "$sha" ] || fail "$url does not serve sha256 $sha"
 balance="$(near_balance "$root")"
-[ "$balance" -ge 13 ] || fail "$root has $balance NEAR, needs 13"
+[ "$balance" -ge 14 ] || fail "$root has $balance NEAR above storage, needs 14"
 [ "$(near_balance "$opt")" -eq -1 ] || fail "$opt already exists: the contract is not upgradeable, pick a new account"
 [ "$(decimals "$usdc")" = 6 ] || fail "$usdc is not 6 decimals"
-for pk in "$mm_pk" "$settler_pk" "$relayer_pk"; do [[ $pk =~ ^ed25519:[1-9A-HJ-NP-Za-km-z]{43,44}$ ]] || fail "$pk is not an ed25519:<base58> public key"; done
+for pk in "$mm_pk" "$settler_pk" "$relayer_pk"; do [[ $pk =~ ^ed25519:[1-9A-HJ-NP-Za-km-z]{32,44}$ ]] || fail "$pk is not an ed25519:<base58> public key"; done
 [ "$(printf '%s\n' "$mm_pk" "$settler_pk" "$relayer_pk" | sort -u | wc -l)" -eq 3 ] || fail "MM, settler and relayer need three different keys"
 (cd "$repo/contracts/options" && cargo near build reproducible-wasm >&2)
+[ "$(wc -c <"$wasm")" -le 440000 ] || fail "$wasm is over 440 KB: raise the contract's 6.5 NEAR below"
 echo "preflight ok. Contract $(git -C "$repo" rev-parse --short HEAD), wasm sha256 $(shasum -a 256 "$wasm" | cut -d' ' -f1)" >&2
 
 net="network-config mainnet"
@@ -59,7 +60,9 @@ path() { printf '"%s"' "44'/397'/0'/0'/$1'"; }
 ledger() { echo "$net sign-with-ledger --seed-phrase-hd-path $(path "$1") usb send"; }
 uses_ledger() { echo "use-ledger --seed-phrase-hd-path $(path "$1") usb"; }
 create() {
-  if [ "$(near_balance "$1")" -eq -1 ]; then
+  local balance
+  balance="$(near_balance "$1")"
+  if [ "$balance" -eq -1 ]; then
     echo "near account create-account fund-myself $1 '$2 NEAR' $3 sign-as $root $(ledger 1)"
   else
     echo "# $1 exists: needs ~$2 NEAR and $4"
@@ -69,9 +72,9 @@ call="near contract call-function as-transaction"
 view="near contract call-function as-read-only"
 echo "# 0. One account per role. Ledger keys at 44'/397'/0'/0'/N': $root 1, $oracle 2, $relayer 3, $mm 4."
 echo "#    Server keys are generated on the server and go straight into Infisical; only their public halves are used here."
-echo "#    The monitor alerts below 2 NEAR above storage on the relayer and the MM, so they start with 2.5"
+echo "#    The monitor alerts below 2 NEAR above storage on the relayer and the MM: the relayer only pays gas, the MM also about 1 NEAR of series storage"
 create "$relayer" 2.5 "$(uses_ledger 3)" "the Ledger key at 3"
-create "$mm" 2.5 "$(uses_ledger 4)" "the Ledger key at 4"
+create "$mm" 3.5 "$(uses_ledger 4)" "the Ledger key at 4"
 create "$settler" 1 "use-manually-provided-public-key $settler_pk" "full access for $settler_pk"
 create "$oracle" 0.2 "$(uses_ledger 2)" "the Ledger key at 2"
 echo "# The relay only sends execute_intents: its RELAYER_PRIVATE_KEY is this function-call key; the Ledger keeps full access"
