@@ -101,10 +101,10 @@ SIGINT/SIGTERM closes the relay socket and stops all timers; already-signed quot
 
 | Step | What |
 |---|---|
-| Expiries | Next 4 daily 08:00 UTC expiries still writable 10 min from now (`expiry − write_cutoff_sec > now + 600`) and within `max_horizon_sec`. If `period_sec` < 1 day (testnet), also the next 4-hourly expiry (00, 04, …, 20 UTC) at least 90 min out, unless it is a daily. All on the contract's grid |
+| Expiries | Next 4 daily 08:00 UTC expiries still quotable 10 min from now (`quotableUntil(expiry, write_cutoff_sec) > now + 600`) and within `max_horizon_sec`. If `period_sec` < 1 day (testnet), also the next 4-hourly expiry (00, 04, …, 20 UTC) at least 90 min out, unless it is a daily. All on the contract's grid |
 | Strikes | Step = largest 1/2/5×10^n at most 1.5 % of spot (BTC $80k → $1,000). Dailies: 5 strikes around spot; short expiry: the strike either side of spot. Calls and puts, width 2 steps of the strike's own grid (`listedWidth` in the SDK: BTC $2,000), so a strike keeps its id when spot re-centres; puts whose width would reach the strike are skipped |
 | Create and write | Per target, nearest expiry and strike first: `create_series` if missing (30 TGas, 0.05 NEAR attached, storage charged, the rest refunded), then straight away top long inventory up to `min(MAX_SERIES_USD, $500)` of max payout, if the gap is at least the underlying's `min_write`, so a fresh contract gets prices within the first few series. Collateral is `ceil(n·W)` USDC, never spending the last `max($500, MAX_TRADE_USD)` of USDC, so a pending quote that buys back from a user still settles. Targets with nothing to write are created after the rest |
-| Burn | From `expiry − write_cutoff_sec`, burn the MM's unsold pairs (`min(long, short)`) with `burn_pair`: one intent per series |
+| Burn | From `quotableUntil(expiry, write_cutoff_sec)`, when the bot stops quoting, burn the MM's unsold pairs (`min(long, short)`) with `burn_pair`: one intent per series |
 | Redeem | Once a series' price is final, redeem the MM's shorts beyond its pairs, up to 10 per intent |
 | Exercise | Once a series' price is final, exercise the MM's longs beyond its pairs (bought back from users) that pay something, up to 10 per intent |
 | Delete | The MM's own series that ended 7 to 37 days ago and that `deletable_series` says owe nothing: `delete_series`, up to 20 per call, refunding their storage to the MM. Older ones are no longer checked; anyone can still delete them |
