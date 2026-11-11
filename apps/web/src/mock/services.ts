@@ -101,7 +101,7 @@ export function createMockServices(config: Config): Services {
       const trade = { option: option(series.id), quote: config.quoteAsset, size, premium, pips: 1n };
       const userLeg = (request.side === "buy" ? buyDiffs(trade) : sellDiffs(trade)).user;
       const signBy = Date.now() + MM_DEADLINE_MS - SIGN_MARGIN_MS;
-      const p = payload(config.intentsId, request.signer.signer_id, signBy, randomBytes(4), randomBytes(15), [tokenDiff(userLeg)]);
+      const p = payload(config.intentsId, request.signer.signer_id, signBy + SIGN_MARGIN_MS, randomBytes(4), randomBytes(15), [tokenDiff(userLeg)]);
       const cash = { asset: config.quoteAsset, amount: premium.toString() };
       const opt = { asset: trade.option, amount: request.size };
       const quote: Quote = {

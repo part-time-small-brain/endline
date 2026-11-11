@@ -33,7 +33,7 @@ The relay runs the RFQ auction, settles trades with `intents.near::execute_inten
 | Session | Sign once an intents payload with an empty `intents` list (`sessionPayload` in the SDK). The web app uses a 24 h deadline; the relay accepts up to 7 days. It checks the payload is canonical, for its verifier, from the request's signer, and passes `simulate_intents` (signature, registered key, unused nonce) |
 | Quote | `POST /quote {series_id, side, size, signer: {standard, signer_id}, session}`. `side` is yours: `buy` or `sell` (to close). A buy must be at least the asset's `min_write` |
 | Auction | The relay asks every connected market maker for 300 to 1500 ms, closing early once all have answered. Best price wins (buy: lowest, sell: highest, ties: first answer) |
-| Sign | The `Quote` carries `premium`, `pay`, `receive`, `sign_by_ms` (market maker deadline − 3 s) and `payload`, exactly what your wallet signs |
+| Sign | The `Quote` carries `premium`, `pay`, `receive`, `sign_by_ms` (market maker deadline − 3 s, the last moment to publish) and `payload`, exactly what your wallet signs, with the market maker's deadline so a publish just before `sign_by_ms` can still land |
 | Publish | `POST /publish {quote_id, signed}`, accepted only if byte-for-byte what the relay issued and unused. The relay simulates both halves, then calls `execute_intents([mm, user])`: both fill or neither does. If that call errors, the relay reads every transaction it signed for it at `final`: `settled` with the one that succeeded, `failed` once all of them failed or a final block passes the deadline with none succeeded. Until then the quote stays `settling` |
 
 ### Signing `Quote.payload`

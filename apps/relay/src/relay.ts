@@ -143,7 +143,7 @@ export class Relay {
 
       const signByMs = bid.deadlineMs - SIGN_MARGIN_MS;
       const userLeg = legs(event, bid.premium).user;
-      const userPayload = payload(config.intents_id, request.signer.signer_id, signByMs, salt, randomBytes(15), [tokenDiff(userLeg)]);
+      const userPayload = payload(config.intents_id, request.signer.signer_id, bid.deadlineMs, salt, randomBytes(15), [tokenDiff(userLeg)]);
       const premium = bid.premium.toString();
       const option = { asset: event.option_asset, amount: request.size };
       const cash = { asset: event.quote_asset, amount: premium };
