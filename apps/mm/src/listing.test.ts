@@ -208,7 +208,7 @@ const EXPIRY = at("2026-10-26T08:00:00Z");
 const hold = (s: Series, long: bigint, short: bigint): Holding => ({ series: s, long, short });
 
 describe("recycling", () => {
-  it("burns unsold pairs only from the write cutoff on, and only the paired amount", () => {
+  it("burns unsold pairs only once quoting stops, and only the paired amount", () => {
     const s = series("A", EXPIRY);
     const holdings = [hold(s, 3n, 10n), hold(series("B", EXPIRY), 0n, 10n), hold(series("C", EXPIRY), 5n, 0n), hold(series("D", EXPIRY), 7n, 7n)];
     expect(planBurns(holdings, 1_800, EXPIRY - 1_801)).toEqual([]);

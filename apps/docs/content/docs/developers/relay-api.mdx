@@ -71,7 +71,7 @@ Body: `{error}`.
 | `402` | Your balance doesn't cover the quote (a buy needs at least $1 of USDC before any market maker is asked), or a free call's caller holds under $1. Deposit first |
 | `403` | Faucet off (mainnet) |
 | `404` | Unknown or forgotten series or quote |
-| `409` | Past the write cutoff, a width no market maker lists at that strike, already published, price not final, payload already submitted or another from the same signer still being sent, claims above the options held, above what you bought through the relay or over 100 open per account, or a free call that's too late, not on the next round, repeated, or on a cell priced at its full payout |
+| `409` | Past the quoting stop (`quotableUntil`), a width no market maker lists at that strike, already published, price not final, payload already submitted or another from the same signer still being sent, claims above the options held, above what you bought through the relay or over 100 open per account, or a free call that's too late, not on the next round, repeated, or on a cell priced at its full payout |
 | `410` | Quote expired |
 | `413` | Body over 64 KB |
 | `415` | Faucet request not `application/json` |
