@@ -21,7 +21,7 @@ export const Payload = z.strictObject({
   signer_id: z.string(),
   verifying_contract: z.string(),
   deadline: z.string(),
-  nonce: z.base64(),
+  nonce: z.base64().regex(/^[A-Za-z0-9+/]{43}=$/, "32-byte nonce"),
   intents: z.array(Intent),
 });
 export type Payload = z.infer<typeof Payload>;

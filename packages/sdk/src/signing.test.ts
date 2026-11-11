@@ -57,6 +57,13 @@ describe("what the wallet signs", () => {
     for (const variant of variants) expect(() => readPayload(variant)).toThrow();
   });
 
+  it("refuses a nonce that isn't 32 bytes, which would shift the NEP-413 fields after it", () => {
+    const p = intent("alice.near");
+    for (const nonce of [Buffer.alloc(28, 7).toString("base64"), Buffer.alloc(33, 7).toString("base64")]) {
+      expect(() => readPayload({ standard: "erc191", payload: JSON.stringify({ ...p, nonce }) }), nonce).toThrow();
+    }
+  });
+
   it("refuses intents the verifier would run but we never build", () => {
     const p = { ...intent("alice.near"), intents: [{ intent: "add_public_key", public_key: "ed25519:x" }] };
     expect(() => readPayload({ standard: "erc191", payload: JSON.stringify(p) })).toThrow();
