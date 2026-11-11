@@ -7,31 +7,31 @@ auth:
     client-secret: C:/infisical/client-secret
     remove_client_secret_on_read: false
 templates:
-  - template-content: '{{ range listSecrets "<project-id>" "testnet" "/" `{"expandSecretReferences": false}` }}{{ if eq .Key "RELAYER_PRIVATE_KEY" }}{{ .Value }}{{ end }}{{ end }}'
+  - template-content: '{{ range listSecrets "031c2321-2111-42c6-b94a-a629b8025580" "testnet" "/" `{"expandSecretReferences": false}` }}{{ if eq .Key "RELAYER_PRIVATE_KEY" }}{{ .Value }}{{ end }}{{ end }}'
     destination-path: C:/endline-secrets/testnet/RELAYER_PRIVATE_KEY
-  - template-content: '{{ range listSecrets "<project-id>" "testnet" "/" `{"expandSecretReferences": false}` }}{{ if eq .Key "MM_PRIVATE_KEY" }}{{ .Value }}{{ end }}{{ end }}'
+  - template-content: '{{ range listSecrets "031c2321-2111-42c6-b94a-a629b8025580" "testnet" "/" `{"expandSecretReferences": false}` }}{{ if eq .Key "MM_PRIVATE_KEY" }}{{ .Value }}{{ end }}{{ end }}'
     destination-path: C:/endline-secrets/testnet/MM_PRIVATE_KEY
-  - template-content: '{{ range listSecrets "<project-id>" "testnet" "/" `{"expandSecretReferences": false}` }}{{ if eq .Key "MM_API_KEY" }}{{ .Value }}{{ end }}{{ end }}'
+  - template-content: '{{ range listSecrets "031c2321-2111-42c6-b94a-a629b8025580" "testnet" "/" `{"expandSecretReferences": false}` }}{{ if eq .Key "MM_API_KEY" }}{{ .Value }}{{ end }}{{ end }}'
     destination-path: C:/endline-secrets/testnet/MM_API_KEY
-  - template-content: '{{ range listSecrets "<project-id>" "testnet" "/" `{"expandSecretReferences": false}` }}{{ if eq .Key "ORACLE_PRIVATE_KEY" }}{{ .Value }}{{ end }}{{ end }}'
+  - template-content: '{{ range listSecrets "031c2321-2111-42c6-b94a-a629b8025580" "testnet" "/" `{"expandSecretReferences": false}` }}{{ if eq .Key "ORACLE_PRIVATE_KEY" }}{{ .Value }}{{ end }}{{ end }}'
     destination-path: C:/endline-secrets/testnet/ORACLE_PRIVATE_KEY
-  - template-content: '{{ range listSecrets "<project-id>" "testnet" "/" `{"expandSecretReferences": false}` }}{{ if eq .Key "TUNNEL_TOKEN" }}{{ .Value }}{{ end }}{{ end }}'
+  - template-content: '{{ range listSecrets "031c2321-2111-42c6-b94a-a629b8025580" "testnet" "/" `{"expandSecretReferences": false}` }}{{ if eq .Key "TUNNEL_TOKEN" }}{{ .Value }}{{ end }}{{ end }}'
     destination-path: C:/endline-secrets/testnet/TUNNEL_TOKEN
-  - template-content: '{{ range listSecrets "<project-id>" "testnet" "/" `{"expandSecretReferences": false}` }}{{ if eq .Key "ALERT_WEBHOOK_URL" }}{{ .Value }}{{ end }}{{ end }}'
+  - template-content: '{{ range listSecrets "031c2321-2111-42c6-b94a-a629b8025580" "testnet" "/" `{"expandSecretReferences": false}` }}{{ if eq .Key "ALERT_WEBHOOK_URL" }}{{ .Value }}{{ end }}{{ end }}'
     destination-path: C:/endline-secrets/testnet/ALERT_WEBHOOK_URL
-  - template-content: '{{ range listSecrets "<project-id>" "testnet" "/" `{"expandSecretReferences": false}` }}{{ if eq .Key "ONECLICK_JWT" }}{{ .Value }}{{ end }}{{ end }}'
+  - template-content: '{{ range listSecrets "031c2321-2111-42c6-b94a-a629b8025580" "testnet" "/" `{"expandSecretReferences": false}` }}{{ if eq .Key "ONECLICK_JWT" }}{{ .Value }}{{ end }}{{ end }}'
     destination-path: C:/endline-secrets/testnet/ONECLICK_JWT
-  - template-content: '{{ range listSecrets "<project-id>" "mainnet" "/" `{"expandSecretReferences": false}` }}{{ if eq .Key "RELAYER_PRIVATE_KEY" }}{{ .Value }}{{ end }}{{ end }}'
+  - template-content: '{{ range listSecrets "031c2321-2111-42c6-b94a-a629b8025580" "mainnet" "/" `{"expandSecretReferences": false}` }}{{ if eq .Key "RELAYER_PRIVATE_KEY" }}{{ .Value }}{{ end }}{{ end }}'
     destination-path: C:/endline-secrets/mainnet/RELAYER_PRIVATE_KEY
-  - template-content: '{{ range listSecrets "<project-id>" "mainnet" "/" `{"expandSecretReferences": false}` }}{{ if eq .Key "MM_PRIVATE_KEY" }}{{ .Value }}{{ end }}{{ end }}'
+  - template-content: '{{ range listSecrets "031c2321-2111-42c6-b94a-a629b8025580" "mainnet" "/" `{"expandSecretReferences": false}` }}{{ if eq .Key "MM_PRIVATE_KEY" }}{{ .Value }}{{ end }}{{ end }}'
     destination-path: C:/endline-secrets/mainnet/MM_PRIVATE_KEY
-  - template-content: '{{ range listSecrets "<project-id>" "mainnet" "/" `{"expandSecretReferences": false}` }}{{ if eq .Key "MM_API_KEY" }}{{ .Value }}{{ end }}{{ end }}'
+  - template-content: '{{ range listSecrets "031c2321-2111-42c6-b94a-a629b8025580" "mainnet" "/" `{"expandSecretReferences": false}` }}{{ if eq .Key "MM_API_KEY" }}{{ .Value }}{{ end }}{{ end }}'
     destination-path: C:/endline-secrets/mainnet/MM_API_KEY
-  - template-content: '{{ range listSecrets "<project-id>" "mainnet" "/" `{"expandSecretReferences": false}` }}{{ if eq .Key "SETTLER_PRIVATE_KEY" }}{{ .Value }}{{ end }}{{ end }}'
+  - template-content: '{{ range listSecrets "031c2321-2111-42c6-b94a-a629b8025580" "mainnet" "/" `{"expandSecretReferences": false}` }}{{ if eq .Key "SETTLER_PRIVATE_KEY" }}{{ .Value }}{{ end }}{{ end }}'
     destination-path: C:/endline-secrets/mainnet/SETTLER_PRIVATE_KEY
-  - template-content: '{{ range listSecrets "<project-id>" "mainnet" "/" `{"expandSecretReferences": false}` }}{{ if eq .Key "TUNNEL_TOKEN" }}{{ .Value }}{{ end }}{{ end }}'
+  - template-content: '{{ range listSecrets "031c2321-2111-42c6-b94a-a629b8025580" "mainnet" "/" `{"expandSecretReferences": false}` }}{{ if eq .Key "TUNNEL_TOKEN" }}{{ .Value }}{{ end }}{{ end }}'
     destination-path: C:/endline-secrets/mainnet/TUNNEL_TOKEN
-  - template-content: '{{ range listSecrets "<project-id>" "mainnet" "/" `{"expandSecretReferences": false}` }}{{ if eq .Key "ALERT_WEBHOOK_URL" }}{{ .Value }}{{ end }}{{ end }}'
+  - template-content: '{{ range listSecrets "031c2321-2111-42c6-b94a-a629b8025580" "mainnet" "/" `{"expandSecretReferences": false}` }}{{ if eq .Key "ALERT_WEBHOOK_URL" }}{{ .Value }}{{ end }}{{ end }}'
     destination-path: C:/endline-secrets/mainnet/ALERT_WEBHOOK_URL
-  - template-content: '{{ range listSecrets "<project-id>" "mainnet" "/" `{"expandSecretReferences": false}` }}{{ if eq .Key "ONECLICK_JWT" }}{{ .Value }}{{ end }}{{ end }}'
+  - template-content: '{{ range listSecrets "031c2321-2111-42c6-b94a-a629b8025580" "mainnet" "/" `{"expandSecretReferences": false}` }}{{ if eq .Key "ONECLICK_JWT" }}{{ .Value }}{{ end }}{{ end }}'
     destination-path: C:/endline-secrets/mainnet/ONECLICK_JWT
