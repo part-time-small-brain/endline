@@ -7,7 +7,7 @@ const base58 = (curve: string) => z.string().regex(new RegExp(`^${curve}:[1-9A-H
 
 const Nep413 = z.strictObject({
   standard: z.literal("nep413"),
-  payload: z.strictObject({ message: z.string(), nonce: z.base64(), recipient: z.string() }),
+  payload: z.strictObject({ message: z.string(), nonce: Payload.shape.nonce, recipient: z.string() }),
 });
 const Erc191 = z.strictObject({ standard: z.literal("erc191"), payload: z.string() });
 

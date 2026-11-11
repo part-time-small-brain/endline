@@ -1,7 +1,7 @@
 import { createIntentSignerNEP413, createIntentSignerViem } from "@defuse-protocol/intents-sdk";
 import { describe, expect, it } from "vitest";
 import { payload, sessionPayload, tokenDiff } from "./intents.ts";
-import { readPayload, SignedPayload, toSign, type Unsigned } from "./signing.ts";
+import { readPayload, SignedPayload, toSign, Unsigned } from "./signing.ts";
 
 const B64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
@@ -59,8 +59,10 @@ describe("what the wallet signs", () => {
 
   it("refuses a nonce that isn't 32 bytes, which would shift the NEP-413 fields after it", () => {
     const p = intent("alice.near");
+    const nep = toSign("nep413", p) as Extract<Unsigned, { standard: "nep413" }>;
     for (const nonce of [Buffer.alloc(28, 7).toString("base64"), Buffer.alloc(33, 7).toString("base64")]) {
       expect(() => readPayload({ standard: "erc191", payload: JSON.stringify({ ...p, nonce }) }), nonce).toThrow();
+      expect(() => readPayload(Unsigned.parse({ ...nep, payload: { ...nep.payload, nonce } })), nonce).toThrow();
     }
   });
 
