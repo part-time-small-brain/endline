@@ -1,6 +1,8 @@
+import { YEAR_MS } from "@endline/sdk";
 import { type Instrument, type Mark, parseInstrument } from "./deribit.ts";
 
 const MAX_FORWARD_GAP = 0.1;
+const MAX_BASIS_A_YEAR = 0.5;
 
 export interface Spot {
   price: number;
@@ -38,15 +40,15 @@ function interpolate(points: { x: number; vol: number }[], x: number): number {
 export function markFor(points: Point[], spot: Spot | undefined, target: Instrument): Mark | undefined {
   const smile = nearestExpiry(points, target);
   const first = smile[0];
-  if (!first) return undefined;
+  if (!first || !spot) return undefined;
+  const years = Math.max(0, first.expiry * 1000 - spot.at) / YEAR_MS;
+  if (Math.abs(Math.log(first.mark.forward / spot.price)) > MAX_FORWARD_GAP + MAX_BASIS_A_YEAR * years) return undefined;
   const sameExpiry = first.expiry === target.expiry;
-  const forward = sameExpiry ? first.mark.forward : spot?.price;
-  if (forward === undefined) return undefined;
-  if (spot && Math.abs(forward / spot.price - 1) > MAX_FORWARD_GAP) return undefined;
+  const forward = sameExpiry ? first.mark.forward : spot.price;
   const vol = interpolate(
     smile.map((p) => ({ x: Math.log(p.strike / p.mark.forward), vol: p.mark.vol })),
     Math.log(target.strike / forward),
   );
   const marksAt = Math.min(...smile.map((p) => p.mark.at));
-  return { vol, forward, at: sameExpiry ? marksAt : Math.min(marksAt, spot?.at ?? 0) };
+  return { vol, forward, at: sameExpiry ? marksAt : Math.min(marksAt, spot.at) };
 }
