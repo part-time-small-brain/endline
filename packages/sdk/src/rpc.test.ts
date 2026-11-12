@@ -154,7 +154,10 @@ describe("RoutedRpcProvider", () => {
     const calls = stubRpc({});
     await block(new RoutedRpcProvider({ urls: ["https://h.rpc/full#x-api-key=a+b%2Fc==&x-other=1"], network: "mainnet" }, vi.fn()));
     expect(calls.at(-1)).toMatchObject({ url: "https://h.rpc/full", headers: expect.objectContaining({ "x-api-key": "a+b/c==", "x-other": "1" }) });
-    expect(() => rpcUrls("https://deploy.rpc", "https://h.rpc/full#bad header=secret")).toThrow(/h\.rpc has a bad header name/);
+    for (const fragment of ["bad header=secret", "x-api-key=a%0Ab", "x-api-key=%E0%A4%A"]) {
+      expect(() => rpcUrls("https://deploy.rpc", `https://h.rpc/full#${fragment}`)).toThrow(/h\.rpc has a (bad header|malformed #fragment)/);
+      expect(() => rpcUrls("https://deploy.rpc", `https://h.rpc/full#${fragment}`)).not.toThrow(/secret|%0A|%E0/);
+    }
   });
 
   it("tries each endpoint once, then sends traffic to the one that answered faster", async () => {

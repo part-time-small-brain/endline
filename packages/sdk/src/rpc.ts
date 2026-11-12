@@ -22,6 +22,7 @@ const SEND_METHODS = new Set(["send_tx", "broadcast_tx_commit", "broadcast_tx_as
 const LONG_METHODS = new Set([...SEND_METHODS, "tx", "EXPERIMENTAL_tx_status"]);
 const NODE_ERRORS = [DoesNotTrackShardError, GarbageCollectedBlockError, InternalHandlerError, InternalRpcError, NodeIsSyncingError, NoNewBlocksError, NoSyncedBlocksError, NotSyncedYetError, UnavailableShardError];
 const HEADER_NAME = /^[A-Za-z0-9-]+$/;
+const UNPARSED = new Set(["Unknown RPC error", "Handler error with no cause"]);
 
 export interface Rpc {
   urls: string[];
@@ -45,7 +46,13 @@ export function rpcUrls(fallback: string, extra: string | undefined): string[] {
   for (const url of listed) {
     const host = URL.canParse(url) ? new URL(url).host : "?";
     if (!URL.canParse(url) || !url.startsWith("https://")) throw new Error(`NEAR_RPC_URLS entry ${host} must be an https URL`);
-    if (Object.keys(fragmentHeaders(url)).some((name) => !HEADER_NAME.test(name))) throw new Error(`NEAR_RPC_URLS entry ${host} has a bad header name in its #fragment`);
+    let headers: Record<string, string>;
+    try {
+      headers = fragmentHeaders(url);
+    } catch {
+      throw new Error(`NEAR_RPC_URLS entry ${host} has a malformed #fragment`);
+    }
+    if (Object.entries(headers).some(([name, value]) => !HEADER_NAME.test(name) || /[\0\r\n]/.test(value))) throw new Error(`NEAR_RPC_URLS entry ${host} has a bad header in its #fragment`);
   }
   return [...new Set([...listed, fallback])];
 }
@@ -53,7 +60,7 @@ export function rpcUrls(fallback: string, extra: string | undefined): string[] {
 function failure(e: unknown): Failure {
   if (e instanceof Error && (e as { cause?: unknown }).cause === 429) return "refused";
   if (!(e instanceof RpcError) || NODE_ERRORS.some((type) => e instanceof type)) return "unclear";
-  return e.constructor === RpcError && e.message === "Unknown RPC error" ? "unclear" : "chain";
+  return e.constructor === RpcError && UNPARSED.has(e.message) ? "unclear" : "chain";
 }
 
 function fragmentHeaders(url: string): Record<string, string> {
