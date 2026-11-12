@@ -81,6 +81,18 @@ description: The rules every change keeps, what each actor can do, and the gaps 
 | Testnet wasm not reproducible | Testnet deploys use `cargo near build non-reproducible-wasm`. Mainnet's `opt.endline.near` was built with `reproducible-wasm` in the pinned `sourcescan/cargo-near` image at commit `1339f7c`: anyone with the source can rebuild it and match the code hash `D6Y3uQ1gvt6AUU2j9TCkwLFnnAMbVGL1RcboyzsUSwCg` |
 | Contract account keys | `opt.endline.near` has no access keys (`view_access_key_list`). A new deployment must delete its full-access keys after deploy |
 
+## Verify the contract
+
+Needs Docker and `cargo-near`. The build runs in the image pinned in `contracts/options/Cargo.toml`.
+
+```bash
+git clone https://github.com/part-time-small-brain/endline && cd endline
+git checkout 1339f7c8b9888dbd2d1c26e98acc3d88051a5b48
+cd contracts/options && cargo near build reproducible-wasm
+```
+
+The SHA-256 it prints in base58 must equal the contract's `code_hash`, `D6Y3uQ1gvt6AUU2j9TCkwLFnnAMbVGL1RcboyzsUSwCg` (`near account view-account-summary opt.endline.near network-config mainnet now`). `contract_source_metadata` on the contract names the same commit and image.
+
 ## Monitoring
 
 `pnpm --filter @endline/mm start monitor` checks every minute, logs alerts and can post them to a webhook:
