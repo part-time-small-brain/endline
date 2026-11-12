@@ -93,7 +93,7 @@ Then get a fresh-context review of the whole package with the same questions. Fi
 ## Safety
 
 - Never push to `main` or `staging`, and never force-push. Work on a branch in its own worktree (`.worktrees/<name>`), commit with Conventional Commits, and open a PR to `staging` (`--assignee @me`). Merge only after a fresh-context review, and only when a maintainer merges or says an agent may.
-- `staging` deploys to testnet. `main` deploys to mainnet, app.endline.trade and these docs, and only moves through a promotion PR from `staging` (merge commit, never squash) that a maintainer merges. Roll back by reverting on `staging` and promoting again.
+- `staging` deploys to testnet. `main` deploys to mainnet, app.endline.trade and docs.endline.trade, and only moves through a promotion PR from `staging` (merge commit, never squash) that a maintainer merges. Roll back by reverting on `staging` and promoting again.
 - Never create remotes or change repo settings. A human does that.
 - Never sign transactions, deploy to mainnet or spend tokens. Testnet deploys only when a human asks.
 - No secrets in the repo. Keys come from env vars. Never read `.env*` files.
