@@ -73,7 +73,7 @@ echo "preflight ok. Contract $(git -C "$repo" rev-parse --short HEAD), wasm sha2
 
 net="network-config mainnet"
 send="$net sign-with-legacy-keychain send"
-admin() { echo "$net sign-with-plaintext-private-key \"\$1\" send; rm -f \"\$TMPDIR/near-cli-rs-final-command.log\""; }
+admin() { echo "$net sign-with-plaintext-private-key \"\$$1\" send; rm -f \"\$TMPDIR/near-cli-rs-final-command.log\""; }
 create() {
   local balance
   balance="$(near_balance "$1")"
