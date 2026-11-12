@@ -3,6 +3,7 @@ export * from "./calls.ts";
 export * from "./fees.ts";
 export * from "./intents.ts";
 export * from "./math.ts";
+export * from "./money.ts";
 export * from "./oneClick.ts";
 export * from "./series.ts";
 export * from "./signing.ts";
