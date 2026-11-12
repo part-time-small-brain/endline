@@ -71,7 +71,7 @@ Toolchain: Rust 1.95 with `wasm32-unknown-unknown` and `wasm32-wasip2`, `cargo-n
 6. Series ids come from their parameters (`BTC-27NOV26-110000_112000-C`). Mainnet expiry is 08:00 UTC; testnet follows its configured minute grid.
 7. Every cross-contract call has a callback that handles failure explicitly. Don't change state after scheduling a promise in a way the callback can't undo.
 8. Math uses u128 with U256 intermediates. Overflow panics, it never wraps. Release builds keep `overflow-checks = true`.
-9. Admin can pause writes and override a settlement inside the dispute window. Admin can never move user collateral or pause exits. It can stall settlement by removing every oracle or pinning a WASM that never answers; `developers/security.mdx` says so, and any change there needs a fallback.
+9. Admin can pause writes and override a settlement inside the dispute window. Admin can never move user collateral or pause exits. It can stall settlement by removing every oracle account and pinning a WASM that never returns a price (a known gap in `developers/security.mdx`). Don't add another way to stall it.
 10. A change to math or series ids means updating `testdata/vectors.json`. Rust checks every field; TS mirrors only what the apps use (series ids, `longPayout`). Keep both green.
 
 ## Review cycle (every change, no exceptions)
