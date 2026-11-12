@@ -55,7 +55,7 @@ The official NEAR Intents quote bus needs a partner key and KYC for market maker
 | | Mainnet | Testnet |
 |---|---|---|
 | Intents | `intents.near` | `intents.near-options-dev.testnet`, a copy of the exact mainnet wasm |
-| Options contract | Coming soon | `opt6.near-options-dev.testnet` |
+| Options contract | `opt.endline.near` (owner `endline.near`) | `opt6.near-options-dev.testnet` |
 | Collateral | Native USDC | Mock USDC (6 decimals) |
 | Expiries | Daily 08:00 UTC (Deribit's grid) | Contract grid every minute; the lister lists the next 4 daily 08:00 UTC ends plus one 4-hourly end |
 | Write cutoff | 30 min before the end | 60 s before |
@@ -64,7 +64,7 @@ The official NEAR Intents quote bus needs a partner key and KYC for market maker
 | Funding | 1Click from any chain | 100 test USDC a day from Add funds (relay `POST /faucet`) |
 | Oracle | `outlayer.near` | `outlayer.testnet`. Manual oracle: `oracle.near-options-dev.testnet`, driven by the proposer |
 
-Testnet ids are in `deploy/testnet.json`. RPC: `https://rpc.testnet.fastnear.com`.
+Ids are in `deploy/mainnet.json` and `deploy/testnet.json`. RPC: `https://rpc.mainnet.fastnear.com`, `https://rpc.testnet.fastnear.com`.
 
 ## Keys on mainnet
 
