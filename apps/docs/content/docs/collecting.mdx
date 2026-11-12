@@ -29,4 +29,4 @@ Collecting returns your option to the contract for its payout. Auto-collect is t
 
 The relay only pays gas for an exercise of our own option tokens (1 to 10 per collect, each at least the minimum size) after the price is final, with a total payout of at least $1 (collect several positions together to reach it). Smaller payouts are collected from a NEAR wallet. Each signed instruction goes on-chain once, and each IP address gets 30 requests per minute.
 
-If the transfer to your NEAR Intents balance fails, the amount is recorded as claimable in the contract. Anyone can retry it with `withdraw_claimable`, and it always goes to you, so an EVM wallet that can't sign NEAR transactions doesn't need to: ask us and we retry it for you. Payouts only come from the collateral locked for that market.
+If the transfer to your NEAR Intents balance fails, the amount is recorded as claimable in the contract. Anyone can retry it with `withdraw_claimable`, and it always goes to you. An EVM wallet can't sign NEAR transactions, so ask us and we retry it for you. Payouts only come from the collateral locked for that market.
