@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { expect, it, vi } from "vitest";
+import { analyticsScript } from "../lib/analytics.ts";
 import manifest from "./manifest.json" with { type: "json" };
 import { restoreNear } from "./near.ts";
 
@@ -29,7 +30,8 @@ it("lets wallet iframes run their scripts by the nonce the CSP allows, the page'
   const html = readFileSync(new URL("../../index.html", import.meta.url), "utf8");
   const hashes = [...html.matchAll(/<script(?![^>]*\ssrc=)[^>]*>([\s\S]*?)<\/script>/g)].map(([, body]) => `'sha256-${createHash("sha256").update(body ?? "").digest("base64")}'`);
   expect(hashes.length).toBeGreaterThan(0);
-  expect(csp).toContain(`script-src 'self' 'nonce-${cspNonce}' ${hashes.join(" ")}`);
+  const beacon = new URL(analyticsScript({ mock: false, network: "mainnet" })?.src ?? "").origin;
+  expect(csp).toContain(`script-src 'self' 'nonce-${cspNonce}' ${hashes.join(" ")} ${beacon}`);
   expect(csp).toContain("frame-ancestors 'none'");
 });
 
