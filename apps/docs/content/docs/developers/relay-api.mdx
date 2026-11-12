@@ -22,6 +22,7 @@ The relay runs the RFQ auction, settles trades with `intents.near::execute_inten
 | `GET /calls/:account_id` | `Call[]`, newest first, with `result: {price, points}` once scored |
 | `GET /leaderboard` | `{round, today, week}`: the latest scored round's top 20 and the last 7 rounds' top 20, each `{account_id, rank, points, wins, streak}` |
 | `GET /leaderboard/:account_id` | The same plus `you: {today, week}` |
+| `POST /deposit-quote` | A 1Click deposit quote request: `dry: false`, `EXACT_INPUT`, `ORIGIN_CHAIN` into the quote asset, `recipient` and `refundTo` the same account, both `INTENTS`, deadline within 24 h → 1Click's quote, returned only if its signature checks out. The relay adds Endline's partner key. CORS only for `APP_ORIGINS`, `content-type: application/json`. 10 per minute per IP, 60 per minute in total |
 | `POST /faucet` | Testnet only. `{account_id}` → `{tx_hash}`. Sends 100 test USDC into that account's intents balance (NEAR account or lowercase `0x` address). CORS only for the relay's `APP_ORIGINS` (the Endline app), `content-type: application/json`. Once per account and once per IP (IPv6: per /48) per 24 h |
 
 `POST /quote`, `/execute`, `/claims`, `/calls`, `/faucet` and `/deposit-quote` share one rate limit: 30 requests per minute per client IP (IPv6: per /64). `GET /fills` has its own: 600 per minute per client IP. `/deposit-quote` also allows 10 quotes per minute per client IP (IPv6: per /48). On top, each signer gets 4 quotes per 25 s, counted once their session and balance check out (quotes refused for funds don't count), and a quote that settles into a trade gives its slot back within that 25 s window, and a buyer needs $1 before any market maker is asked.
@@ -74,12 +75,12 @@ Body: `{error}`.
 | `409` | Past the quoting stop (`quotableUntil`), a width no market maker lists at that strike, already published, price not final, payload already submitted or another from the same signer still being sent, claims above the options held, above what you bought through the relay or over 100 open per account, or a free call that's too late, not on the next round, repeated, or on a cell priced at its full payout |
 | `410` | Quote expired |
 | `413` | Body over 64 KB |
-| `415` | Faucet request not `application/json` |
+| `415` | Faucet or deposit quote request not `application/json` |
 | `422` | Refused by `simulate_intents` |
 | `500` | A collect errored and the relayer's transactions for it failed, or none had succeeded or was still finalising once a final block was 60 s past its deadline: it never ran. If the response never arrives (the relay holds it until then, up to the deadline), check the balance before signing again |
 | `429` | Rate limit (per IP, 10 deposit quotes per minute per IP, or 4 quotes per 25 s per signer), faucet already used in the last 24 h, or 10 free calls used this round (100 per IP) |
-| `502` | Faucet transfer refunded (try again) or of unknown outcome (check your balance; it counts as sent) |
-| `503` | No market maker online, no valid quote, claim queue full, no price for a free call's series right now, or the free-call store full |
+| `502` | Faucet transfer refunded (try again) or of unknown outcome (check your balance; it counts as sent), or 1Click unreachable, failing or sending a quote whose signature doesn't check out |
+| `503` | No market maker online, no valid quote, claim queue full, no price for a free call's series right now, the free-call store full, or deposit quotes busy (60 per minute in total, or 1Click rate-limiting) |
 
 ## Market maker API (WebSocket `/mm`)
 

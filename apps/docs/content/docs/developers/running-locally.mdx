@@ -59,15 +59,15 @@ MM_ACCOUNT_ID=<mm>.testnet MM_PRIVATE_KEY=ed25519:… RELAY_WS_URL=ws://localhos
 VITE_RELAY_URL=http://localhost:8080 VITE_NETWORK=testnet pnpm --filter @endline/web dev
 ```
 
-Each command runs in its own shell after the `export` line. Write market maker inventory with `pnpm --filter @endline/mm start write <series_id> <usdc units>`.
+Each command runs in its own shell after the `export` line. Write market maker inventory with `pnpm --filter @endline/mm start write <series_id> <usdc units>`. Trade size, spread and risk limits are env vars too, listed in `apps/mm/README.md`.
 
 ## Settlement helpers
 
 ```bash
 pnpm --filter @endline/mm start propose [--once]    # testnet proposer: NETWORK_ID, ORACLE_ACCOUNT_ID, ORACLE_PRIVATE_KEY
-pnpm --filter @endline/mm start monitor [--once]    # read-only alerts: NETWORK_ID
+pnpm --filter @endline/mm start monitor [--once]    # read-only alerts: NETWORK_ID; optional RELAYER_ACCOUNT_ID, MM_ACCOUNT_ID, ALERT_WEBHOOK_URL, HEALTH_URL
 pnpm --filter @endline/mm start settle [--once]     # mainnet settler, deploy/mainnet.json: SETTLER_ACCOUNT_ID, SETTLER_PRIVATE_KEY
-pnpm --filter @endline/mm start positions           # market maker balances, greeks, net delta
+pnpm --filter @endline/mm start positions           # market maker balances, greeks, net delta: the market maker's env
 ```
 
 ## Docker
