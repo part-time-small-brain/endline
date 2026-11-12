@@ -8,12 +8,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates
 
 FROM node:24.22.1-slim@sha256:be8204d4bd327363357f532187b752ff62759c31bedf98e9e18fc08c9cbd605c AS deps
 COPY --from=wasmtime /usr/local/bin/wasmtime /usr/local/bin/wasmtime
-RUN npm install -g pnpm@12.11.2
+RUN npm install -g pnpm@12.16.1
 WORKDIR /app
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json ./
 COPY packages packages
 COPY apps apps
-RUN chmod -R a+rX /app && pnpm install --frozen-lockfile --filter '!@endline/docs' --filter '!@endline/web'
+RUN chmod -R a+rX /app && pnpm install --frozen-lockfile --prod --filter @endline/relay... --filter @endline/mm...
 
 FROM deps AS app
 COPY deploy/*.json deploy/

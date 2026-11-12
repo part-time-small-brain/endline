@@ -63,10 +63,10 @@ export function Header({ route, open, toCollect, onConnect, onAddFunds }: Props)
         ))}
         <a
           href="/docs"
-          className="relative hidden h-11 items-center gap-2 border-y-2 border-y-transparent px-1 sm:inline-flex font-mono text-xs font-semibold tracking-[0.06em] text-ink-2 uppercase transition-colors duration-150 hover:text-ink"
+          className="relative inline-flex h-11 items-center justify-center gap-2 border-y-2 border-y-transparent px-1 max-[374px]:hidden max-sm:min-w-11 font-mono text-xs font-semibold tracking-[0.06em] text-ink-2 uppercase transition-colors duration-150 hover:text-ink"
         >
-          <BookOpen size={18} aria-hidden="true" />
-          <span className="sr-only lg:not-sr-only">Docs</span>
+          <BookOpen size={18} aria-hidden="true" className="hidden sm:block" />
+          <span className="sm:sr-only lg:not-sr-only">Docs</span>
         </a>
       </nav>
       {route === "trade" && (

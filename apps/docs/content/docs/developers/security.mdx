@@ -44,7 +44,7 @@ description: The rules every change keeps, what each actor can do, and the gaps 
 | Relay or MM skewing the ticket's prices | The ticket's cost, size, chance and values come from the relay's `GET /marks`, so a lying relay or MM sets what it shows. Funds stay safe: the firm quote comes from the auction and the pre-sign card shows the exact `token_diff` the wallet signs |
 | Created series or sent tokens crowding out the market maker's prices | It prices only series it holds, ranked by what its tokens there are worth, within the relay's 64 KB message limit. Pushing a series out costs sending it tokens worth more than its position there |
 | Lying relay | The app takes USDC and option decimals from the contract, shows a series only if its id is rebuilt from its terms, and refuses a quote that stays signable more than 2 minutes after it arrived |
-| Injected script | A CSP allows only the app's own scripts and the wallet nonce, and `frame-ancestors 'none'` stops framing |
+| Injected script | A CSP allows only the app's own scripts, the theme script by its hash and the wallet nonce, and `frame-ancestors 'none'` stops framing |
 | Swapped wallet scripts | The app ships the wallet list, with GitHub-hosted wallet scripts pinned to commits |
 | Relay as a free gas payer | `/execute` and `/claims` accept only a canonical exercise of our long tokens; each nonce sent once; rate limits |
 | Quote spam | Signed sessions, balance-backed quotes, one open quote per signer, rate limits |
@@ -80,6 +80,18 @@ description: The rules every change keeps, what each actor can do, and the gaps 
 | Oracle wasm build not reproducible | The pinned oracle sha256 is checked against what the URL serves, but the wasm is built with the local toolchain, so nobody can rebuild it from source to check the pin |
 | Testnet wasm not reproducible | Testnet deploys use `cargo near build non-reproducible-wasm`. Mainnet's `opt.endline.near` was built with `reproducible-wasm` in the pinned `sourcescan/cargo-near` image at commit `1339f7c`: anyone with the source can rebuild it and match the code hash `D6Y3uQ1gvt6AUU2j9TCkwLFnnAMbVGL1RcboyzsUSwCg` |
 | Contract account keys | `opt.endline.near` has no access keys (`view_access_key_list`). A new deployment must delete its full-access keys after deploy |
+
+## Verify the contract
+
+Needs Docker and `cargo-near`. The build runs in the image pinned in `contracts/options/Cargo.toml`.
+
+```bash
+git clone https://github.com/part-time-small-brain/endline && cd endline
+git checkout 1339f7c8b9888dbd2d1c26e98acc3d88051a5b48
+cd contracts/options && cargo near build reproducible-wasm
+```
+
+The `SHA-256 checksum bs58` it prints must equal the contract's code hash, `D6Y3uQ1gvt6AUU2j9TCkwLFnnAMbVGL1RcboyzsUSwCg`. `near account view-account-summary opt.endline.near network-config mainnet now` shows the same hash in hex (`b3b7416d575996885ae58a3153a9f3ea036e32e18da8a7f4038d1f9c1658ae55`). `contract_source_metadata` on the contract names the same commit and image.
 
 ## Monitoring
 

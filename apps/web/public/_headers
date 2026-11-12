@@ -3,4 +3,7 @@
   X-Content-Type-Options: nosniff
   Referrer-Policy: strict-origin-when-cross-origin
   Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=()
-  Content-Security-Policy: default-src 'self'; script-src 'self' 'nonce-C3e81UrLlcvSI878Vp11WNpx'; style-src 'self' 'unsafe-inline' https://rsms.me https://fonts.cdnfonts.com https://fonts.googleapis.com; img-src 'self' data: https:; font-src 'self' data: https://rsms.me https://fonts.cdnfonts.com https://fonts.gstatic.com; connect-src 'self' https: wss:; frame-src https://wallet.intear.tech hotwallet: intear: intent: meteorwallet: near-mobile-wallet:; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'nonce-C3e81UrLlcvSI878Vp11WNpx' 'sha256-WT2bJVdgC9Fzc1xrSIlqeDknJlXjNpcOPXQ3k0IRoBU='; style-src 'self' 'unsafe-inline' https://rsms.me https://fonts.cdnfonts.com https://fonts.googleapis.com; img-src 'self' data: https:; font-src 'self' data: https://rsms.me https://fonts.cdnfonts.com https://fonts.gstatic.com; connect-src 'self' https: wss:; frame-src https://wallet.intear.tech hotwallet: intear: intent: meteorwallet: near-mobile-wallet:; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'
+
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable

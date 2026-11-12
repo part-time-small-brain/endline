@@ -1,5 +1,5 @@
 import { domAnimation, LazyMotion, MotionConfig } from "motion/react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useApp } from "./app/context.ts";
 import { useData } from "./app/data.tsx";
 import { Link, navigate, usePathname } from "./app/router.tsx";
@@ -20,8 +20,18 @@ import { Positions } from "./screens/Positions.tsx";
 import { Trade } from "./screens/Trade.tsx";
 import { useWallet } from "./wallet/context.tsx";
 
+const TITLES: Record<Route, string> = {
+  landing: "Endline: crypto options on NEAR Intents",
+  trade: "Trade · Endline",
+  positions: "Positions · Endline",
+  missing: "Not found · Endline",
+};
+
 export function App() {
   const route = routeOf(usePathname(), useApp().config.paths);
+  useEffect(() => {
+    document.title = TITLES[route];
+  }, [route]);
   const { wallet } = useWallet();
   const [sheet, setSheet] = useState<"connect" | "deposit" | QuoteSelection>();
   const connect = () => setSheet("connect");

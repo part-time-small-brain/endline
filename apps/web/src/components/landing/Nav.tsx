@@ -20,9 +20,9 @@ export function Nav() {
         <a href="#top" onClick={jump} aria-label="Endline, back to top" className="rounded-lg">
           <Wordmark />
         </a>
-        <nav aria-label="Main" className="hidden gap-4 lg:flex">
+        <nav aria-label="Main" className="flex gap-4 max-[374px]:hidden">
           {SECTIONS.map(({ id, label }) => (
-            <a key={id} href={`#${id}`} onClick={jump} className={LINK}>
+            <a key={id} href={`#${id}`} onClick={jump} className={`${LINK} max-lg:hidden`}>
               {label}
             </a>
           ))}
