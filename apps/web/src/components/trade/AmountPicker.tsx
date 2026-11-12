@@ -1,5 +1,5 @@
 import { X } from "@phosphor-icons/react";
-import { useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import type { BudgetChoice } from "../../app/useTicket.ts";
 import { formatToken, formatUsd, parseBudget } from "../../lib/money.ts";
 import { amountChoices, maxBinds } from "../../lib/ticket.ts";
@@ -20,12 +20,15 @@ const MAX = "max";
 export function AmountPicker({ value, atMax, max, quoteDecimals, onChange }: Props) {
   const unit = 10n ** BigInt(quoteDecimals);
   const capped = maxBinds(max, unit);
-  const dollars = amountChoices(max, unit);
-  const presets = dollars.map((d) => BigInt(d) * unit);
   const maxPicked = capped && (atMax || value >= max);
-  const [editing, setEditing] = useState(() => !atMax && !presets.includes(value) && !maxPicked);
+  const [editing, setEditing] = useState(() => !atMax && !maxPicked && !amountChoices(max, unit).includes(value));
+  const presets = amountChoices(max, unit, atMax || editing ? 0n : value);
   const [custom, setCustom] = useState(() => (editing ? formatToken(value, quoteDecimals, 2) : ""));
   const errorId = useId();
+  const input = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (editing) input.current?.focus({ preventScroll: true });
+  }, [editing]);
   const invalid = editing && parseBudget(custom, quoteDecimals) === null;
   const close = () => {
     setEditing(false);
@@ -39,7 +42,7 @@ export function AmountPicker({ value, atMax, max, quoteDecimals, onChange }: Pro
         <label className="flex h-12 items-center gap-2 rounded-xl bg-paper px-3 shadow-[inset_0_0_0_2px_var(--ink)]">
           <span className="font-display text-xl font-semibold text-ink-2">$</span>
           <input
-            autoFocus
+            ref={input}
             inputMode="decimal"
             placeholder="Amount"
             value={custom}
@@ -69,7 +72,7 @@ export function AmountPicker({ value, atMax, max, quoteDecimals, onChange }: Pro
             onChange(0n);
           }}
           options={[
-            ...dollars.map((d, i) => ({ value: String(presets[i]), label: <span className="font-display text-lg">${d}</span> })),
+            ...presets.map((amount) => ({ value: String(amount), label: <span className="font-display text-lg">{formatUsd(amount, quoteDecimals).replace(/\.00$/, "")}</span> })),
             ...(capped
               ? [{ value: MAX, label: <span className="text-sm">Max<span className="sr-only"> {formatUsd(max, quoteDecimals, "up").replace(/\.00$/, "")}</span></span> }]
               : []),

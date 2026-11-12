@@ -31,8 +31,9 @@ export function maxBinds(max: bigint | undefined, unit: bigint): max is bigint {
   return max !== undefined && max > 0n && max <= BigInt(PRESETS.at(-1) ?? 0) * unit;
 }
 
-export function amountChoices(max: bigint | undefined, unit: bigint): number[] {
-  return maxBinds(max, unit) ? [...SMALL, ...PRESETS].filter((dollars) => BigInt(dollars) * unit < max).slice(-BELOW_MAX) : PRESETS;
+export function amountChoices(max: bigint | undefined, unit: bigint, keep = 0n): bigint[] {
+  const offered = (maxBinds(max, unit) ? [...SMALL, ...PRESETS].filter((dollars) => BigInt(dollars) * unit < max).slice(-BELOW_MAX) : PRESETS).map((dollars) => BigInt(dollars) * unit);
+  return keep < unit || offered.includes(keep) || (maxBinds(max, unit) && keep >= max) ? offered : [...offered, keep].sort((a, b) => (a < b ? -1 : 1));
 }
 
 export interface GoodCase {

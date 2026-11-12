@@ -223,7 +223,7 @@ export function Lite({ state, nowSec, action, stickyAction }: Props) {
               I put{" "}
               <span className="whitespace-nowrap">
                 <Popover fit preferAbove label="Trade amount" description={amountLabel} button={<>{amountLabel}<Caret /></>} buttonClassName={`${slot} min-w-[4.5rem] before:content-['Amount']`} panelClassName={panel}>
-                  {current && <AmountPicker value={budget} atMax={atMax} max={current.maxCost} quoteDecimals={quoteDecimals} onChange={setBudget} />}
+                  {current ? <AmountPicker value={budget} atMax={atMax} max={current.maxCost} quoteDecimals={quoteDecimals} onChange={setBudget} /> : <p className="px-3 py-2 text-ink-2">{empty}</p>}
                 </Popover>
                 ,
               </span>{" "}

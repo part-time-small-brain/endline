@@ -124,21 +124,35 @@ describe("capNote", () => {
 });
 
 describe("amountChoices", () => {
+  const usd = (...dollars: number[]) => dollars.map((d) => BigInt(Math.round(d * 100)) * (USD / 100n));
+
   it("offers only amounts one trade can actually spend once the max is $100 or less", () => {
-    expect(amountChoices(1_880_000n, USD)).toEqual([1]);
-    expect(amountChoices(7_190_000n, USD)).toEqual([1, 2, 5]);
-    expect(amountChoices(10n * USD, USD)).toEqual([1, 2, 5]);
-    expect(amountChoices(30n * USD, USD)).toEqual([5, 10, 25]);
-    expect(amountChoices(100n * USD, USD)).toEqual([10, 25, 50]);
+    expect(amountChoices(1_880_000n, USD)).toEqual(usd(1));
+    expect(amountChoices(7_190_000n, USD)).toEqual(usd(1, 2, 5));
+    expect(amountChoices(10n * USD, USD)).toEqual(usd(1, 2, 5));
+    expect(amountChoices(30n * USD, USD)).toEqual(usd(5, 10, 25));
+    expect(amountChoices(100n * USD, USD)).toEqual(usd(10, 25, 50));
     expect(amountChoices(USD, USD)).toEqual([]);
     expect([USD, 7_190_000n, 100n * USD].every((max) => maxBinds(max, USD))).toBe(true);
   });
 
   it("keeps the usual amounts while no max is known or it's above $100", () => {
     for (const max of [undefined, 0n, 100n * USD + 1n, 1_400n * USD]) {
-      expect(amountChoices(max, USD)).toEqual([10, 25, 50, 100]);
+      expect(amountChoices(max, USD)).toEqual(usd(10, 25, 50, 100));
       expect(maxBinds(max, USD)).toBe(false);
     }
+  });
+
+  it("keeps an amount picked on another market in the list, in order, so the pick stays visible", () => {
+    expect(amountChoices(1_400n * USD, USD, 5n * USD)).toEqual(usd(5, 10, 25, 50, 100));
+    expect(amountChoices(30n * USD, USD, 2_500_000n)).toEqual(usd(2.5, 5, 10, 25));
+    expect(amountChoices(30n * USD, USD, 10n * USD)).toEqual(usd(5, 10, 25));
+  });
+
+  it("never adds an amount at or over the max, which Max already covers, or an invalid one", () => {
+    expect(amountChoices(30n * USD, USD, 30n * USD)).toEqual(usd(5, 10, 25));
+    expect(amountChoices(30n * USD, USD, 50n * USD)).toEqual(usd(5, 10, 25));
+    expect(amountChoices(30n * USD, USD, 0n)).toEqual(usd(5, 10, 25));
   });
 });
 
