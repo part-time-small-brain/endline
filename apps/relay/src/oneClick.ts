@@ -1,11 +1,12 @@
 import { AccountId, DEPOSIT_ORIGIN, verifyDepositQuote } from "@endline/sdk";
 import { z } from "zod";
+import type { Deposits } from "./deposits.ts";
 import { parseJson } from "./json.ts";
 import { rateLimit } from "./limit.ts";
 import { HttpError } from "./relay.ts";
 
-const QUOTE_URL = "https://1click.chaindefuser.com/v0/quote";
-const TIMEOUT_MS = 10_000;
+export const ONECLICK_API = "https://1click.chaindefuser.com/v0";
+export const TIMEOUT_MS = 10_000;
 const MAX_DEADLINE_MS = 24 * 3_600_000;
 const MAX_QUOTES_PER_MINUTE = 60;
 const MAX_QUOTES_PER_CLIENT_PER_MINUTE = 10;
@@ -30,6 +31,8 @@ const depositQuote = (quoteAsset: string) =>
 
 type DepositQuoteRequest = z.infer<ReturnType<typeof depositQuote>>;
 
+export const partnerHeaders = (apiKey: string | undefined) => (apiKey ? { "x-api-key": apiKey } : {});
+
 export class OneClick {
   readonly schema: ReturnType<typeof depositQuote>;
   private allow = rateLimit(MAX_QUOTES_PER_MINUTE, 60_000);
@@ -38,6 +41,7 @@ export class OneClick {
   constructor(
     quoteAsset: string,
     private apiKey: string | undefined,
+    private deposits: Pick<Deposits, "track">,
   ) {
     this.schema = depositQuote(quoteAsset);
   }
@@ -52,9 +56,9 @@ export class OneClick {
     let status: number;
     let text: string;
     try {
-      const response = await fetch(QUOTE_URL, {
+      const response = await fetch(`${ONECLICK_API}/quote`, {
         method: "POST",
-        headers: { "content-type": "application/json", ...(this.apiKey ? { "x-api-key": this.apiKey } : {}) },
+        headers: { "content-type": "application/json", ...partnerHeaders(this.apiKey) },
         body: JSON.stringify(body),
         signal: AbortSignal.timeout(TIMEOUT_MS),
       });
@@ -66,7 +70,10 @@ export class OneClick {
     }
     const json = parseJson(text);
     const answered = status >= 200 && status < 300;
-    if (answered && verifyDepositQuote(body, json)) return json;
+    if (answered && verifyDepositQuote(body, json)) {
+      this.deposits.track(body, json);
+      return json;
+    }
     if (status === 400) throw new HttpError(400, z.object({ message: z.string() }).safeParse(json).data?.message ?? "1Click refused the quote");
     console.error(`1click quote: ${answered ? "signature check failed" : `HTTP ${status}`} ${text.slice(0, 200)}`);
     if (status === 429) throw new HttpError(503, "1Click is busy, try again in a minute");
