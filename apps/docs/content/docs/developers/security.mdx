@@ -18,7 +18,7 @@ description: The rules every change keeps, what each actor can do, and the gaps 
 
 | Actor | Can | Can't |
 |---|---|---|
-| Owner | Pause writes and new series, override a price before `final_at` (which decides how a series' collateral is split), add assets, add or remove oracle accounts, pin the oracle WASM (adds and pins take effect after `oracle_delay_sec`, 1 day on mainnet), propose a new owner who must accept. Removing every oracle account and pinning a WASM that never returns a price stalls settlement forever | Move collateral out of a series, pause exits, change timing or the dispute window, move `final_at` |
+| Owner | Pause writes and new series, override a price before `final_at` (which decides how a series' collateral is split), add assets, add or remove oracle accounts, pin the oracle WASM (adds and pins take effect after `oracle_delay_sec`, 6 h on mainnet), propose a new owner who must accept. Removing every oracle account and pinning a WASM that never returns a price stalls settlement forever | Move collateral out of a series, pause exits, change timing or the dispute window, move `final_at` |
 | Oracle account | Propose a price after `E + oracle_window_sec`, once per `(underlying, expiry)` | Propose early, change a proposal |
 | OutLayer | Return a result for a request the contract made | Write a price that fails `ok`, index, expiry and `price > 0` checks |
 | Relay | Submit signed payloads, refuse quotes | Change what users signed. It only submits byte-identical payloads |
@@ -50,7 +50,7 @@ description: The rules every change keeps, what each actor can do, and the gaps 
 | Quote spam | Signed sessions, balance-backed quotes, one open quote per signer, rate limits |
 | Tampered user payload | Relay accepts only the byte-identical payload it issued, once, before expiry |
 | Unbounded loops | Batches capped at 10 tokens; views paginated (≤ 200) |
-| Owner key taken over or mistyped | New oracles and oracle WASMs take effect only `oracle_delay_sec` after the call (1 day on mainnet). Ownership moves only when the new owner calls `accept_owner`, so it can sit behind a multisig |
+| Owner key taken over or mistyped | New oracles and oracle WASMs take effect only `oracle_delay_sec` after the call (6 h on mainnet: time to see the monitor's pending-change alert and overwrite a wrong pin). Ownership moves only when the new owner calls `accept_owner`, so it can sit behind a multisig |
 
 ## Known gaps
 
