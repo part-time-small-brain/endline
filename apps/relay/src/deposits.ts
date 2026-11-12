@@ -13,6 +13,8 @@ const Issued = z.object({ quote: z.object({ depositAddress: z.string().min(1), a
 const Status = z.object({ status: z.string() });
 const Token = z.object({ assetId: z.string(), symbol: z.string(), blockchain: z.string() });
 
+const waiting = (deposit: Deposit) => deposit.status === undefined || deposit.status === "PENDING_DEPOSIT";
+
 interface Request {
   originAsset: string;
   recipient: string;
@@ -30,8 +32,11 @@ export class Deposits {
     if (!this.notifier.on || !quote) return;
     void this.tokenName(request.originAsset)
       .then((token) => {
-        const oldest = this.pending.size >= MAX_TRACKED ? this.pending.keys().next().value : undefined;
-        if (oldest !== undefined) this.pending.delete(oldest);
+        if (this.pending.size >= MAX_TRACKED && !this.pending.has(quote.depositAddress)) {
+          const deposits = [...this.pending.values()];
+          const oldest = deposits.find(waiting) ?? deposits[0];
+          if (oldest) this.pending.delete(oldest.address);
+        }
         this.pending.set(quote.depositAddress, { address: quote.depositAddress, accountId: request.recipient, sent: `${quote.amountInFormatted} ${token}`, amountOut: BigInt(quote.amountOut), deadlineMs: Date.parse(request.deadline) });
       })
       .catch(console.error);
@@ -53,10 +58,9 @@ export class Deposits {
       console.error(`deposits: 1click status of ${deposit.address}: ${error}`);
     }
     const outcome = TERMINAL.find((status) => status === deposit.status);
-    const waiting = deposit.status === undefined || deposit.status === "PENDING_DEPOSIT";
-    if (outcome !== undefined || (waiting && Date.now() > deposit.deadlineMs + GRACE_MS)) this.pending.delete(deposit.address);
+    if (outcome !== undefined || (waiting(deposit) && Date.now() > deposit.deadlineMs + GRACE_MS)) this.pending.delete(deposit.address);
     if (outcome !== undefined) return this.notifier.post({ kind: "deposit", deposit, outcome });
-    deposit.nextAt = waiting ? Date.now() + WAITING_EVERY_MS : 0;
+    deposit.nextAt = waiting(deposit) ? Date.now() + WAITING_EVERY_MS : 0;
   }
 
   private async status(address: string): Promise<string> {

@@ -97,6 +97,23 @@ describe("deposit tracker", () => {
     expect(vi.mocked(console.error).mock.calls.flat().join("\n")).toMatch(/HTTP 503/);
   });
 
+  it("makes room by dropping the oldest deposit nothing has reached, so spammed quotes can't push out one on its way", async () => {
+    const statuses: Record<string, string> = { D0: "PROCESSING" };
+    const fetch = oneClick(statuses);
+    const { deposits } = setup();
+    deposits.track(REQUEST, quoteAt("D0"));
+    await vi.advanceTimersByTimeAsync(0);
+    await deposits.poll();
+    for (let i = 1; i <= 200; i++) deposits.track(REQUEST, quoteAt(`D${i}`));
+    await vi.advanceTimersByTimeAsync(0);
+    fetch.mockClear();
+    await deposits.poll();
+    const polled = statusCalls(fetch).map(([url]) => new URL(url).searchParams.get("depositAddress"));
+    expect(polled).toContain("D0");
+    expect(polled).not.toContain("D1");
+    expect(polled).toHaveLength(200);
+  });
+
   it("makes room by dropping the oldest when it already follows 200 deposits", async () => {
     const fetch = oneClick({});
     const { deposits } = setup();

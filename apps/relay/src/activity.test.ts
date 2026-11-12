@@ -44,6 +44,6 @@ describe("render", () => {
     ["REFUNDED", "↩️ mainnet · Deposit refunded\n1.0 SOL on sol for about $100 · alice.near"],
     ["FAILED", "❌ mainnet · Deposit failed\n1.0 SOL on sol for about $100 · alice.near"],
   ] as const)("names a deposit that is %s", (outcome, message) => {
-    expect(text({ kind: "deposit", deposit: { ...deposit, status: "PENDING_DEPOSIT" }, outcome })).toBe(message);
+    expect(text({ kind: "deposit", deposit, outcome })).toBe(message);
   });
 });
