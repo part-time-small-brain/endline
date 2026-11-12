@@ -505,6 +505,35 @@ test("a long shot sizes to what one trade may pay out, and Pro and Lite say why 
   await expect(why).toHaveCount(0);
 });
 
+test("when one trade can't reach the $25 default, the app opens on Max at what it costs and the hero links there", async ({ page }) => {
+  await page.addInitScript(() => {
+    (window as unknown as { ethereum: object }).ethereum = {
+      async request({ method }: { method: string }) {
+        if (method === "eth_requestAccounts") return ["0x1111111111111111111111111111111111111111"];
+        throw new Error(method);
+      },
+    };
+  });
+  await page.route("**/fills/*", (route) => route.fulfill({ json: [] }));
+  await live(page, () => [{ series_id: "BTC-5NOV26-81000_83000-C", ask: String(7 * USD), max_size: String(10 ** 8), vol: 0.4 }]);
+  await page.route(RPC, (route) => {
+    const params = route.request().postDataJSON().params;
+    const args = JSON.parse(Buffer.from(params.args_base64, "base64").toString());
+    const value = params.method_name === "mt_batch_balance_of" ? args.token_ids.map((id: string) => (id === testnet.quote_asset ? String(250 * USD) : "0")) : view[params.method_name];
+    route.fulfill({ json: { jsonrpc: "2.0", id: "web", ...(value === undefined ? { error: { message: "unknown" } } : { result: { result: [...Buffer.from(JSON.stringify(value))] } }) } });
+  });
+  await page.getByRole("button", { name: "Connect", exact: true }).click();
+  await page.getByRole("button", { name: /Ethereum wallet/ }).click();
+  await expect(page.getByRole("radio", { name: "Max $7", exact: true })).toHaveAttribute("aria-checked", "true");
+  await expect(page.getByRole("button", { name: "Buy Up · $7", exact: true })).toBeVisible();
+  await expect(page.getByText(/^One trade pays out at most/)).toHaveCount(0);
+  await page.goto("/");
+  const cta = landingHero(page).getByRole("link", { name: "Try BTC Up for $7", exact: true });
+  await expect(cta).toHaveAttribute("href", /[?&]pay=max(&|$)/);
+  await cta.click();
+  await expect(page.getByRole("radio", { name: "Max $7", exact: true })).toHaveAttribute("aria-checked", "true");
+});
+
 test("a sell-back worth under $1, which no market maker buys, shows no price", async ({ page }) => {
   let bid = USD;
   await live(page, () => [{ series_id: "BTC-5NOV26-81000_83000-C", ask: String(40 * USD), bid: String(bid), max_size: String(10 ** 8), vol: 0.4 }]);

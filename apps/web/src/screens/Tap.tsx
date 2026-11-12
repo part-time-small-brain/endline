@@ -42,7 +42,7 @@ interface Props {
 }
 
 export function Tap({ state, nowSec, views, onConnect, onAddFunds, onQuote }: Props) {
-  const { data, quoteDecimals, symbols, symbol, budget, atMax, ceiling, setSymbol, setBudget, spot, spotNumber, history, first, priced, loading, empty } = state;
+  const { data, quoteDecimals, symbols, symbol, budget, atMax, picked, ceiling, setSymbol, setBudget, spot, spotNumber, history, first, priced, loading, empty } = state;
   const { wallet } = useWallet();
   const calls = useCalls();
   const [free, setFreeState] = useState(storedFree);
@@ -56,7 +56,7 @@ export function Tap({ state, nowSec, views, onConnect, onAddFunds, onQuote }: Pr
     if (!wallet) return onConnect();
     if (free) return calls.call(series);
     if (data.balance !== undefined && data.balance < ticket.cost) return onAddFunds();
-    onQuote({ wallet, series, side: "buy", size: ticket.size, ...(atMax ? {} : { budget }) });
+    onQuote({ wallet, series, side: "buy", size: ticket.size, ...(picked ? { budget } : {}) });
   };
   const callable = (s: ListedSeries) => s.quotable && callableAt(s.expiry, nowSec);
   const callRound = nextRound((data.listing?.series ?? []).filter(callable).map((s) => s.expiry));

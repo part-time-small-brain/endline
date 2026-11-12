@@ -43,7 +43,9 @@ export function useTicket(nowSec: number) {
     return maxCost > most ? maxCost : most;
   }, 0n);
   const atMax = budgetChoice === "max" || (budgetChoice === undefined && ceiling > 0n && ceiling < DEFAULT_BUDGET_USD * unit);
+  const picked = typeof budgetChoice === "bigint";
   const budget = atMax ? ceiling : typeof budgetChoice === "bigint" ? budgetChoice : DEFAULT_BUDGET_USD * unit;
+  const invalid = !atMax && budget < unit;
   const price = (s: ListedSeries, amount: bigint = budget): Ticket => ticket(s, amount, markOf(s));
   const expiries = [...new Set(priced.filter((s) => s.underlying === symbol && s.kind === kind).map((s) => s.expiry))]
     .sort((a, b) => a - b)
@@ -105,7 +107,7 @@ export function useTicket(nowSec: number) {
         : undefined;
 
   return {
-    data, quoteDecimals, balance, unit, symbols, symbol, kind, expiry, budget, atMax, spend, ceiling,
+    data, quoteDecimals, balance, unit, symbols, symbol, kind, expiry, budget, atMax, picked, invalid, spend, ceiling,
     setSymbol, setKind, setExpiry, setSeries, setBudget,
     spotNumber, spot, history, odds, usdOf, payoutAt, up, strikes, choices,
     series, current, vol, reference, sides, first, empty, expiries, dates, notice, priced, loading,

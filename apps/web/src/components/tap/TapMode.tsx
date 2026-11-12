@@ -1,7 +1,7 @@
 import { FREE_CALLS_PER_ROUND, MAX_CALL_MULTIPLE } from "@endline/sdk";
+import type { BudgetChoice } from "../../app/useTicket.ts";
 import { formatUsd } from "../../lib/money.ts";
 import { Chips } from "../Chips.tsx";
-import type { BudgetChoice } from "../../app/useTicket.ts";
 import { AmountPicker } from "../trade/AmountPicker.tsx";
 
 interface Props {

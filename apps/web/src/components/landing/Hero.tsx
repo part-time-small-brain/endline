@@ -24,7 +24,7 @@ export function Hero({ nowSec }: { nowSec: number }) {
   const { paths } = useApp().config;
   const reduce = useReducedMotion();
   const state = useTicket(nowSec);
-  const { data, symbol, up, series, current, budget, atMax, spend, unit, quoteDecimals, notice, loading } = state;
+  const { data, symbol, up, series, current, budget, atMax, invalid, spend, quoteDecimals, notice, loading } = state;
   const waiting = (!data.listing && !data.listingError) || (!notice && loading);
   const label = `Try ${symbol} ${up ? "Up" : "Down"} for ${formatUsd(spend, quoteDecimals, "up").replace(/\.00$/, "")}`;
   const pay = atMax ? "max" : formatToken(budget, quoteDecimals, 2).replaceAll(",", "");
@@ -38,7 +38,7 @@ export function Hero({ nowSec }: { nowSec: number }) {
     </Link>
   ) : (
     <Button size="lg" disabled>
-      {budget < unit ? "Enter a valid amount" : label}
+      {invalid ? "Enter a valid amount" : label}
     </Button>
   );
 

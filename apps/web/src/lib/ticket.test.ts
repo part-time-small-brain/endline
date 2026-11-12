@@ -109,7 +109,7 @@ describe("payoutMultiple", () => {
 
 describe("capNote", () => {
   const series = { id: "BTC-X", underlying: "BTC", kind: "call" as const, strike: (81_000n * USD).toString(), width: (2_000n * USD).toString(), expiry: 1_800_000_000, underlying_decimals: 8 };
-  const capped = (budget: bigint, ask: bigint, atMax = false) => capNote(ticket(series, budget, { series_id: series.id, ask: ask.toString(), max_size: BTC.toString(), vol: 0.4 }), budget, atMax, 6);
+  const capped = (budget: bigint, ask: bigint, picked = true) => capNote(ticket(series, budget, { series_id: series.id, ask: ask.toString(), max_size: BTC.toString(), vol: 0.4 }), budget, picked, 6);
 
   it("says why a capped ticket costs less than the stake, and stays quiet when it doesn't or the cost reads as the stake", () => {
     expect(capped(100n * USD, 40n * USD)).toBe("One trade pays out at most $2,000, so this costs $40.");
@@ -117,9 +117,9 @@ describe("capNote", () => {
     expect(capped(100n * USD, 100n * USD - 1n)).toBeUndefined();
   });
 
-  it("stays quiet when the trader picked Max, even on a series whose cap is lower than another's", () => {
-    expect(capped(70n * USD, 40n * USD, true)).toBeUndefined();
-    expect(capped(70n * USD, 40n * USD, false)).toBe("One trade pays out at most $2,000, so this costs $40.");
+  it("stays quiet unless the trader asked for that amount, so Max and the default never explain themselves", () => {
+    expect(capped(70n * USD, 40n * USD, false)).toBeUndefined();
+    expect(capped(70n * USD, 40n * USD, true)).toBe("One trade pays out at most $2,000, so this costs $40.");
   });
 });
 
