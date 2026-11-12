@@ -59,7 +59,8 @@ test("deposit addresses match the selected chain, and so does the warning", asyn
     await expect(sheet.locator("code")).toHaveText(pattern);
     const send = sheet.getByText("Send exactly").locator("..");
     await expect(send).toHaveText(`Send exactly 1,000 USDC on ${chain}Copy`);
-    await send.getByRole("button", { name: "Copy" }).click();
+    await send.getByRole("button", { name: "Copy amount", exact: true }).click();
+    await expect(send.getByRole("button", { name: "amount copied", exact: true })).toBeVisible();
     expect(await page.evaluate(() => navigator.clipboard.readText())).toBe("1000");
     await expect(sheet.getByText(/^Only send/)).toHaveText(`Only send USDC on ${chain}. Anything else may be lost.`);
     await sheet.getByRole("button", { name: "Back" }).click();

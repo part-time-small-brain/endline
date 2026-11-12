@@ -42,7 +42,7 @@ export function DepositAddress({ deposit, status, quoteDecimals, onBack }: Props
           </span>{" "}
           on {chain}
         </p>
-        <CopyButton value={amount.replaceAll(",", "")} />
+        <CopyButton value={amount.replaceAll(",", "")} what="amount" />
       </div>
       <div className="flex justify-center">
         <QrCode value={deposit.depositAddress} />
