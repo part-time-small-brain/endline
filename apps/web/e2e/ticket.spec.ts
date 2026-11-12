@@ -35,20 +35,87 @@ test("an invalid Other amount never trades the previous amount", async ({ page }
   await expect(buy).toBeEnabled();
 });
 
-test("deposit addresses match the selected chain", async ({ page }) => {
+const openAddFunds = async (page: Page) => {
+  await page.getByRole("button", { name: /^(Add funds|Balance, add funds)$/ }).click();
+  return page.getByRole("dialog", { name: "Add funds" });
+};
+
+test("deposit addresses match the selected chain, and so does the warning", async ({ page, context }) => {
+  await context.grantPermissions(["clipboard-read", "clipboard-write"]);
   await connectDemo(page);
-  for (const [asset, pattern] of [
-    ["USDC Base", /^0x[0-9a-f]{40}$/],
-    ["USDC Solana", /^[1-9A-HJ-NP-Za-km-z]{32,44}$/],
+  for (const [chain, pattern] of [
+    ["Base", /^0x[0-9a-f]{40}$/],
+    ["Solana", /^[1-9A-HJ-NP-Za-km-z]{32,44}$/],
   ] as const) {
-    await page.getByRole("button", { name: /^(Add funds|Balance, add funds)$/ }).click();
-    const sheet = page.getByRole("dialog");
-    await sheet.getByRole("radio", { name: asset, exact: true }).click();
-    await sheet.getByRole("textbox", { name: "Amount to deposit" }).fill("25");
+    const sheet = await openAddFunds(page);
+    await sheet.getByRole("radiogroup", { name: "Network" }).getByRole("radio", { name: chain, exact: true }).click();
+    await sheet.getByRole("textbox", { name: "Amount to deposit" }).fill("1000");
     await sheet.getByRole("button", { name: "Get deposit address" }).click();
     await expect(sheet.locator("code")).toHaveText(pattern);
-    await sheet.getByRole("button", { name: "Close", exact: true }).click();
+    const send = sheet.getByText("Send exactly").locator("..");
+    await expect(send).toHaveText(`Send exactly 1,000 USDC on ${chain}Copy`);
+    await send.getByRole("button", { name: "Copy" }).click();
+    expect(await page.evaluate(() => navigator.clipboard.readText())).toBe("1000");
+    await expect(sheet.getByText(/^Only send/)).toHaveText(`Only send USDC on ${chain}. Anything else may be lost.`);
+    await sheet.getByRole("button", { name: "Back" }).click();
   }
+});
+
+test("Add funds starts on USDC, lists its cheapest networks first and prices the amount", async ({ page }) => {
+  await connectDemo(page);
+  const sheet = await openAddFunds(page);
+  const tokens = sheet.getByRole("radiogroup", { name: "You send" }).getByRole("radio");
+  const networks = sheet.getByRole("radiogroup", { name: "Network" }).getByRole("radio");
+  const amount = sheet.getByRole("textbox", { name: "Amount to deposit" });
+  const get = sheet.getByRole("button", { name: "Get deposit address" });
+  await expect(tokens).toHaveText(["USDC", "USDT", "ETH", "BTC", "SOL"]);
+  await expect(tokens.first()).toHaveAttribute("aria-checked", "true");
+  await expect(networks).toHaveText(["Base", "Arbitrum", "Solana", "Polygon", "BNB Chain", "Avalanche", "Ethereum", "Gnosis"]);
+  await expect(networks.first()).toHaveAttribute("aria-checked", "true");
+  await expect(get).toBeInViewport();
+
+  await networks.filter({ hasText: "Ethereum" }).click();
+  await sheet.getByRole("radio", { name: "BTC", exact: true }).click();
+  await expect(networks).toHaveText(["Bitcoin"]);
+  await expect(networks).toHaveAttribute("aria-checked", "true");
+  await amount.fill("0.01");
+  await expect(sheet.getByText(/^≈/)).toHaveText("≈ $800");
+  await sheet.getByRole("radio", { name: "ETH", exact: true }).click();
+  await expect(networks).toHaveText(["Base", "Ethereum", "Abstract"]);
+  await expect(networks.first()).toHaveAttribute("aria-checked", "true");
+  await expect(sheet.getByText(/^≈/)).toHaveText("≈ $20.00");
+  for (const text of ["", "abc", "0.0000000000000000001"]) {
+    await amount.fill(text);
+    await expect(sheet.getByText(/^≈/)).toHaveCount(0);
+    await expect(get).toBeDisabled();
+  }
+});
+
+test("a deposit reopens on its address until it is credited, and Back drops it", async ({ page }) => {
+  await connectDemo(page);
+  let sheet = await openAddFunds(page);
+  await sheet.getByRole("textbox", { name: "Amount to deposit" }).fill("25");
+  await sheet.getByRole("button", { name: "Get deposit address" }).click();
+  const address = await sheet.locator("code").textContent();
+  await sheet.getByRole("button", { name: "Close", exact: true }).click();
+
+  sheet = await openAddFunds(page);
+  await expect(sheet.locator("code")).toHaveText(address ?? "");
+  await expect(sheet.locator("[aria-current=step]")).toHaveText("Waiting for your transfer");
+  await page.clock.runFor(20_000);
+  await expect(sheet.locator("[aria-current=step]")).toHaveText(/^Credited/);
+  await expect.poll(() => money(page.locator("header number-flow-react:visible"))).toBe(274);
+  await sheet.getByRole("button", { name: "Close", exact: true }).click();
+  sheet = await openAddFunds(page);
+  await expect(sheet.locator("code")).toHaveCount(0);
+
+  await sheet.getByRole("textbox", { name: "Amount to deposit" }).fill("25");
+  await sheet.getByRole("button", { name: "Get deposit address" }).click();
+  await expect(sheet.locator("code")).toBeVisible();
+  await sheet.getByRole("button", { name: "Back" }).click();
+  await sheet.getByRole("button", { name: "Close", exact: true }).click();
+  sheet = await openAddFunds(page);
+  await expect(sheet.locator("code")).toHaveCount(0);
 });
 
 test("stepper and presets move the price to beat within the listed strikes", async ({ page }) => {
@@ -230,7 +297,7 @@ test("Add funds shows USDC and deposits, and no test USDC off testnet", async ({
   await connectDemo(page);
   await page.getByRole("button", { name: /add funds/i }).filter({ visible: true }).first().click();
   const sheet = page.getByRole("dialog");
-  await expect(sheet.locator("p").first()).toHaveText("USDC");
-  await expect(sheet.getByRole("radiogroup", { name: "Deposit from" })).toBeVisible();
+  await expect(sheet.getByText(/^Balance /)).toHaveText("Balance $250");
+  await expect(sheet.getByRole("radiogroup", { name: "You send" })).toBeVisible();
   await expect(sheet.getByRole("button", { name: /test USDC/ })).toHaveCount(0);
 });

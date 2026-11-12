@@ -1,63 +1,83 @@
 import { useEffect, useState } from "react";
 import { useApp } from "../../app/context.ts";
 import { useData } from "../../app/data.tsx";
-import type { DepositAsset, DepositQuote, DepositStatus, OneClick } from "../../api/oneClick.ts";
-import { formatToken, parseUnits } from "../../lib/money.ts";
+import type { DepositAsset, DepositStatus, OneClick } from "../../api/oneClick.ts";
+import { depositMenu } from "../../lib/depositMenu.ts";
+import { formatUsd, parseUnits, toNumber, toUnits } from "../../lib/money.ts";
+import { PENDING_DEPOSIT_KEY, type PendingDeposit, readPendingDeposit } from "../../lib/pendingDeposit.ts";
 import { Button } from "../Button.tsx";
 import { Chips } from "../Chips.tsx";
-import { CopyField } from "../CopyField.tsx";
+import { ChainLabel, TokenLabel } from "./AssetLabel.tsx";
+import { DepositAddress } from "./DepositAddress.tsx";
 
-const CHAINS: Record<string, string> = { base: "Base", arb: "Arbitrum", eth: "Ethereum", sol: "Solana", btc: "Bitcoin", tron: "Tron", gnosis: "Gnosis", sui: "Sui", aptos: "Aptos" };
 const POLL_MS = 5_000;
+const FINAL: DepositStatus[] = ["SUCCESS", "REFUNDED", "FAILED"];
 
-const STATUS_COPY: Record<DepositStatus, string> = {
-  PENDING_DEPOSIT: "Waiting for your transfer",
-  KNOWN_DEPOSIT_TX: "Transfer seen",
-  PROCESSING: "Converting to USDC",
-  SUCCESS: "Ready. Your balance is updated.",
-  INCOMPLETE_DEPOSIT: "Less than expected arrived. It will be refunded to your balance.",
-  REFUNDED: "Refunded to your NEAR Intents balance.",
-  FAILED: "Deposit failed. Any funds are refunded to your NEAR Intents balance.",
-};
+function restore(accountId: string): PendingDeposit | undefined {
+  try {
+    return readPendingDeposit(localStorage.getItem(PENDING_DEPOSIT_KEY), accountId, Date.now());
+  } catch {
+    return undefined;
+  }
+}
 
-const chain = (asset: DepositAsset) => CHAINS[asset.blockchain] ?? asset.blockchain.toUpperCase();
+function remember(pending: PendingDeposit | undefined) {
+  try {
+    if (pending) localStorage.setItem(PENDING_DEPOSIT_KEY, JSON.stringify(pending));
+    else localStorage.removeItem(PENDING_DEPOSIT_KEY);
+  } catch {}
+}
 
 export function OneClickDeposit({ oneClick, accountId }: { oneClick: OneClick; accountId: string }) {
   const { config } = useApp();
   const { reload, quoteDecimals } = useData();
   const [assets, setAssets] = useState<DepositAsset[]>();
+  const [symbol, setSymbol] = useState<string>();
   const [assetId, setAssetId] = useState<string>();
   const [amount, setAmount] = useState("");
-  const [quote, setQuote] = useState<DepositQuote & { asset: DepositAsset }>();
+  const [pending, setPending] = useState(() => restore(accountId));
   const [status, setStatus] = useState<DepositStatus>();
   const [error, setError] = useState<string>();
   const [busy, setBusy] = useState(false);
+  const final = status !== undefined && FINAL.includes(status);
 
   useEffect(() => {
     oneClick.assets().then(setAssets, (e: unknown) => setError(e instanceof Error ? e.message : "Deposits unavailable"));
   }, [oneClick]);
 
   useEffect(() => {
-    if (!quote || status === "SUCCESS") return;
-    const timer = setInterval(() => {
-      oneClick.status(quote.depositAddress).then((next) => {
-        setStatus(next);
-        if (next === "SUCCESS") reload();
-      }, () => {});
-    }, POLL_MS);
-    return () => clearInterval(timer);
-  }, [oneClick, quote, status, reload]);
+    if (!pending || final) return;
+    let alive = true;
+    const check = () => oneClick.status(pending.depositAddress).then((next) => alive && setStatus(next), () => {});
+    check();
+    const timer = setInterval(check, POLL_MS);
+    return () => {
+      alive = false;
+      clearInterval(timer);
+    };
+  }, [oneClick, pending, final]);
 
-  const asset = assets?.find((a) => a.assetId === assetId) ?? assets?.[0];
+  useEffect(() => {
+    if (!final) return;
+    remember(undefined);
+    if (status === "SUCCESS") reload();
+  }, [final, status, reload]);
+
+  const menu = assets && depositMenu(assets);
+  const token = menu?.find((t) => t.symbol === symbol) ?? menu?.[0];
+  const asset = token?.networks.find((a) => a.assetId === assetId) ?? token?.networks[0];
   const units = asset ? parseUnits(amount, asset.decimals) : null;
+  const usd = asset && units ? formatUsd(toUnits(toNumber(units, asset.decimals) * asset.price, 2), 2) : undefined;
 
   const start = async () => {
     if (!asset || !units) return;
     setBusy(true);
     setError(undefined);
     try {
-      setQuote({ ...(await oneClick.quote(asset, units, accountId, config.quoteAsset)), asset });
-      setStatus("PENDING_DEPOSIT");
+      const next = { ...(await oneClick.quote(asset, units, accountId, config.quoteAsset)), accountId, asset };
+      remember(next);
+      setStatus(undefined);
+      setPending(next);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Couldn't create a deposit address");
     } finally {
@@ -65,52 +85,61 @@ export function OneClickDeposit({ oneClick, accountId }: { oneClick: OneClick; a
     }
   };
 
-  if (quote)
-    return (
-      <div className="space-y-4">
-        <p className="text-sm text-ink-2">
-          Send exactly{" "}
-          <span className="font-semibold text-ink">
-            {formatToken(BigInt(quote.amountIn), quote.asset.decimals)} {quote.asset.symbol}
-          </span>{" "}
-          on {chain(quote.asset)} to this address. About {formatToken(BigInt(quote.amountOut), quoteDecimals, 2)} USDC arrives in about {quote.timeEstimate} s.
-        </p>
-        <CopyField label="Deposit address" value={quote.depositAddress} />
-        <div className="flex items-center gap-3 rounded-2xl bg-well px-4 py-3 text-sm" role="status">
-          <span className={`size-2 rounded-full ${status === "SUCCESS" ? "bg-ink" : "animate-pulse bg-ink-3"}`} />
-          {status && STATUS_COPY[status]}
-        </div>
-        <p className="text-xs text-ink-3">If anything goes wrong, funds are refunded to your NEAR Intents balance.</p>
-      </div>
-    );
+  const back = () => {
+    remember(undefined);
+    setPending(undefined);
+    setStatus(undefined);
+  };
+
+  if (pending) return <DepositAddress deposit={pending} status={status} quoteDecimals={quoteDecimals} onBack={back} />;
 
   return (
     <div className="space-y-4">
-      {!assets && !error && <p className="text-sm text-ink-2">Loading assets…</p>}
-      {assets && (
-        <Chips
-          label="Deposit from"
-          columns="grid grid-cols-2"
-          value={asset?.assetId}
-          onChange={setAssetId}
-          options={assets.map((a) => ({ value: a.assetId, label: a.symbol, hint: chain(a) }))}
-        />
+      {!menu && !error && <p className="text-sm text-ink-2">Loading assets…</p>}
+      {menu && token && (
+        <>
+          <section className="space-y-2">
+            <h3 className="text-xs text-ink-2">You send</h3>
+            <Chips
+              label="You send"
+              columns="flex overflow-x-auto *:shrink-0"
+              value={token.symbol}
+              onChange={setSymbol}
+              options={menu.map((t) => ({ value: t.symbol, label: <TokenLabel symbol={t.symbol} /> }))}
+            />
+          </section>
+          <section className="space-y-2">
+            <h3 className="text-xs text-ink-2">Network</h3>
+            <Chips
+              label="Network"
+              columns={token.networks.length > 1 ? "grid grid-cols-2" : "grid"}
+              value={asset?.assetId}
+              onChange={setAssetId}
+              options={token.networks.map((a) => ({ value: a.assetId, label: <ChainLabel code={a.blockchain} /> }))}
+            />
+          </section>
+        </>
       )}
-      <label className="flex h-12 items-center gap-2 rounded-xl border border-rule bg-well px-4 focus-within:border-ink">
-        <input
-          inputMode="decimal"
-          placeholder="Amount"
-          value={amount}
-          onChange={(event) => setAmount(event.target.value)}
-          aria-label="Amount to deposit"
-          className="w-full bg-transparent outline-none placeholder:text-ink-3"
-        />
-        <span className="text-ink-2">{asset?.symbol}</span>
-      </label>
+      <div className="space-y-1.5">
+        <label className="flex h-12 items-center gap-2 rounded-xl border border-rule bg-well px-4 focus-within:border-ink">
+          <input
+            inputMode="decimal"
+            placeholder="Amount"
+            value={amount}
+            onChange={(event) => setAmount(event.target.value)}
+            aria-label="Amount to deposit"
+            className="w-full bg-transparent outline-none placeholder:text-ink-3"
+          />
+          <span className="text-ink-2">{asset?.symbol}</span>
+        </label>
+        {usd && <p className="text-sm text-ink-2">≈ {usd}</p>}
+      </div>
       {error && <p className="text-sm text-danger">{error}</p>}
-      <Button size="lg" disabled={!units || busy} onClick={() => void start()}>
-        {busy ? "Creating address…" : "Get deposit address"}
-      </Button>
+      <div className="sticky bottom-0 bg-surface pt-2">
+        <Button size="lg" disabled={!units || busy} onClick={() => void start()}>
+          {busy ? "Creating address…" : "Get deposit address"}
+        </Button>
+      </div>
     </div>
   );
 }

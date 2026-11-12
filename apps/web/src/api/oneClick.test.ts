@@ -4,7 +4,7 @@ import { oneClick } from "./oneClick.ts";
 
 afterEach(() => vi.unstubAllGlobals());
 
-const asset = { assetId: fixture.request.originAsset, symbol: "SOL", blockchain: "sol", decimals: 9 };
+const asset = { assetId: fixture.request.originAsset, symbol: "SOL", blockchain: "sol", decimals: 9, price: 100.54 };
 const ask = () => oneClick("https://app.test/").quote(asset, BigInt(fixture.request.amount), fixture.request.recipient, fixture.request.destinationAsset);
 const relayAnswers = (body: unknown) => {
   const fetch = vi.fn(async (_url: string, _init?: RequestInit) => new Response(JSON.stringify(body), { status: 200 }));
@@ -14,8 +14,8 @@ const relayAnswers = (body: unknown) => {
 
 it("asks the relay for the quote so the partner key stays server side, and shows it once 1Click's signature checks out", async () => {
   const fetch = relayAnswers(fixture.response);
-  const { depositAddress, amountIn, amountOut, timeEstimate } = fixture.response.quote;
-  expect(await ask()).toEqual({ depositAddress, amountIn, amountOut, timeEstimate });
+  const { depositAddress, amountIn, amountOut, timeEstimate, deadline: addressDeadline } = fixture.response.quote;
+  expect(await ask()).toEqual({ depositAddress, amountIn, amountOut, timeEstimate, deadline: addressDeadline });
   const [url, init] = fetch.mock.calls[0] ?? [];
   expect(url).toBe("https://app.test/deposit-quote");
   expect(init).toMatchObject({ method: "POST", headers: { "content-type": "application/json" } });
@@ -38,6 +38,12 @@ it.each([
 it("refuses a malformed quote with the same plain message, not a parser dump", async () => {
   relayAnswers({ quote: {} });
   await expect(ask()).rejects.toThrow("The deposit quote failed its signature check, so it isn't shown.");
+});
+
+it("refuses a quote with no address deadline, since the sheet couldn't say when the address stops working", async () => {
+  const { deadline: _, ...quote } = fixture.response.quote;
+  relayAnswers({ ...fixture.response, quote });
+  await expect(ask()).rejects.toThrow("signature check");
 });
 
 it("refuses a quote whose deposit address the relay swapped", async () => {

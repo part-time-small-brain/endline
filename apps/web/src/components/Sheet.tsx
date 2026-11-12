@@ -2,12 +2,13 @@ import { type ReactNode, useEffect, useRef } from "react";
 
 interface Props {
   title: string;
+  detail?: ReactNode;
   onClose: () => void;
   dismissible?: boolean;
   children: ReactNode;
 }
 
-export function Sheet({ title, onClose, dismissible = true, children }: Props) {
+export function Sheet({ title, detail, onClose, dismissible = true, children }: Props) {
   const panel = useRef<HTMLDivElement>(null);
   const dismiss = () => { if (dismissible) onClose(); };
   const close = useRef(dismiss);
@@ -67,7 +68,10 @@ export function Sheet({ title, onClose, dismissible = true, children }: Props) {
         className="relative max-h-[92dvh] w-full max-w-md overflow-y-auto rounded-t-3xl bg-surface p-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] outline-none [animation:rise_.25s_var(--ease-drawer)] ring-1 ring-rule sm:rounded-3xl"
       >
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-xl font-semibold">{title}</h2>
+          <div className="flex items-baseline gap-3">
+            <h2 className="text-xl font-semibold">{title}</h2>
+            {detail}
+          </div>
           <button type="button" onClick={dismiss} disabled={!dismissible} aria-label="Close" className="grid size-9 place-items-center rounded-xl bg-well text-ink-2 hover:bg-well-hover hover:text-ink disabled:cursor-not-allowed disabled:opacity-40">
             <svg viewBox="0 0 24 24" className="size-4" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
               <path d="M6 6l12 12M18 6L6 18" />

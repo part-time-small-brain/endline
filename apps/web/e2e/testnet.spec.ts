@@ -12,7 +12,7 @@ test("the testnet deposit sheet sends 100 test USDC once a day and says so when 
   const get = sheet.getByRole("button", { name: "Get 100 test USDC" });
 
   await addFunds.click();
-  await expect(sheet.getByRole("radiogroup", { name: "Deposit from" })).toHaveCount(0);
+  await expect(sheet.getByRole("radiogroup", { name: "You send" })).toHaveCount(0);
   await get.click();
   await expect(sheet.getByRole("button", { name: "Sending…" })).toBeDisabled();
   await expect(sheet.getByRole("status")).toHaveText("Sent. Your balance updates in a few seconds.");

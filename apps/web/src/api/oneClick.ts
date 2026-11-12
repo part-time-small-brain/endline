@@ -1,10 +1,11 @@
 import { verifyDepositQuote } from "@endline/sdk";
 import { z } from "zod";
 
-const DepositAsset = z.object({ assetId: z.string(), symbol: z.string(), blockchain: z.string(), decimals: z.number().int() });
+export const DepositAsset = z.object({ assetId: z.string(), symbol: z.string(), blockchain: z.string(), decimals: z.number().int(), price: z.number() });
 export type DepositAsset = z.infer<typeof DepositAsset>;
 
-const DepositQuote = z.object({ depositAddress: z.string(), amountIn: z.string(), amountOut: z.string(), timeEstimate: z.number() });
+const Units = z.string().regex(/^\d+$/);
+export const DepositQuote = z.object({ depositAddress: z.string(), amountIn: Units, amountOut: Units, timeEstimate: z.number(), deadline: z.iso.datetime() });
 export type DepositQuote = z.infer<typeof DepositQuote>;
 const SignedQuote = z.object({ quote: DepositQuote.extend({ amountInUsd: z.string(), amountOutUsd: z.string(), depositMemo: z.string().optional() }) });
 
@@ -18,7 +19,7 @@ export interface OneClick {
 }
 
 const API = "https://1click.chaindefuser.com/v0";
-const SOURCES = new Set(["USDC", "USDT", "ETH", "BTC", "SOL"]);
+export const DEPOSIT_SYMBOLS = ["USDC", "USDT", "ETH", "BTC", "SOL"];
 const QUOTE_DEADLINE_MS = 60 * 60_000;
 // 1Click doesn't sign appFees, so a relay could add its own fee; legit routes cost well under this
 const MAX_LOSS = 0.03;
@@ -37,7 +38,7 @@ export function oneClick(relayUrl: string): OneClick {
   return {
     async assets() {
       const tokens = await request(z.array(DepositAsset), `${API}/tokens`);
-      return tokens.filter((token) => SOURCES.has(token.symbol) && token.assetId.startsWith("nep141:") && token.blockchain !== "near");
+      return tokens.filter((token) => DEPOSIT_SYMBOLS.includes(token.symbol) && token.assetId.startsWith("nep141:") && token.blockchain !== "near");
     },
     async quote(asset, amount, recipient, destinationAsset) {
       const body = {
