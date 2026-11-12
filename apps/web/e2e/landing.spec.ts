@@ -122,6 +122,14 @@ test("the header matches the app header and scrolls away with the page", async (
   expect(await bar(page)).toEqual(landing);
 });
 
+test("the header links to the docs on phones too", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const docs = page.getByRole("banner").getByRole("link", { name: "Docs", exact: true });
+  await expect(docs).toBeVisible();
+  await expect(docs).toHaveAttribute("href", "/docs");
+  expect(await sideways(page)).toBeLessThanOrEqual(0);
+});
+
 test("every funding chain shows a loaded logo", async ({ page }) => {
   const chains = page.locator("#intents li").filter({ hasText: /^(Bitcoin|Ethereum|Base|Arbitrum|Solana|NEAR)$/ });
   await expect(chains).toHaveCount(6);

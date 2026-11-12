@@ -562,12 +562,33 @@ test("pickers stay on screen with reduced motion while the ticket keeps updating
   }
 });
 
-test("the app header links to the docs on every page from tablet width up", async ({ page }) => {
-  await page.setViewportSize({ width: 768, height: 900 });
-  for (const path of ["/app", "/app/positions"]) {
-    await page.goto(path);
-    const docs = page.locator("header").first().getByRole("navigation", { name: "App", exact: true }).getByRole("link", { name: "Docs" });
-    await expect(docs).toBeVisible();
-    await expect(docs).toHaveAttribute("href", "/docs");
+test("the app header links to the docs on every page, phones included", async ({ page }) => {
+  for (const width of [375, 390, 768]) {
+    await page.setViewportSize({ width, height: 900 });
+    for (const path of ["/app", "/app/positions"]) {
+      await page.goto(path);
+      const docs = page.locator("header").first().getByRole("navigation", { name: "App", exact: true }).getByRole("link", { name: "Docs" });
+      await expect(docs, `${width}px ${path}`).toBeVisible();
+      await expect(docs).toHaveAttribute("href", "/docs");
+    }
   }
+});
+
+test("each page names itself in the browser tab", async ({ page }) => {
+  await page.goto("/");
+  await expect(page).toHaveTitle("Endline: crypto options on NEAR Intents");
+  await page.goto("/app");
+  await expect(page).toHaveTitle("Trade · Endline");
+  await page.locator("header").first().getByRole("link", { name: /^Positions/ }).click();
+  await expect(page).toHaveTitle("Positions · Endline");
+  await page.goto("/app/nowhere");
+  await expect(page).toHaveTitle("Not found · Endline");
+});
+
+test("without a browser wallet the Ethereum choice says what to install", async ({ page }) => {
+  await page.goto("/app");
+  await page.getByRole("button", { name: "Connect", exact: true }).click();
+  const evm = page.getByRole("dialog").getByRole("button", { name: /Ethereum wallet/ });
+  await expect(evm).toBeDisabled();
+  await expect(evm).toContainText("Install MetaMask or Rabby to use an Ethereum wallet");
 });

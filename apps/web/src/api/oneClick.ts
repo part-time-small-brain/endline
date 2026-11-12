@@ -76,8 +76,8 @@ export function oneClick(relayUrl: string): OneClick {
       const parsed = SignedQuote.safeParse(signed).data;
       if (!parsed) throw unchecked;
       const { amountInUsd, amountOutUsd, depositMemo, ...quote } = parsed.quote;
-      if (depositMemo) throw new Error("This deposit needs a memo the app doesn't show, so it isn't shown.");
-      if (!(Number(amountInUsd) > 0 && Number(amountOutUsd) >= Number(amountInUsd) * (1 - MAX_LOSS))) throw new Error("This deposit would lose more than 3% on the way, so it isn't shown.");
+      if (depositMemo) throw new Error("This network needs a memo, which the app can't add. Pick another network.");
+      if (!(Number(amountInUsd) > 0 && Number(amountOutUsd) >= Number(amountInUsd) * (1 - MAX_LOSS))) throw new Error("This deposit would lose more than 3% on the way. Try a bigger amount or another network.");
       if (!verifyDepositQuote(body, signed)) throw unchecked;
       const quotedAt = Date.parse(parsed.timestamp);
       // a slow device clock shortens the deadline we sent, so still leave an hour before refunds start
