@@ -2,9 +2,12 @@ import { afterEach, expect, it, vi } from "vitest";
 import fixture from "../../../../testdata/oneclick-quote.json" with { type: "json" };
 import { oneClick } from "./oneClick.ts";
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.useRealTimers();
+});
 
-const asset = { assetId: fixture.request.originAsset, symbol: "SOL", blockchain: "sol", decimals: 9 };
+const asset = { assetId: fixture.request.originAsset, symbol: "SOL", blockchain: "sol", decimals: 9, price: 100.54 };
 const ask = () => oneClick("https://app.test/").quote(asset, BigInt(fixture.request.amount), fixture.request.recipient, fixture.request.destinationAsset);
 const relayAnswers = (body: unknown) => {
   const fetch = vi.fn(async (_url: string, _init?: RequestInit) => new Response(JSON.stringify(body), { status: 200 }));
@@ -12,18 +15,36 @@ const relayAnswers = (body: unknown) => {
   return fetch;
 };
 
-it("asks the relay for the quote so the partner key stays server side, and shows it once 1Click's signature checks out", async () => {
+const MINUTE = 60_000;
+const quotedAt = Date.parse(fixture.response.timestamp);
+const deviceClock = (ms: number) => vi.useFakeTimers({ now: ms, toFake: ["Date"] });
+
+it("asks the relay for the quote so the partner key stays server side, and on a device clock 20 min slow gives an hour from 1Click's quote time to send, with refunds 3 h after the request", async () => {
+  deviceClock(quotedAt - 20 * MINUTE);
   const fetch = relayAnswers(fixture.response);
   const { depositAddress, amountIn, amountOut, timeEstimate } = fixture.response.quote;
-  expect(await ask()).toEqual({ depositAddress, amountIn, amountOut, timeEstimate });
+  const quote = await ask();
   const [url, init] = fetch.mock.calls[0] ?? [];
   expect(url).toBe("https://app.test/deposit-quote");
   expect(init).toMatchObject({ method: "POST", headers: { "content-type": "application/json" } });
   const { deadline, ...body } = JSON.parse(String(init?.body));
   expect(body).toEqual(fixture.request);
-  const ahead = Date.parse(deadline) - Date.now();
-  expect(ahead).toBeGreaterThan(0);
-  expect(ahead).toBeLessThanOrEqual(24 * 60 * 60_000);
+  expect(Date.parse(deadline) - Date.now()).toBe(180 * MINUTE);
+  expect(quote).toEqual({ depositAddress, amountIn, amountOut, timeEstimate, sendBefore: new Date(quotedAt + 60 * MINUTE).toISOString(), deadline, clockOffsetMs: 20 * MINUTE });
+});
+
+it("keeps an hour before refunds start when a slow device clock shortened the deadline it sent", async () => {
+  deviceClock(quotedAt - 100 * MINUTE);
+  relayAnswers(fixture.response);
+  const { sendBefore, deadline } = await ask();
+  expect(Date.parse(deadline) - Date.parse(sendBefore)).toBe(60 * MINUTE);
+  expect(Date.parse(sendBefore) - quotedAt).toBe(20 * MINUTE);
+});
+
+it("refuses an address it could only offer for minutes, when the device clock is hours slow", async () => {
+  deviceClock(quotedAt - 150 * MINUTE);
+  relayAnswers(fixture.response);
+  await expect(ask()).rejects.toThrow("Your device clock looks wrong. Set it to the right time and try again.");
 });
 
 it.each([
@@ -57,4 +78,15 @@ it("still reads tokens and deposit status straight from 1Click", async () => {
   await client.assets();
   expect(await client.status("0xdep")).toBe("SUCCESS");
   expect(fetch.mock.calls.map(([url]) => url)).toEqual(["https://1click.chaindefuser.com/v0/tokens", "https://1click.chaindefuser.com/v0/status?depositAddress=0xdep"]);
+});
+
+it("reads a status it doesn't know as still waiting rather than failing every check", async () => {
+  vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ status: "SOMETHING_NEW" }), { status: 200 })));
+  expect(await oneClick("https://app.test").status("0xdep")).toBe("PENDING_DEPOSIT");
+});
+
+it("drops a token 1Click lists without a price instead of failing every deposit", async () => {
+  const usdc = { assetId: "nep141:base-usdc", symbol: "USDC", blockchain: "base", decimals: 6, price: 1 };
+  vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify([asset, { ...usdc, assetId: "nep141:arb-usdc", price: null }, usdc, { ...usdc, assetId: "nep141:sol-usdc", price: undefined }]), { status: 200 })));
+  expect(await oneClick("https://app.test").assets()).toEqual([asset, usdc]);
 });

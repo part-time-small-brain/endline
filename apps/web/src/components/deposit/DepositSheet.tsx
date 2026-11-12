@@ -22,12 +22,15 @@ export function DepositSheet({ wallet, onClose }: { wallet: Wallet; onClose: () 
   const source = choice ?? sources[0]?.value;
 
   return (
-    <Sheet title="Add funds" onClose={onClose}>
-      <div className="mb-5 rounded-2xl bg-well p-4">
-        <p className="text-xs text-ink-2">USDC</p>
-        <p className="text-2xl font-semibold">{balance === undefined ? "…" : formatUsd(balance, quoteDecimals)}</p>
-        <p className="mt-1 text-xs text-ink-3">On NEAR Intents · {wallet.accountId}</p>
-      </div>
+    <Sheet
+      title="Add funds"
+      detail={
+        <p className="text-sm text-ink-2">
+          Balance <span className="font-semibold text-ink">{balance === undefined ? "…" : formatUsd(balance, quoteDecimals)}</span>
+        </p>
+      }
+      onClose={onClose}
+    >
       {config.network === "testnet" && (
         <div className={source ? "mb-6" : ""}>
           <Faucet accountId={wallet.accountId} />
@@ -38,7 +41,7 @@ export function DepositSheet({ wallet, onClose }: { wallet: Wallet; onClose: () 
           <Chips label="Deposit source" columns="grid grid-cols-2" value={source} onChange={setChoice} options={sources} />
         </div>
       )}
-      {source === "chain" && services.oneClick && <OneClickDeposit oneClick={services.oneClick} accountId={wallet.accountId} />}
+      {source === "chain" && services.oneClick && <OneClickDeposit key={wallet.accountId} oneClick={services.oneClick} accountId={wallet.accountId} />}
       {source === "near" && wallet.call && <NearDeposit call={wallet.call} />}
     </Sheet>
   );

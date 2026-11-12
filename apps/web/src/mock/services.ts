@@ -5,7 +5,7 @@ import type { Market } from "../api/market.ts";
 import type { DepositStatus, OneClick } from "../api/oneClick.ts";
 import { type Relay, RelayError } from "../api/relay.ts";
 import type { Config } from "../config.ts";
-import { toUnits } from "../lib/money.ts";
+import { toNumber, toUnits } from "../lib/money.ts";
 import { costOf } from "../lib/payoff.ts";
 import type { Services } from "../services.ts";
 import { exampleMark } from "./marks.ts";
@@ -26,6 +26,8 @@ const PLAYERS: [string, number, number, number][] = [
   ["pike.near", -100, 0, 0],
 ];
 const DEPOSIT_STEP_MS = 4_000;
+const DEPOSIT_SEND_WINDOW_MS = 60 * 60_000;
+const DEPOSIT_DEADLINE_MS = 3 * DEPOSIT_SEND_WINDOW_MS;
 const FAUCET_AMOUNT = 100_000_000n;
 
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
@@ -260,21 +262,34 @@ export function createMockServices(config: Config): Services {
   const steps: DepositStatus[] = ["PENDING_DEPOSIT", "KNOWN_DEPOSIT_TX", "PROCESSING", "SUCCESS"];
   const oneClick: OneClick = {
     assets: async () => [
-      { assetId: "nep141:base-usdc", symbol: "USDC", blockchain: "base", decimals: 6 },
-      { assetId: "nep141:arb-usdc", symbol: "USDC", blockchain: "arb", decimals: 6 },
-      { assetId: "nep141:sol-usdc", symbol: "USDC", blockchain: "sol", decimals: 6 },
-      { assetId: "nep141:eth-usdt", symbol: "USDT", blockchain: "eth", decimals: 6 },
+      { assetId: "nep141:eth-eth", symbol: "ETH", blockchain: "eth", decimals: 18, price: 2_000 },
+      { assetId: "nep141:eth-usdc", symbol: "USDC", blockchain: "eth", decimals: 6, price: 1 },
+      { assetId: "nep141:eth-usdt", symbol: "USDT", blockchain: "eth", decimals: 6, price: 1 },
+      { assetId: "nep141:abs-eth", symbol: "ETH", blockchain: "abs", decimals: 18, price: 2_000 },
+      { assetId: "nep141:btc-btc", symbol: "BTC", blockchain: "btc", decimals: 8, price: 80_000 },
+      { assetId: "nep141:sol-sol", symbol: "SOL", blockchain: "sol", decimals: 9, price: 150 },
+      { assetId: "nep141:tron-usdt", symbol: "USDT", blockchain: "tron", decimals: 6, price: 1 },
+      { assetId: "nep141:arb-usdc", symbol: "USDC", blockchain: "arb", decimals: 6, price: 1 },
+      { assetId: "nep141:base-eth", symbol: "ETH", blockchain: "base", decimals: 18, price: 2_000 },
+      { assetId: "nep141:base-usdc", symbol: "USDC", blockchain: "base", decimals: 6, price: 1 },
+      { assetId: "nep141:sol-usdc", symbol: "USDC", blockchain: "sol", decimals: 6, price: 1 },
+      { assetId: "nep141:gnosis-usdc", symbol: "USDC", blockchain: "gnosis", decimals: 6, price: 1 },
+      { assetId: "nep141:pol-usdc", symbol: "USDC", blockchain: "pol", decimals: 6, price: 1 },
+      { assetId: "nep141:bsc-usdc", symbol: "USDC", blockchain: "bsc", decimals: 6, price: 1 },
+      { assetId: "nep141:avax-usdc", symbol: "USDC", blockchain: "avax", decimals: 6, price: 1 },
     ],
     async quote(asset, amount, recipient) {
       await sleep(600);
       const depositAddress = asset.blockchain === "sol" ? base58.encode(randomBytes(32)) : `0x${Array.from(randomBytes(20), (b) => b.toString(16).padStart(2, "0")).join("")}`;
-      const amountOut = (amount * 9_990n) / 10_000n;
-      deposits.set(depositAddress, { startedAt: Date.now(), amount: amountOut, account: recipient, credited: false });
-      return { depositAddress, amountIn: amount.toString(), amountOut: amountOut.toString(), timeEstimate: 35 };
+      const amountOut = toUnits(toNumber(amount, asset.decimals) * asset.price * 0.999, QUOTE_DECIMALS);
+      const now = Date.now();
+      deposits.set(depositAddress, { startedAt: now, amount: amountOut, account: recipient, credited: false });
+      const at = (ms: number) => new Date(now + ms).toISOString();
+      return { depositAddress, amountIn: amount.toString(), amountOut: amountOut.toString(), timeEstimate: 35, sendBefore: at(DEPOSIT_SEND_WINDOW_MS), deadline: at(DEPOSIT_DEADLINE_MS), clockOffsetMs: 0 };
     },
     async status(depositAddress) {
       const deposit = deposits.get(depositAddress);
-      if (!deposit) return "FAILED";
+      if (!deposit) return "PENDING_DEPOSIT";
       const step = steps[Math.min(Math.floor((Date.now() - deposit.startedAt) / DEPOSIT_STEP_MS), steps.length - 1)] ?? "FAILED";
       if (step === "SUCCESS" && !deposit.credited) {
         deposit.credited = true;

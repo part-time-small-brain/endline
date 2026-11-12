@@ -1,63 +1,109 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useApp } from "../../app/context.ts";
 import { useData } from "../../app/data.tsx";
-import type { DepositAsset, DepositQuote, DepositStatus, OneClick } from "../../api/oneClick.ts";
-import { formatToken, parseUnits } from "../../lib/money.ts";
+import { type DepositAsset, type DepositStatus, MAX_DEPOSIT_UNITS, type OneClick } from "../../api/oneClick.ts";
+import { useNow } from "../../hooks/useNow.ts";
+import { depositMenu } from "../../lib/depositMenu.ts";
+import { formatUsd, parseUnits, toNumber, toUnits } from "../../lib/money.ts";
+import { depositStage, keepsDeposit, type PendingDeposit, pendingDepositKey, readPendingDeposit } from "../../lib/pendingDeposit.ts";
 import { Button } from "../Button.tsx";
 import { Chips } from "../Chips.tsx";
-import { CopyField } from "../CopyField.tsx";
+import { ChainLabel, TokenLabel } from "./AssetLabel.tsx";
+import { DepositAddress } from "./DepositAddress.tsx";
 
-const CHAINS: Record<string, string> = { base: "Base", arb: "Arbitrum", eth: "Ethereum", sol: "Solana", btc: "Bitcoin", tron: "Tron", gnosis: "Gnosis", sui: "Sui", aptos: "Aptos" };
 const POLL_MS = 5_000;
+const NETWORK_PICKED = '[aria-label="Network"] [aria-checked="true"]';
 
-const STATUS_COPY: Record<DepositStatus, string> = {
-  PENDING_DEPOSIT: "Waiting for your transfer",
-  KNOWN_DEPOSIT_TX: "Transfer seen",
-  PROCESSING: "Converting to USDC",
-  SUCCESS: "Ready. Your balance is updated.",
-  INCOMPLETE_DEPOSIT: "Less than expected arrived. It will be refunded to your balance.",
-  REFUNDED: "Refunded to your NEAR Intents balance.",
-  FAILED: "Deposit failed. Any funds are refunded to your NEAR Intents balance.",
-};
+function restore(key: string): PendingDeposit | undefined {
+  try {
+    const stored = localStorage.getItem(key);
+    const pending = stored === null ? undefined : readPendingDeposit(stored);
+    if (stored !== null && !pending) localStorage.removeItem(key);
+    return pending;
+  } catch {
+    return undefined;
+  }
+}
 
-const chain = (asset: DepositAsset) => CHAINS[asset.blockchain] ?? asset.blockchain.toUpperCase();
+function save(key: string, pending: PendingDeposit, replace = false) {
+  try {
+    const saved = readPendingDeposit(localStorage.getItem(key) ?? "");
+    if (replace || !saved || saved.depositAddress === pending.depositAddress) localStorage.setItem(key, JSON.stringify(pending));
+  } catch {}
+}
+
+function forget(key: string, depositAddress: string) {
+  try {
+    if (readPendingDeposit(localStorage.getItem(key) ?? "")?.depositAddress === depositAddress) localStorage.removeItem(key);
+  } catch {}
+}
 
 export function OneClickDeposit({ oneClick, accountId }: { oneClick: OneClick; accountId: string }) {
   const { config } = useApp();
   const { reload, quoteDecimals } = useData();
   const [assets, setAssets] = useState<DepositAsset[]>();
+  const [symbol, setSymbol] = useState<string>();
   const [assetId, setAssetId] = useState<string>();
   const [amount, setAmount] = useState("");
-  const [quote, setQuote] = useState<DepositQuote & { asset: DepositAsset }>();
+  const key = pendingDepositKey(accountId);
+  const [pending, setPending] = useState(() => restore(key));
   const [status, setStatus] = useState<DepositStatus>();
   const [error, setError] = useState<string>();
   const [busy, setBusy] = useState(false);
+  const now = useNow(1_000);
+  const stage = pending && depositStage(status, pending, now);
+  const done = stage === "done";
+  const root = useRef<HTMLDivElement>(null);
+  const moveFocus = useRef(false);
 
   useEffect(() => {
     oneClick.assets().then(setAssets, (e: unknown) => setError(e instanceof Error ? e.message : "Deposits unavailable"));
   }, [oneClick]);
 
   useEffect(() => {
-    if (!quote || status === "SUCCESS") return;
-    const timer = setInterval(() => {
-      oneClick.status(quote.depositAddress).then((next) => {
-        setStatus(next);
-        if (next === "SUCCESS") reload();
-      }, () => {});
-    }, POLL_MS);
-    return () => clearInterval(timer);
-  }, [oneClick, quote, status, reload]);
+    if (!pending || done) return;
+    let alive = true;
+    const check = () => oneClick.status(pending.depositAddress).then((next) => alive && setStatus(next), () => {});
+    check();
+    const timer = setInterval(check, POLL_MS);
+    return () => {
+      alive = false;
+      clearInterval(timer);
+    };
+  }, [oneClick, pending, done]);
 
-  const asset = assets?.find((a) => a.assetId === assetId) ?? assets?.[0];
-  const units = asset ? parseUnits(amount, asset.decimals) : null;
+  useEffect(() => {
+    if (!pending || !stage) return;
+    if (keepsDeposit(stage, status)) return save(key, pending);
+    forget(key, pending.depositAddress);
+    if (status === "SUCCESS") reload();
+  }, [pending, stage, status, key, reload]);
+
+  useEffect(() => {
+    if (!moveFocus.current) return;
+    moveFocus.current = false;
+    root.current?.querySelector<HTMLElement>(pending ? "h3" : NETWORK_PICKED)?.focus();
+  }, [pending]);
+
+  const menu = assets && depositMenu(assets);
+  const token = menu?.find((t) => t.symbol === symbol) ?? menu?.[0];
+  const asset = token?.networks.find((a) => a.assetId === assetId) ?? token?.networks[0];
+  const parsed = asset ? parseUnits(amount, asset.decimals) : null;
+  const tooLarge = parsed !== null && parsed > MAX_DEPOSIT_UNITS;
+  const units = tooLarge ? null : parsed;
+  const dollars = asset && units ? toNumber(units, asset.decimals) * asset.price : NaN;
+  const usd = Number.isFinite(dollars) ? formatUsd(toUnits(dollars, 2), 2) : undefined;
 
   const start = async () => {
     if (!asset || !units) return;
     setBusy(true);
     setError(undefined);
     try {
-      setQuote({ ...(await oneClick.quote(asset, units, accountId, config.quoteAsset)), asset });
-      setStatus("PENDING_DEPOSIT");
+      const next = { ...(await oneClick.quote(asset, units, accountId, config.quoteAsset)), asset };
+      setStatus(undefined);
+      save(key, next, true);
+      moveFocus.current = true;
+      setPending(next);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Couldn't create a deposit address");
     } finally {
@@ -65,52 +111,68 @@ export function OneClickDeposit({ oneClick, accountId }: { oneClick: OneClick; a
     }
   };
 
-  if (quote)
+  const back = () => {
+    if (pending) forget(key, pending.depositAddress);
+    setStatus(undefined);
+    moveFocus.current = true;
+    setPending(undefined);
+  };
+
+  if (pending && stage)
     return (
-      <div className="space-y-4">
-        <p className="text-sm text-ink-2">
-          Send exactly{" "}
-          <span className="font-semibold text-ink">
-            {formatToken(BigInt(quote.amountIn), quote.asset.decimals)} {quote.asset.symbol}
-          </span>{" "}
-          on {chain(quote.asset)} to this address. About {formatToken(BigInt(quote.amountOut), quoteDecimals, 2)} USDC arrives in about {quote.timeEstimate} s.
-        </p>
-        <CopyField label="Deposit address" value={quote.depositAddress} />
-        <div className="flex items-center gap-3 rounded-2xl bg-well px-4 py-3 text-sm" role="status">
-          <span className={`size-2 rounded-full ${status === "SUCCESS" ? "bg-ink" : "animate-pulse bg-ink-3"}`} />
-          {status && STATUS_COPY[status]}
-        </div>
-        <p className="text-xs text-ink-3">If anything goes wrong, funds are refunded to your NEAR Intents balance.</p>
+      <div ref={root}>
+        <DepositAddress deposit={pending} status={status} stage={stage} quoteDecimals={quoteDecimals} onBack={back} />
       </div>
     );
 
   return (
-    <div className="space-y-4">
-      {!assets && !error && <p className="text-sm text-ink-2">Loading assets…</p>}
-      {assets && (
-        <Chips
-          label="Deposit from"
-          columns="grid grid-cols-2"
-          value={asset?.assetId}
-          onChange={setAssetId}
-          options={assets.map((a) => ({ value: a.assetId, label: a.symbol, hint: chain(a) }))}
-        />
+    <div ref={root} className="space-y-4">
+      {!menu && !error && <p className="text-sm text-ink-2">Loading assets…</p>}
+      {menu && token && (
+        <>
+          <section className="space-y-2">
+            <h3 className="text-xs text-ink-2">You send</h3>
+            <Chips
+              label="You send"
+              columns="flex overflow-x-auto *:shrink-0"
+              value={token.symbol}
+              onChange={setSymbol}
+              options={menu.map((t) => ({ value: t.symbol, label: <TokenLabel symbol={t.symbol} /> }))}
+            />
+          </section>
+          <section className="space-y-2">
+            <h3 className="text-xs text-ink-2">Network</h3>
+            <Chips
+              label="Network"
+              columns={token.networks.length > 1 ? "grid grid-cols-2" : "grid"}
+              value={asset?.assetId}
+              onChange={setAssetId}
+              options={token.networks.map((a) => ({ value: a.assetId, label: <ChainLabel code={a.blockchain} /> }))}
+            />
+          </section>
+        </>
       )}
-      <label className="flex h-12 items-center gap-2 rounded-xl border border-rule bg-well px-4 focus-within:border-ink">
-        <input
-          inputMode="decimal"
-          placeholder="Amount"
-          value={amount}
-          onChange={(event) => setAmount(event.target.value)}
-          aria-label="Amount to deposit"
-          className="w-full bg-transparent outline-none placeholder:text-ink-3"
-        />
-        <span className="text-ink-2">{asset?.symbol}</span>
-      </label>
+      <div className="space-y-1.5">
+        <label className="flex h-12 items-center gap-2 rounded-xl border border-rule bg-well px-4 focus-within:border-ink">
+          <input
+            inputMode="decimal"
+            placeholder="Amount"
+            value={amount}
+            onChange={(event) => setAmount(event.target.value)}
+            aria-label="Amount to deposit"
+            className="w-full bg-transparent outline-none placeholder:text-ink-3"
+          />
+          <span className="text-ink-2">{asset?.symbol}</span>
+        </label>
+        {usd && <p className="text-sm text-ink-2">≈ {usd}</p>}
+        {tooLarge && <p className="text-sm text-danger">That amount is too large.</p>}
+      </div>
       {error && <p className="text-sm text-danger">{error}</p>}
-      <Button size="lg" disabled={!units || busy} onClick={() => void start()}>
-        {busy ? "Creating address…" : "Get deposit address"}
-      </Button>
+      <div className="sticky bottom-0 bg-surface pt-2">
+        <Button size="lg" disabled={!units || busy} onClick={() => void start()}>
+          {busy ? "Creating address…" : "Get deposit address"}
+        </Button>
+      </div>
     </div>
   );
 }
