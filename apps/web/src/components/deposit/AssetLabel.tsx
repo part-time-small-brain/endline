@@ -1,17 +1,22 @@
+import abstract from "../../assets/chains/abstract.svg";
+import aptos from "../../assets/chains/aptos.svg";
 import arbitrum from "../../assets/chains/arbitrum.svg";
 import avalanche from "../../assets/chains/avalanche.svg";
 import base from "../../assets/chains/base.svg";
 import bitcoin from "../../assets/chains/bitcoin.svg";
 import bnb from "../../assets/chains/bnb.svg";
 import ethereum from "../../assets/chains/ethereum.svg";
+import gnosis from "../../assets/chains/gnosis.svg";
 import polygon from "../../assets/chains/polygon.svg";
+import robinhood from "../../assets/chains/robinhood.svg";
 import solana from "../../assets/chains/solana.svg";
+import sui from "../../assets/chains/sui.svg";
 import tron from "../../assets/chains/tron.svg";
 import usdc from "../../assets/tokens/usdc.svg";
 import usdt from "../../assets/tokens/usdt.svg";
 import { chainName } from "../../lib/depositMenu.ts";
 
-const CHAIN_LOGOS: Record<string, string> = { base, arb: arbitrum, sol: solana, pol: polygon, bsc: bnb, avax: avalanche, eth: ethereum, btc: bitcoin, tron };
+const CHAIN_LOGOS: Record<string, string> = { base, arb: arbitrum, sol: solana, pol: polygon, bsc: bnb, avax: avalanche, eth: ethereum, btc: bitcoin, tron, gnosis, sui, aptos, abs: abstract, hood: robinhood };
 const TOKEN_LOGOS: Record<string, string> = { USDC: usdc, USDT: usdt, ETH: ethereum, BTC: bitcoin, SOL: solana };
 
 function AssetLabel({ logo, name, layout }: { logo: string | undefined; name: string; layout: string }) {
