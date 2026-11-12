@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import { App } from "./App.tsx";
 import { AppContext } from "./app/context.ts";
 import { DataProvider } from "./app/data.tsx";
+import { analyticsScript } from "./lib/analytics.ts";
 import { type Config, loadConfig } from "./config.ts";
 import { createServices, type Services } from "./services.ts";
 import { WalletProvider } from "./wallet/context.tsx";
@@ -18,6 +19,12 @@ async function start(config: Config): Promise<Services> {
 
 try {
   const config = loadConfig(import.meta.env);
+  const analytics = analyticsScript(config);
+  if (analytics) {
+    const script = Object.assign(document.createElement("script"), { src: analytics.src, defer: true });
+    script.dataset.cfBeacon = analytics.beacon;
+    document.head.append(script);
+  }
   const services = await start(config);
   root.render(
     <StrictMode>
