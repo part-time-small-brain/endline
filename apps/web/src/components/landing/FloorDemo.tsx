@@ -4,7 +4,7 @@ import { m, useInView, useReducedMotion } from "motion/react";
 import { type KeyboardEvent, type PointerEvent, type ReactNode, useEffect, useRef, useState } from "react";
 import { linear, ticks } from "../../lib/chart.ts";
 import { formatPrice, formatUsd, toNumber, toUnits } from "../../lib/money.ts";
-import { ticket } from "../../lib/ticket.ts";
+import { amountChoices, maxBinds, ticket } from "../../lib/ticket.ts";
 import { SideGlyph } from "../Glyphs.tsx";
 import { GlowRect } from "../GlowRect.tsx";
 import { LABEL } from "../label.ts";
@@ -20,7 +20,8 @@ interface Props {
   quoteDecimals: number;
 }
 
-const PAY_USD = [10, 25, 100];
+const DEFAULT_PAY_USD = 25n;
+const MAX = "max";
 const BARS = 46;
 const RANGE = 0.08;
 const TOP = 44;
@@ -46,7 +47,7 @@ export function FloorDemo({ asset, quoteDecimals: qd }: Props) {
   const clampEnd = (value: number) => snap(Math.min(Math.max(value, low + step), high - step));
   const balanced = (k: OptionKind) => balancedOf(asset, k, qd);
   const [kind, setKind] = useState<OptionKind>("call");
-  const [payUsd, setPay] = useState(25);
+  const [pay, setPay] = useState<string>();
   const [playing, setPlaying] = useState(true);
   const [end, setEnd] = useState(() => {
     const first = balanced("call");
@@ -73,7 +74,16 @@ export function FloorDemo({ asset, quoteDecimals: qd }: Props) {
 
   const up = kind === "call";
   const strike = toNumber(BigInt(series.strike), qd);
-  const bought = ticket(series, BigInt(payUsd) * 10n ** BigInt(qd), asset.marks[series.id]);
+  const unit = 10n ** BigInt(qd);
+  const mark = asset.marks[series.id];
+  const max = ticket(series, unit, mark).maxCost;
+  const capped = maxBinds(max, unit);
+  const budget = pay === MAX ? max : pay ? BigInt(pay) : capped && max < DEFAULT_PAY_USD * unit ? max : DEFAULT_PAY_USD * unit;
+  const bought = ticket(series, budget, mark);
+  const payOptions = [
+    ...amountChoices(max, unit, budget).map((amount) => ({ value: String(amount), label: formatUsd(amount, qd).replace(/\.00$/, "") })),
+    ...(capped ? [{ value: MAX, label: "Max" }] : []),
+  ];
   const paid = toNumber(bought.cost, qd);
   const payout = (price: number) => longPayout(bought.terms, bought.size, toUnits(price, qd));
   const y = linear([low, high], [height - BOTTOM, TOP]);
@@ -125,7 +135,7 @@ export function FloorDemo({ asset, quoteDecimals: qd }: Props) {
                 ),
               };
             })} />
-            <Segmented label="You pay" value={payUsd} onChange={setPay} options={PAY_USD.map((usd) => ({ value: usd, label: `$${usd}` }))} />
+            <Segmented label="You pay" value={capped && budget >= max ? MAX : String(budget)} onChange={setPay} options={payOptions} />
             <div aria-live="polite" className={`flex flex-col gap-2 rounded-md border p-6 transition-colors duration-300 ${won > 0n ? "border-side bg-side-field" : "border-rule bg-surface"}`}>
               <p className="font-mono text-[0.6875rem] tracking-[0.08em] text-ink-3 uppercase">
                 {asset.symbol} ends at {price(end)}
