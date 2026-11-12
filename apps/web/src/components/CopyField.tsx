@@ -5,7 +5,7 @@ export function CopyButton({ value, what }: { value: string; what: string }) {
   return (
     <button
       type="button"
-      aria-label={copied ? `${what} copied` : `Copy ${what}`}
+      aria-label={copied ? undefined : `Copy ${what}`}
       onClick={() => void navigator.clipboard.writeText(value).then(() => setCopied(true))}
       className="shrink-0 rounded-lg bg-surface px-3 py-1.5 text-xs font-semibold hover:bg-paper"
     >

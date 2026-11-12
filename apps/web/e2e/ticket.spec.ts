@@ -60,11 +60,49 @@ test("deposit addresses match the selected chain, and so does the warning", asyn
     const send = sheet.getByText("Send exactly").locator("..");
     await expect(send).toHaveText(`Send exactly 1,000 USDC on ${chain}Copy`);
     await send.getByRole("button", { name: "Copy amount", exact: true }).click();
-    await expect(send.getByRole("button", { name: "amount copied", exact: true })).toBeVisible();
+    await expect(send.getByRole("button", { name: "Copied", exact: true })).toBeVisible();
     expect(await page.evaluate(() => navigator.clipboard.readText())).toBe("1000");
     await expect(sheet.getByText(/^Only send/)).toHaveText(`Only send USDC on ${chain}. Anything else may be lost.`);
     await sheet.getByRole("button", { name: "Back" }).click();
   }
+});
+
+test("the amount to send and copy is exact to the token's last decimal", async ({ page, context }) => {
+  await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+  await connectDemo(page);
+  const sheet = await openAddFunds(page);
+  for (const [symbol, typed, shown, chain] of [
+    ["SOL", "1.123456789", "1.123456789", "Solana"],
+    ["ETH", "0.000000000000000001", "0.000000000000000001", "Base"],
+    ["ETH", "1234.500000000000000001", "1,234.500000000000000001", "Base"],
+  ] as const) {
+    await sheet.getByRole("radio", { name: symbol, exact: true }).click();
+    await sheet.getByRole("textbox", { name: "Amount to deposit" }).fill(typed);
+    await sheet.getByRole("button", { name: "Get deposit address" }).click();
+    const heading = sheet.getByRole("heading", { name: /^Send exactly/ });
+    await expect(heading).toHaveText(`Send exactly ${shown} ${symbol} on ${chain}`);
+    await expect(heading).toBeFocused();
+    await sheet.getByRole("button", { name: "Copy amount", exact: true }).click();
+    expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(typed);
+    await sheet.getByRole("button", { name: "Back" }).click();
+    await expect(sheet.getByRole("radiogroup", { name: "Network" }).getByRole("radio", { name: chain, exact: true })).toBeFocused();
+  }
+});
+
+test("an address past its send-by time is replaced and forgotten when nothing was sent", async ({ page }) => {
+  await connectDemo(page);
+  const deadline = new Date((await page.evaluate(() => Date.now())) + 60_000).toISOString();
+  const pending = { depositAddress: "0x00000000000000000000000000000000000000aa", amountIn: "25000000", amountOut: "24975000", timeEstimate: 35, deadline, asset: { assetId: "nep141:base-usdc", symbol: "USDC", blockchain: "base", decimals: 6, price: 1 } };
+  await page.evaluate((value) => localStorage.setItem("pending-deposit:demo.near", value), JSON.stringify(pending));
+  const sheet = await openAddFunds(page);
+  await expect(sheet.locator("code")).toHaveText(pending.depositAddress);
+  await page.clock.runFor(61_000);
+  await expect(sheet.getByText("This address has expired. Get a new one.")).toBeVisible();
+  await expect(sheet.locator("code")).toHaveCount(0);
+  await expect(sheet.getByRole("img", { name: "Deposit address QR code" })).toHaveCount(0);
+  await expect.poll(() => page.evaluate(() => localStorage.getItem("pending-deposit:demo.near"))).toBeNull();
+  await sheet.getByRole("button", { name: "Back" }).click();
+  await expect(sheet.getByRole("button", { name: "Get deposit address" })).toBeVisible();
 });
 
 test("Add funds starts on USDC, lists its cheapest networks first and prices the amount", async ({ page }) => {
@@ -97,7 +135,7 @@ test("Add funds starts on USDC, lists its cheapest networks first and prices the
   }
 });
 
-test("a deposit reopens on its address until it is credited, and Back drops it", async ({ page }) => {
+test("a deposit reopens on its address until it is credited, Back drops it, and Back hides once the transfer is seen", async ({ page }) => {
   await connectDemo(page);
   let sheet = await openAddFunds(page);
   await sheet.getByRole("textbox", { name: "Amount to deposit" }).fill("25");
@@ -108,7 +146,11 @@ test("a deposit reopens on its address until it is credited, and Back drops it",
   sheet = await openAddFunds(page);
   await expect(sheet.locator("code")).toHaveText(address ?? "");
   await expect(sheet.locator("[aria-current=step]")).toHaveText("Waiting for your transfer");
-  await page.clock.runFor(20_000);
+  await expect(sheet.getByRole("button", { name: "Back" })).toBeVisible();
+  await page.clock.runFor(6_000);
+  await expect(sheet.locator("[aria-current=step]")).toHaveText("Transfer seen");
+  await expect(sheet.getByRole("button", { name: "Back" })).toHaveCount(0);
+  await page.clock.runFor(14_000);
   await expect(sheet.locator("[aria-current=step]")).toHaveText(/^Credited/);
   await expect.poll(() => money(page.locator("header number-flow-react:visible"))).toBe(274);
   await sheet.getByRole("button", { name: "Close", exact: true }).click();

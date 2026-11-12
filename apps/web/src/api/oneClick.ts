@@ -7,7 +7,7 @@ export type DepositAsset = z.infer<typeof DepositAsset>;
 const Units = z.string().regex(/^\d+$/);
 export const DepositQuote = z.object({ depositAddress: z.string(), amountIn: Units, amountOut: Units, timeEstimate: z.number(), deadline: z.iso.datetime() });
 export type DepositQuote = z.infer<typeof DepositQuote>;
-const SignedQuote = z.object({ quote: DepositQuote.extend({ amountInUsd: z.string(), amountOutUsd: z.string(), depositMemo: z.string().optional() }) });
+const SignedQuote = z.object({ quote: DepositQuote.omit({ deadline: true }).extend({ amountInUsd: z.string(), amountOutUsd: z.string(), depositMemo: z.string().optional() }) });
 
 const DepositStatus = z.enum(["PENDING_DEPOSIT", "KNOWN_DEPOSIT_TX", "PROCESSING", "SUCCESS", "INCOMPLETE_DEPOSIT", "REFUNDED", "FAILED"]);
 export type DepositStatus = z.infer<typeof DepositStatus>;
@@ -37,7 +37,7 @@ async function request<T>(schema: z.ZodType<T>, url: string, body?: unknown): Pr
 export function oneClick(relayUrl: string): OneClick {
   return {
     async assets() {
-      const tokens = await request(z.array(DepositAsset), `${API}/tokens`);
+      const tokens = (await request(z.array(z.unknown()), `${API}/tokens`)).flatMap((token) => DepositAsset.safeParse(token).data ?? []);
       return tokens.filter((token) => DEPOSIT_SYMBOLS.includes(token.symbol) && token.assetId.startsWith("nep141:") && token.blockchain !== "near");
     },
     async quote(asset, amount, recipient, destinationAsset) {
@@ -63,7 +63,7 @@ export function oneClick(relayUrl: string): OneClick {
       if (depositMemo) throw new Error("This deposit needs a memo the app doesn't show, so it isn't shown.");
       if (!(Number(amountInUsd) > 0 && Number(amountOutUsd) >= Number(amountInUsd) * (1 - MAX_LOSS))) throw new Error("This deposit would lose more than 3% on the way, so it isn't shown.");
       if (!verifyDepositQuote(body, signed)) throw unchecked;
-      return quote;
+      return { ...quote, deadline: body.deadline };
     },
     async status(depositAddress) {
       return (await request(z.object({ status: DepositStatus }), `${API}/status?depositAddress=${encodeURIComponent(depositAddress)}`)).status;

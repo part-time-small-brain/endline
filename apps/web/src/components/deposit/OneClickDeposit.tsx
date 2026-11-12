@@ -1,30 +1,34 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useApp } from "../../app/context.ts";
 import { useData } from "../../app/data.tsx";
 import type { DepositAsset, DepositStatus, OneClick } from "../../api/oneClick.ts";
+import { useNow } from "../../hooks/useNow.ts";
 import { depositMenu } from "../../lib/depositMenu.ts";
 import { formatUsd, parseUnits, toNumber, toUnits } from "../../lib/money.ts";
-import { PENDING_DEPOSIT_KEY, type PendingDeposit, readPendingDeposit } from "../../lib/pendingDeposit.ts";
+import { depositStage, keepsDeposit, type PendingDeposit, pendingDepositKey, readPendingDeposit } from "../../lib/pendingDeposit.ts";
 import { Button } from "../Button.tsx";
 import { Chips } from "../Chips.tsx";
 import { ChainLabel, TokenLabel } from "./AssetLabel.tsx";
 import { DepositAddress } from "./DepositAddress.tsx";
 
 const POLL_MS = 5_000;
-const FINAL: DepositStatus[] = ["SUCCESS", "REFUNDED", "FAILED"];
+const NETWORK_PICKED = '[aria-label="Network"] [aria-checked="true"]';
 
-function restore(accountId: string): PendingDeposit | undefined {
+function restore(key: string): PendingDeposit | undefined {
   try {
-    return readPendingDeposit(localStorage.getItem(PENDING_DEPOSIT_KEY), accountId, Date.now());
+    const stored = localStorage.getItem(key);
+    const pending = stored === null ? undefined : readPendingDeposit(stored);
+    if (stored !== null && !pending) localStorage.removeItem(key);
+    return pending;
   } catch {
     return undefined;
   }
 }
 
-function remember(pending: PendingDeposit | undefined) {
+function remember(key: string, pending: PendingDeposit | undefined) {
   try {
-    if (pending) localStorage.setItem(PENDING_DEPOSIT_KEY, JSON.stringify(pending));
-    else localStorage.removeItem(PENDING_DEPOSIT_KEY);
+    if (pending) localStorage.setItem(key, JSON.stringify(pending));
+    else localStorage.removeItem(key);
   } catch {}
 }
 
@@ -35,18 +39,23 @@ export function OneClickDeposit({ oneClick, accountId }: { oneClick: OneClick; a
   const [symbol, setSymbol] = useState<string>();
   const [assetId, setAssetId] = useState<string>();
   const [amount, setAmount] = useState("");
-  const [pending, setPending] = useState(() => restore(accountId));
+  const key = pendingDepositKey(accountId);
+  const [pending, setPending] = useState(() => restore(key));
   const [status, setStatus] = useState<DepositStatus>();
   const [error, setError] = useState<string>();
   const [busy, setBusy] = useState(false);
-  const final = status !== undefined && FINAL.includes(status);
+  const now = useNow(1_000);
+  const stage = pending && depositStage(status, pending.deadline, now);
+  const done = stage === "done";
+  const root = useRef<HTMLDivElement>(null);
+  const moveFocus = useRef(false);
 
   useEffect(() => {
     oneClick.assets().then(setAssets, (e: unknown) => setError(e instanceof Error ? e.message : "Deposits unavailable"));
   }, [oneClick]);
 
   useEffect(() => {
-    if (!pending || final) return;
+    if (!pending || done) return;
     let alive = true;
     const check = () => oneClick.status(pending.depositAddress).then((next) => alive && setStatus(next), () => {});
     check();
@@ -55,13 +64,19 @@ export function OneClickDeposit({ oneClick, accountId }: { oneClick: OneClick; a
       alive = false;
       clearInterval(timer);
     };
-  }, [oneClick, pending, final]);
+  }, [oneClick, pending, done]);
 
   useEffect(() => {
-    if (!final) return;
-    remember(undefined);
+    if (!stage || keepsDeposit(stage, status)) return;
+    remember(key, undefined);
     if (status === "SUCCESS") reload();
-  }, [final, status, reload]);
+  }, [stage, status, key, reload]);
+
+  useEffect(() => {
+    if (!moveFocus.current) return;
+    moveFocus.current = false;
+    root.current?.querySelector<HTMLElement>(pending ? "h3" : NETWORK_PICKED)?.focus();
+  }, [pending]);
 
   const menu = assets && depositMenu(assets);
   const token = menu?.find((t) => t.symbol === symbol) ?? menu?.[0];
@@ -74,9 +89,10 @@ export function OneClickDeposit({ oneClick, accountId }: { oneClick: OneClick; a
     setBusy(true);
     setError(undefined);
     try {
-      const next = { ...(await oneClick.quote(asset, units, accountId, config.quoteAsset)), accountId, asset };
-      remember(next);
+      const next = { ...(await oneClick.quote(asset, units, accountId, config.quoteAsset)), asset };
+      remember(key, next);
       setStatus(undefined);
+      moveFocus.current = true;
       setPending(next);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Couldn't create a deposit address");
@@ -86,15 +102,21 @@ export function OneClickDeposit({ oneClick, accountId }: { oneClick: OneClick; a
   };
 
   const back = () => {
-    remember(undefined);
-    setPending(undefined);
+    remember(key, undefined);
     setStatus(undefined);
+    moveFocus.current = true;
+    setPending(undefined);
   };
 
-  if (pending) return <DepositAddress deposit={pending} status={status} quoteDecimals={quoteDecimals} onBack={back} />;
+  if (pending && stage)
+    return (
+      <div ref={root}>
+        <DepositAddress deposit={pending} status={status} stage={stage} quoteDecimals={quoteDecimals} onBack={back} />
+      </div>
+    );
 
   return (
-    <div className="space-y-4">
+    <div ref={root} className="space-y-4">
       {!menu && !error && <p className="text-sm text-ink-2">Loading assets…</p>}
       {menu && token && (
         <>

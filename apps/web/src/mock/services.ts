@@ -26,7 +26,7 @@ const PLAYERS: [string, number, number, number][] = [
   ["pike.near", -100, 0, 0],
 ];
 const DEPOSIT_STEP_MS = 4_000;
-const DEPOSIT_ADDRESS_MS = 24 * 3_600_000;
+const DEPOSIT_DEADLINE_MS = 60 * 60_000;
 const FAUCET_AMOUNT = 100_000_000n;
 
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
@@ -282,11 +282,11 @@ export function createMockServices(config: Config): Services {
       const depositAddress = asset.blockchain === "sol" ? base58.encode(randomBytes(32)) : `0x${Array.from(randomBytes(20), (b) => b.toString(16).padStart(2, "0")).join("")}`;
       const amountOut = toUnits(toNumber(amount, asset.decimals) * asset.price * 0.999, QUOTE_DECIMALS);
       deposits.set(depositAddress, { startedAt: Date.now(), amount: amountOut, account: recipient, credited: false });
-      return { depositAddress, amountIn: amount.toString(), amountOut: amountOut.toString(), timeEstimate: 35, deadline: new Date(Date.now() + DEPOSIT_ADDRESS_MS).toISOString() };
+      return { depositAddress, amountIn: amount.toString(), amountOut: amountOut.toString(), timeEstimate: 35, deadline: new Date(Date.now() + DEPOSIT_DEADLINE_MS).toISOString() };
     },
     async status(depositAddress) {
       const deposit = deposits.get(depositAddress);
-      if (!deposit) return "FAILED";
+      if (!deposit) return "PENDING_DEPOSIT";
       const step = steps[Math.min(Math.floor((Date.now() - deposit.startedAt) / DEPOSIT_STEP_MS), steps.length - 1)] ?? "FAILED";
       if (step === "SUCCESS" && !deposit.credited) {
         deposit.credited = true;

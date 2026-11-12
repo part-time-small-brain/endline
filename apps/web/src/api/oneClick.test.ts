@@ -12,10 +12,10 @@ const relayAnswers = (body: unknown) => {
   return fetch;
 };
 
-it("asks the relay for the quote so the partner key stays server side, and shows it once 1Click's signature checks out", async () => {
+it("asks the relay for the quote so the partner key stays server side, and shows it with the refund deadline it sent once 1Click's signature checks out", async () => {
   const fetch = relayAnswers(fixture.response);
-  const { depositAddress, amountIn, amountOut, timeEstimate, deadline: addressDeadline } = fixture.response.quote;
-  expect(await ask()).toEqual({ depositAddress, amountIn, amountOut, timeEstimate, deadline: addressDeadline });
+  const { depositAddress, amountIn, amountOut, timeEstimate } = fixture.response.quote;
+  const quote = await ask();
   const [url, init] = fetch.mock.calls[0] ?? [];
   expect(url).toBe("https://app.test/deposit-quote");
   expect(init).toMatchObject({ method: "POST", headers: { "content-type": "application/json" } });
@@ -24,6 +24,7 @@ it("asks the relay for the quote so the partner key stays server side, and shows
   const ahead = Date.parse(deadline) - Date.now();
   expect(ahead).toBeGreaterThan(0);
   expect(ahead).toBeLessThanOrEqual(24 * 60 * 60_000);
+  expect(quote).toEqual({ depositAddress, amountIn, amountOut, timeEstimate, deadline });
 });
 
 it.each([
@@ -38,12 +39,6 @@ it.each([
 it("refuses a malformed quote with the same plain message, not a parser dump", async () => {
   relayAnswers({ quote: {} });
   await expect(ask()).rejects.toThrow("The deposit quote failed its signature check, so it isn't shown.");
-});
-
-it("refuses a quote with no address deadline, since the sheet couldn't say when the address stops working", async () => {
-  const { deadline: _, ...quote } = fixture.response.quote;
-  relayAnswers({ ...fixture.response, quote });
-  await expect(ask()).rejects.toThrow("signature check");
 });
 
 it("refuses a quote whose deposit address the relay swapped", async () => {
@@ -63,4 +58,10 @@ it("still reads tokens and deposit status straight from 1Click", async () => {
   await client.assets();
   expect(await client.status("0xdep")).toBe("SUCCESS");
   expect(fetch.mock.calls.map(([url]) => url)).toEqual(["https://1click.chaindefuser.com/v0/tokens", "https://1click.chaindefuser.com/v0/status?depositAddress=0xdep"]);
+});
+
+it("drops a token 1Click lists without a price instead of failing every deposit", async () => {
+  const usdc = { assetId: "nep141:base-usdc", symbol: "USDC", blockchain: "base", decimals: 6, price: 1 };
+  vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify([asset, { ...usdc, assetId: "nep141:arb-usdc", price: null }, usdc, { ...usdc, assetId: "nep141:sol-usdc", price: undefined }]), { status: 200 })));
+  expect(await oneClick("https://app.test").assets()).toEqual([asset, usdc]);
 });
