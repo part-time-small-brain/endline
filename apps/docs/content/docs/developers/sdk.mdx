@@ -29,8 +29,8 @@ const id = seriesId({ underlying: "BTC", expiry: 1795766400, strike: 110_000_000
 longPayout({ kind: "call", strike: 110_000_000_000n, width: 2_000_000_000n, unit: 100_000_000n }, 1_000_000n, 115_000_000_000n);
 // 20000000n: 0.01 BTC of Up at $110,000, capped at $112,000, settling at $115,000 pays $20.00 in USDC
 
-const option = intentsAssetId("opt6.near-options-dev.testnet", id);
-const quote = "nep141:usdc.near-options-dev.testnet";
+const option = intentsAssetId("opt.endline.near", id);
+const quote = "nep141:17208628f84f5d6ad33f0da3bbbeb27ffcb398eac501a31bd6ad2011e36133a1";
 const { user, marketMaker } = buyDiffs({ option, quote, size: 1_000_000n, premium: 20_000_000n, pips: 1n });
 // user:        { usdc: -20000000, option: +1000000 }
 // marketMaker: { usdc: +19999980, option: -1000002 }
