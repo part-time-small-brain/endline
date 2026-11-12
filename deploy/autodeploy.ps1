@@ -1,6 +1,6 @@
 param([Parameter(Mandatory)][ValidateSet('testnet', 'mainnet')][string]$Network)
 
-$Ref = @{ testnet = 'main'; mainnet = 'mainnet' }[$Network]
+$Ref = @{ testnet = 'staging'; mainnet = 'main' }[$Network]
 $Repo = Split-Path -Parent $PSScriptRoot
 $Log = Join-Path (Split-Path -Parent $Repo) "endline-$Network-deploy.log"
 Set-Location $Repo
@@ -21,7 +21,7 @@ try {
   $deployed = git rev-parse -q --verify deployed
   if ($deployed -ne $remote) {
     $changed = if ($deployed) { Run git diff --name-only --no-renames $deployed $remote } else { @() }
-    # main's compose and this script run on the host next to the mainnet keys: testnet takes them only by hand
+    # staging's compose and this script run on the host next to the mainnet keys: testnet takes them only by hand
     if ($Network -eq 'testnet' -and ($changed -match '^deploy/(compose\.yaml|autodeploy\.ps1)$')) { throw "held ${remote}: deploy/compose.yaml or deploy/autodeploy.ps1 changed, deploy by hand" }
     Run git reset --hard --quiet $remote | Out-Null
     $server = -not $deployed -or ($changed | Where-Object { $_ -notmatch '^(apps/web/|apps/docs/)|\.md$' })
