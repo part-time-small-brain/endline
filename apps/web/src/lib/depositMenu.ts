@@ -19,7 +19,6 @@ const CHAINS: Record<string, string> = {
   scroll: "Scroll",
   xlayer: "X Layer",
   monad: "Monad",
-  starknet: "Starknet",
   ton: "TON",
   miden: "Miden",
 };

@@ -91,13 +91,13 @@ it("drops a token 1Click lists without a price instead of failing every deposit"
   expect(await oneClick("https://app.test").assets()).toEqual([asset, usdc]);
 });
 
-it("offers HOT omni and 1cs_v1 networks but drops near, memo-only stellar, hypercore and asset kinds the relay refuses", async () => {
+it("offers HOT omni networks but drops near, memo-only stellar and asset kinds the relay refuses", async () => {
   const usdc = (blockchain: string, assetId: string) => ({ assetId, symbol: "USDC", blockchain, decimals: 6, price: 1 });
-  const offered = [usdc("base", "nep141:base-usdc"), usdc("op", "nep245:v2_1.omni.hot.tg:10_usdc"), usdc("aptos", "1cs_v1:aptos:aptos-fa:0xusdc")];
+  const offered = [usdc("base", "nep141:base-usdc"), usdc("op", "nep245:v2_1.omni.hot.tg:10_usdc"), usdc("aptos", "nep141:aptos-usdc")];
   const hidden = [
     usdc("near", "nep141:usdc.near"),
     usdc("stellar", "nep245:v2_1.omni.hot.tg:1100_usdc"),
-    usdc("hypercore", "1cs_v1:hypercore:hip1:0xusdc"),
+    usdc("aptos", "1cs_v1:aptos:aptos-fa:0xusdc"),
     usdc("eth", "nep171:eth-usdc"),
     usdc("eth", "xnep141:eth-usdc"),
   ];

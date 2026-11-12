@@ -14,7 +14,6 @@ import polygon from "../../assets/chains/polygon.svg";
 import robinhood from "../../assets/chains/robinhood.svg";
 import scroll from "../../assets/chains/scroll.svg";
 import solana from "../../assets/chains/solana.svg";
-import starknet from "../../assets/chains/starknet.svg";
 import sui from "../../assets/chains/sui.svg";
 import ton from "../../assets/chains/ton.svg";
 import tron from "../../assets/chains/tron.svg";
@@ -23,7 +22,7 @@ import usdc from "../../assets/tokens/usdc.svg";
 import usdt from "../../assets/tokens/usdt.svg";
 import { chainName } from "../../lib/depositMenu.ts";
 
-const CHAIN_LOGOS: Record<string, string> = { base, arb: arbitrum, op: optimism, sol: solana, pol: polygon, bsc: bnb, avax: avalanche, eth: ethereum, btc: bitcoin, tron, gnosis, sui, aptos, abs: abstract, hood: robinhood, scroll, xlayer, monad, starknet, ton, miden };
+const CHAIN_LOGOS: Record<string, string> = { base, arb: arbitrum, op: optimism, sol: solana, pol: polygon, bsc: bnb, avax: avalanche, eth: ethereum, btc: bitcoin, tron, gnosis, sui, aptos, abs: abstract, hood: robinhood, scroll, xlayer, monad, ton, miden };
 const TOKEN_LOGOS: Record<string, string> = { USDC: usdc, USDT: usdt, ETH: ethereum, BTC: bitcoin, SOL: solana };
 
 function AssetLabel({ logo, name, layout }: { logo: string | undefined; name: string; layout: string }) {

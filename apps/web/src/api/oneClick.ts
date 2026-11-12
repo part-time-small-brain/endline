@@ -32,8 +32,8 @@ export interface OneClick {
 const API = "https://1click.chaindefuser.com/v0";
 export const DEPOSIT_SYMBOLS = ["USDC", "USDT", "ETH", "BTC", "SOL"];
 export const MAX_DEPOSIT_UNITS = 10n ** 39n - 1n;
-// near deposits are a plain transfer, stellar needs a memo, hypercore can't refund into intents
-const HIDDEN_CHAINS = ["near", "stellar", "hypercore"];
+// near deposits are a plain transfer, stellar needs a memo
+const HIDDEN_CHAINS = ["near", "stellar"];
 const SEND_WINDOW_MS = 60 * 60_000;
 const MIN_SEND_MS = 15 * 60_000;
 const QUOTE_DEADLINE_MS = 3 * SEND_WINDOW_MS;

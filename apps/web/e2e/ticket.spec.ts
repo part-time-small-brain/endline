@@ -198,7 +198,7 @@ test("Add funds starts on USDC, lists its cheapest networks first and prices the
 
   await networks.filter({ hasText: "Ethereum" }).click();
   await sheet.getByRole("radio", { name: "BTC", exact: true }).click();
-  await expectOptions(networks, ["Bitcoin", "Aptos"]);
+  await expectOptions(networks, ["Bitcoin"]);
   await expect(networks.first()).toHaveAttribute("aria-checked", "true");
   await amount.fill("0.01");
   await expect(sheet.getByText(/^≈/)).toHaveText("≈ $800");
@@ -214,7 +214,7 @@ test("Add funds starts on USDC, lists its cheapest networks first and prices the
   await sheet.getByRole("radio", { name: "USDT", exact: true }).click();
   await expectOptions(networks, ["Ethereum", "Tron", "Aptos", "TON", "Miden"]);
   await sheet.getByRole("radio", { name: "SOL", exact: true }).click();
-  await expectOptions(networks, ["Solana", "Starknet"]);
+  await expectOptions(networks, ["Solana"]);
 
   await sheet.getByRole("radio", { name: "USDC", exact: true }).click();
   const tooLarge = sheet.getByText("That amount is too large.");

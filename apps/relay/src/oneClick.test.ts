@@ -100,7 +100,6 @@ it("gives a client its slot back when the shared cap refuses it, so it isn't bla
 it.each([
   ["a NEP-141", "nep141:sol.omft.near"],
   ["a HOT omni NEP-245", "nep245:v2_1.omni.hot.tg:10_11111111111111111111"],
-  ["a 1cs_v1", "1cs_v1:aptos:aptos-fa:0x0b0b819dcf8d9517ed14195a95adfae6a49bfdb49de33a532ca0aa7ee588e8e0"],
 ])("accepts %s origin asset", (_, originAsset) => {
   expect(new OneClick(USDC, "partner-jwt").schema.safeParse({ ...DEPOSIT, originAsset }).success).toBe(true);
 });
@@ -116,6 +115,7 @@ it.each([
   ["a deposit from intents", { depositType: "INTENTS" }],
   ["an origin asset of an unknown kind", { originAsset: "nep171:v2_1.omni.hot.tg:56_11111111111111111111" }],
   ["an origin asset with a lookalike prefix", { originAsset: "xnep141:sol.omft.near" }],
+  ["a 1cs_v1 origin asset, whose refunds aren't confirmed to land in intents", { originAsset: "1cs_v1:aptos:aptos-fa:0x0b0b819dcf8d9517ed14195a95adfae6a49bfdb49de33a532ca0aa7ee588e8e0" }],
   ["a dry quote", { dry: true }],
   ["an exact-output swap", { swapType: "EXACT_OUTPUT" }],
   ["slippage over 1%", { slippageTolerance: 101 }],
