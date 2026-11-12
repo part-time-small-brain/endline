@@ -33,6 +33,7 @@ export type Config = z.infer<typeof Config>;
 export const Deployment = z.object({
   network: z.enum(["mainnet", "testnet"]),
   rpc_url: z.url(),
+  rpc_fallbacks: z.array(z.url()).default([]),
   intents_id: AccountId,
   options_id: AccountId,
   quote_asset: z.string().startsWith("nep141:"),

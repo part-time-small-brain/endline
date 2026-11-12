@@ -19,9 +19,40 @@ it("reads the cutoff, USDC decimals and each underlying's option decimals from t
       return new Response(JSON.stringify({ result: { result: [...new TextEncoder().encode(JSON.stringify(views[params.method_name]))] } }));
     }),
   );
-  expect(await rpcChain("https://rpc.test", "intents.near", "opt.near").contract()).toEqual({
+  expect(await rpcChain(["https://rpc.test"], "intents.near", "opt.near").contract()).toEqual({
     timing: { write_cutoff_sec: 1_800 },
     quoteDecimals: 6,
     decimals: { BTC: 8, ETH: 18 },
   });
+});
+
+const answer = (body: unknown) => new Response(JSON.stringify(body));
+const salt = { result: { result: [...new TextEncoder().encode(JSON.stringify("0a0b0c0d"))] } };
+
+it("moves to the next endpoint when one rate-limits, errors, hangs up or sends garbage", async () => {
+  const asked: string[] = [];
+  const replies: Record<string, () => Response> = {
+    "https://a.rpc": () => new Response('{"error":"Rate limits exceeded"}', { status: 429 }),
+    "https://b.rpc": () => answer({ jsonrpc: "2.0", error: { code: -32000, message: "Server error" } }),
+    "https://c.rpc": () => {
+      throw new TypeError("Failed to fetch");
+    },
+    "https://d.rpc": () => new Response("<html>bad gateway</html>", { status: 502 }),
+    "https://e.rpc": () => answer(salt),
+  };
+  vi.stubGlobal("fetch", vi.fn(async (url: string) => (asked.push(url), replies[url]!())));
+  expect(await rpcChain(Object.keys(replies), "intents.near", "opt.near").salt()).toEqual(Uint8Array.from([10, 11, 12, 13]));
+  expect(asked).toEqual(Object.keys(replies));
+});
+
+it("returns a contract's own error from the first endpoint instead of asking the next", async () => {
+  const fetch = vi.fn(async () => answer({ result: { error: "wasm execution failed: no such method" } }));
+  vi.stubGlobal("fetch", fetch);
+  await expect(rpcChain(["https://a.rpc", "https://b.rpc"], "intents.near", "opt.near").salt()).rejects.toThrow("wasm execution failed: no such method");
+  expect(fetch).toHaveBeenCalledTimes(1);
+});
+
+it("shows a plain message, never a provider's upsell, when no endpoint answers", async () => {
+  vi.stubGlobal("fetch", vi.fn(async () => new Response('{"error":"Rate limits exceeded. For higher rate limits get a subscription"}', { status: 429 })));
+  await expect(rpcChain(["https://a.rpc", "https://b.rpc"], "intents.near", "opt.near").contract()).rejects.toThrow("NEAR isn't answering right now. Trying again in a minute.");
 });

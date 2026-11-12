@@ -1,6 +1,7 @@
 {
   "network": "testnet",
   "rpc_url": "https://rpc.testnet.fastnear.com",
+  "rpc_fallbacks": ["https://near-testnet.drpc.org", "https://rpc.testnet.near.org"],
   "owner": "near-options-dev.testnet",
   "intents_id": "intents.near-options-dev.testnet",
   "options_id": "opt6.near-options-dev.testnet",

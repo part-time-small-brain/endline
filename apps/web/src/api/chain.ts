@@ -8,6 +8,10 @@ export interface ContractTerms {
   decimals: Record<string, number>;
 }
 
+const RPC_TIMEOUT_MS = 5_000;
+
+type RpcAnswer = { result?: { result?: number[]; error?: string } };
+
 const Underlyings = z.array(z.tuple([z.string(), z.object({ decimals: z.number().int() })]));
 
 export interface Chain {
@@ -18,11 +22,23 @@ export interface Chain {
   hasPublicKey(accountId: string, publicKey: string): Promise<boolean>;
 }
 
-export function rpcChain(rpcUrl: string, intentsId: string, optionsId: string): Chain {
+export function rpcChain(rpcUrls: string[], intentsId: string, optionsId: string): Chain {
   async function view(contract: string, method: string, args: object): Promise<unknown> {
-    const response = await fetch(rpcUrl, {
+    for (const url of rpcUrls) {
+      const answer = await ask(url, contract, method, args).catch(() => undefined);
+      if (answer?.result) {
+        if (!answer.result.result) throw new Error(answer.result.error ?? `${method} failed`);
+        return JSON.parse(new TextDecoder().decode(new Uint8Array(answer.result.result)));
+      }
+    }
+    throw new Error("NEAR isn't answering right now. Trying again in a minute.");
+  }
+
+  async function ask(url: string, contract: string, method: string, args: object): Promise<RpcAnswer> {
+    const response = await fetch(url, {
       method: "POST",
       headers: { "content-type": "application/json" },
+      signal: AbortSignal.timeout(RPC_TIMEOUT_MS),
       body: JSON.stringify({
         jsonrpc: "2.0",
         id: "web",
@@ -30,9 +46,7 @@ export function rpcChain(rpcUrl: string, intentsId: string, optionsId: string): 
         params: { request_type: "call_function", finality: "final", account_id: contract, method_name: method, args_base64: btoa(JSON.stringify(args)) },
       }),
     });
-    const json = (await response.json()) as { result?: { result?: number[]; error?: string }; error?: { message?: string } };
-    if (!json.result?.result) throw new Error(json.result?.error ?? json.error?.message ?? `${method} failed`);
-    return JSON.parse(new TextDecoder().decode(new Uint8Array(json.result.result)));
+    return (await response.json()) as RpcAnswer;
   }
 
   return {
