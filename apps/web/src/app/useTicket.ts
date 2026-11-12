@@ -107,7 +107,7 @@ export function useTicket(nowSec: number) {
         : undefined;
 
   return {
-    data, quoteDecimals, balance, unit, symbols, symbol, kind, expiry, budget, atMax, picked, invalid, spend, ceiling,
+    data, quoteDecimals, balance, unit, symbols, symbol, kind, expiry, budget, atMax, picked, invalid, spend,
     setSymbol, setKind, setExpiry, setSeries, setBudget,
     spotNumber, spot, history, odds, usdOf, payoutAt, up, strikes, choices,
     series, current, vol, reference, sides, first, empty, expiries, dates, notice, priced, loading,

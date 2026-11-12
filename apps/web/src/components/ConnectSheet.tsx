@@ -46,7 +46,7 @@ export function ConnectSheet({ onClose }: { onClose: () => void }) {
             >
               <span>
                 <span className="block font-semibold">{choice.title}</span>
-                <span className="block text-sm text-ink-2">{unavailable ? "No browser wallet found" : choice.body}</span>
+                <span className="block text-sm text-ink-2">{unavailable ? "Install MetaMask or Rabby to use an Ethereum wallet" : choice.body}</span>
               </span>
               <span aria-hidden="true" className="text-ink-2">
                 {busy === choice.kind ? "…" : "→"}

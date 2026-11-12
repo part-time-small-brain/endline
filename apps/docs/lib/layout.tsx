@@ -2,6 +2,10 @@ import type { BaseLayoutProps } from "fumadocs-ui/layouts/shared";
 
 export const sourceUrl = "https://github.com/part-time-small-brain/endline";
 
+export const siteUrl = "https://docs.endline.trade";
+
+export const openGraph = { siteName: "Endline docs", type: "website", images: "/og.png" } as const;
+
 export const sourceMarkdown = `Source: [GitHub](${sourceUrl})`;
 
 function Wordmark() {

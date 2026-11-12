@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { expect, it, vi } from "vitest";
 import manifest from "./manifest.json" with { type: "json" };
@@ -21,15 +22,15 @@ it("builds the wallet selector from the pinned manifest, never one fetched at ru
   expect(built).toEqual([expect.objectContaining({ manifest })]);
 });
 
-it("lets wallet iframes run their scripts by the nonce the CSP allows, and nothing else inline, and the app can't be framed", async () => {
+it("lets wallet iframes run their scripts by the nonce the CSP allows, the page's inline scripts by their exact hash, and the app can't be framed", async () => {
   await restoreNear("mainnet");
   const { cspNonce } = built[0] as { cspNonce: string };
   const csp = /Content-Security-Policy: (.*)/.exec(readFileSync(new URL("../../public/_headers", import.meta.url), "utf8"))?.[1]?.split("; ") ?? [];
-  expect(csp).toContain(`script-src 'self' 'nonce-${cspNonce}'`);
+  const html = readFileSync(new URL("../../index.html", import.meta.url), "utf8");
+  const hashes = [...html.matchAll(/<script(?![^>]*\ssrc=)[^>]*>([\s\S]*?)<\/script>/g)].map(([, body]) => `'sha256-${createHash("sha256").update(body ?? "").digest("base64")}'`);
+  expect(hashes.length).toBeGreaterThan(0);
+  expect(csp).toContain(`script-src 'self' 'nonce-${cspNonce}' ${hashes.join(" ")}`);
   expect(csp).toContain("frame-ancestors 'none'");
-  const inline = readFileSync(new URL("../../index.html", import.meta.url), "utf8").match(/<script(?![^>]*\ssrc=)[^>]*>/g) ?? [];
-  expect(inline.length).toBeGreaterThan(0);
-  expect(inline.every((tag) => tag.includes(`nonce="${cspNonce}"`))).toBe(true);
 });
 
 it("pins every GitHub-hosted wallet script to a commit, not a branch", () => {

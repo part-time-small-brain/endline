@@ -431,6 +431,30 @@ test("the landing's sections use live marks even when the price history fails", 
   await expect(chance).toHaveText("0%");
 });
 
+test("the floor demo offers what one trade can cost and its floor is the stake picked", async ({ page }) => {
+  await live(page, () => listed.map((s) => ({ series_id: s.id, ask: String(1_400 * USD), max_size: "500000", vol: 0.4 })));
+  await page.goto("/");
+  const floor = page.locator("#floor");
+  const pay = floor.getByRole("radiogroup", { name: "You pay" });
+  const line = floor.locator("svg text", { hasText: /^Floor / });
+  await expect(pay.getByRole("radio")).toHaveText(["$1", "$2", "$5", "Max"]);
+  await pay.scrollIntoViewIfNeeded();
+  await expect(pay.getByRole("radio", { name: "Max", exact: true })).toHaveAttribute("aria-checked", "true");
+  await expect(line).toHaveText("Floor −$7");
+  for (const amount of ["$1", "$2", "$5"]) {
+    await pay.getByRole("radio", { name: amount, exact: true }).click();
+    await expect(line).toHaveText(`Floor −${amount}`);
+  }
+});
+
+test("Tap offers stakes up to what its own cells cost, not the pricier ones it doesn't show", async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem("trade-mode", "tap"));
+  const shown = (s: (typeof listed)[number]) => (s.kind === "call") === (Number(s.strike) > 80_650 * USD);
+  await live(page, () => listed.map((s) => ({ series_id: s.id, ask: String((shown(s) ? 300 : 1_500) * USD), max_size: "500000", vol: 0.4 })));
+  await expect(page.getByRole("radiogroup", { name: "You pay" }).getByRole("radio")).toHaveText(["$1", "Max $1.50", "Other"]);
+  await expect(page.getByText("Each tap gets a firm quote for up to $1.50.", { exact: false })).toBeVisible();
+});
+
 test("without marks from a market maker nothing is offered", async ({ page }) => {
   await live(page, () => []);
   await expect(page.getByText("No prices right now")).toBeVisible();

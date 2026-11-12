@@ -42,7 +42,7 @@ interface Props {
 }
 
 export function Tap({ state, nowSec, views, onConnect, onAddFunds, onQuote }: Props) {
-  const { data, quoteDecimals, symbols, symbol, budget, atMax, picked, ceiling, setSymbol, setBudget, spot, spotNumber, history, first, priced, loading, empty } = state;
+  const { data, quoteDecimals, symbols, symbol, budget, atMax, picked, setSymbol, setBudget, spot, spotNumber, history, first, priced, loading, empty } = state;
   const { wallet } = useWallet();
   const calls = useCalls();
   const [free, setFreeState] = useState(storedFree);
@@ -68,6 +68,7 @@ export function Tap({ state, nowSec, views, onConnect, onAddFunds, onQuote }: Pr
   const closingPrice = closing?.settlement?.price ?? (average === undefined ? undefined : toUnits(average, quoteDecimals));
   const active = views?.filter((v) => v.series.underlying === symbol && v.status === "active") ?? [];
   const grid = spot === undefined ? undefined : buildGrid(listed, spot, budget, data.marks, held, (expiry) => (expiry === closing?.expiry ? (closingPrice ?? spot) : spot));
+  const ceiling = grid?.cells.flat().reduce((most, cell) => (cell && cell.series.expiry !== closing?.expiry && priced.includes(cell.series) && cell.ticket.maxCost > most ? cell.ticket.maxCost : most), 0n) ?? 0n;
   const closingColumn = closing && grid ? grid.expiries.indexOf(closing.expiry) : -1;
   const staked = (seriesId: string) => stakes.find((v) => v.series.id === seriesId)?.amount ?? 0n;
   const rows = grid?.strikes.length ?? 0;

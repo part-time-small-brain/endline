@@ -48,9 +48,9 @@ it("refuses an address it could only offer for minutes, when the device clock is
 });
 
 it.each([
-  ["loses more than 3% on the way, as an unsigned fee added by the relay would", { amountOutUsd: "97.5" }, "more than 3%"],
-  ["has no USD price to measure the loss by", { amountInUsd: "" }, "more than 3%"],
-  ["needs a deposit memo the sheet doesn't show", { depositMemo: "123" }, "memo"],
+  ["loses more than 3% on the way, as an unsigned fee added by the relay would", { amountOutUsd: "97.5" }, "This deposit would lose more than 3% on the way. Try a bigger amount or another network."],
+  ["has no USD price to measure the loss by", { amountInUsd: "" }, "Can't price this deposit right now. Try again or pick another network."],
+  ["needs a deposit memo the sheet doesn't show", { depositMemo: "123" }, "This network needs a memo, which the app can't add. Pick another network."],
 ])("refuses a quote that %s", async (_, change, message) => {
   relayAnswers({ ...fixture.response, quote: { ...fixture.response.quote, ...change } });
   await expect(ask()).rejects.toThrow(message);
