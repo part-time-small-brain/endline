@@ -1,6 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { Config as ConfigView, type Intent, type OptionKind, payload, Series, Settlement } from "@endline/sdk";
-import { Account, JsonRpcProvider, teraToGas } from "near-api-js";
+import { type Rpc, RoutedRpcProvider } from "@endline/sdk/rpc";
+import { Account, type JsonRpcProvider, teraToGas } from "near-api-js";
 import { z } from "zod";
 import type { Config } from "./config.ts";
 import type { Underlying } from "./market.ts";
@@ -72,8 +73,8 @@ function timed<T>(read: Promise<T>, what: string): Promise<T> {
 export class ChainReader {
   protected readonly provider: JsonRpcProvider;
 
-  constructor(rpcUrl: string, protected readonly optionsId: string) {
-    this.provider = new JsonRpcProvider({ url: rpcUrl });
+  constructor(rpc: Rpc, protected readonly optionsId: string) {
+    this.provider = new RoutedRpcProvider(rpc);
   }
 
   networkId(): Promise<string> {
@@ -159,7 +160,7 @@ export class Chain extends ChainReader {
   private readonly sign: SignPayload;
 
   constructor(private readonly config: Config) {
-    super(config.rpcUrl, config.optionsId);
+    super(config.rpc, config.optionsId);
     this.account = new Account(config.accountId, this.provider, config.privateKey);
     this.sign = nep413Signer(config.privateKey);
   }

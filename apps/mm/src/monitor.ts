@@ -21,7 +21,7 @@ interface Opened {
 }
 
 export async function monitorCommand(config: MonitorConfig, once: boolean): Promise<void> {
-  const chain = new ChainReader(config.rpcUrl, config.optionsId);
+  const chain = new ChainReader(config.rpc, config.optionsId);
   const final = new Set<string>();
   const open = new Map<string, Opened>();
   const net = config.networkId;

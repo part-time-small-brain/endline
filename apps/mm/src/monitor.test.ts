@@ -21,7 +21,7 @@ vi.mock("./chain.ts", () => ({
 }));
 
 const CONFIG = {
-  rpcUrl: "http://rpc",
+  rpc: { urls: ["https://rpc"], network: "testnet" },
   optionsId: "opt.testnet",
   intentsId: "intents.testnet",
   relayerId: "relayer.testnet" as string | undefined,

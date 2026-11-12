@@ -39,7 +39,7 @@ describe("config", () => {
   it("runs the monitor without an account or key", () => {
     const monitor = { NETWORK_ID: "testnet" };
     expect(loadMonitorConfig(monitor)).toEqual({
-      rpcUrl: testnet.rpc_url,
+      rpc: { urls: [testnet.rpc_url], network: "testnet" },
       optionsId: testnet.options_id,
       intentsId: testnet.intents_id,
       relayerId: undefined,
@@ -55,10 +55,10 @@ describe("config", () => {
   });
 
   it("takes the contract ids from deploy/<NETWORK_ID>.json, never from env", () => {
-    const ids = { rpcUrl: testnet.rpc_url, intentsId: testnet.intents_id, optionsId: testnet.options_id };
+    const ids = { rpc: { urls: [testnet.rpc_url], network: "testnet" }, intentsId: testnet.intents_id, optionsId: testnet.options_id };
     expect(loadConfig({ ...ENV, ...STALE })).toMatchObject(ids);
     expect(loadMonitorConfig({ NETWORK_ID: "testnet", ...STALE })).toMatchObject(ids);
-    expect(loadProposerConfig({ NETWORK_ID: "testnet", ORACLE_ACCOUNT_ID: "oracle.testnet", ORACLE_PRIVATE_KEY: KEY, ...STALE })).toMatchObject({ rpcUrl: ids.rpcUrl, optionsId: ids.optionsId });
+    expect(loadProposerConfig({ NETWORK_ID: "testnet", ORACLE_ACCOUNT_ID: "oracle.testnet", ORACLE_PRIVATE_KEY: KEY, ...STALE })).toMatchObject({ rpc: ids.rpc, optionsId: ids.optionsId });
   });
 
   it("reads secrets from <NAME>_FILE, an empty one as unset, and never prints a bad one", () => {
@@ -75,9 +75,9 @@ describe("config", () => {
   });
 
   it("takes mainnet's ids from deploy/mainnet.json for every command, settle included", () => {
-    const ids = { rpcUrl: mainnet.rpc_url, intentsId: "intents.near", optionsId: mainnet.options_id };
+    const ids = { rpc: { urls: [mainnet.rpc_url], network: "mainnet" }, intentsId: "intents.near", optionsId: mainnet.options_id };
     expect(loadConfig({ ...ENV, NETWORK_ID: "mainnet" })).toMatchObject(ids);
     expect(loadMonitorConfig({ NETWORK_ID: "mainnet" })).toMatchObject(ids);
-    expect(loadSettlerConfig({ SETTLER_ACCOUNT_ID: "settler.near", SETTLER_PRIVATE_KEY: KEY })).toMatchObject({ rpcUrl: ids.rpcUrl, optionsId: ids.optionsId });
+    expect(loadSettlerConfig({ SETTLER_ACCOUNT_ID: "settler.near", SETTLER_PRIVATE_KEY: KEY })).toMatchObject({ rpc: ids.rpc, optionsId: ids.optionsId });
   });
 });

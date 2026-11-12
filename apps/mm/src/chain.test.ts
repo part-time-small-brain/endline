@@ -28,7 +28,7 @@ describe("seriesFrom", () => {
       const { from_expiry: expiry, after_id: after, limit } = args;
       return from(expiry).filter((s) => after === undefined || s.expiry > expiry || s.id > after).slice(0, limit);
     }) as unknown as JsonRpcProvider["callFunction"]);
-    return { chain: new ChainReader("http://rpc", "opt.testnet"), calls };
+    return { chain: new ChainReader({ urls: ["https://rpc"], network: "testnet" }, "opt.testnet"), calls };
   }
 
   it("pages by expiry cursor without repeats or gaps", async () => {
@@ -52,7 +52,7 @@ describe("balances", () => {
       pages.push(args.token_ids.length);
       return args.token_ids.map((id) => id.slice(1));
     }) as unknown as JsonRpcProvider["callFunction"]);
-    const config = { rpcUrl: "http://rpc", optionsId: "opt.testnet", intentsId: "intents.testnet", accountId: "mm.testnet", privateKey: KeyPair.fromRandom("ed25519").toString() };
+    const config = { rpc: { urls: ["https://rpc"], network: "testnet" }, optionsId: "opt.testnet", intentsId: "intents.testnet", accountId: "mm.testnet", privateKey: KeyPair.fromRandom("ed25519").toString() };
     const assets = Array.from({ length: 450 }, (_, i) => `a${i}`);
     const balances = await new Chain(config as Config).balances(assets);
     expect(pages).toEqual([200, 200, 50]);
@@ -64,7 +64,7 @@ describe("view", () => {
   it("gives up on an RPC read that never answers, so a stalled node can't freeze a loop", async () => {
     vi.useFakeTimers();
     for (const method of ["callFunction", "viewAccount", "getNetworkId"] as const) vi.spyOn(JsonRpcProvider.prototype, method).mockReturnValue(new Promise(() => {}));
-    const chain = new ChainReader("http://rpc", "opt.testnet");
+    const chain = new ChainReader({ urls: ["https://rpc"], network: "testnet" }, "opt.testnet");
     const outcomes = [chain.series(), chain.nearBalance("mm.testnet"), chain.networkId()].map((read) => expect(read).rejects.toThrow(/RPC/));
     await vi.advanceTimersByTimeAsync(15_000);
     await Promise.all(outcomes);

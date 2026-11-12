@@ -14,7 +14,7 @@ At startup the relay checks that the RPC is on `NETWORK_ID` and that `options_id
 
 ## Env
 
-Read from the process environment (no `.env` loading). `RELAYER_PRIVATE_KEY`, `MM_API_KEYS` and `ONECLICK_JWT` can come from a file instead: set `<NAME>_FILE` to its path, not both ([Secrets](https://docs.endline.trade/developers/running-locally#secrets)).
+Read from the process environment (no `.env` loading). `RELAYER_PRIVATE_KEY`, `MM_API_KEYS`, `ONECLICK_JWT` and `NEAR_RPC_URLS` can come from a file instead: set `<NAME>_FILE` to its path, not both ([Secrets](https://docs.endline.trade/developers/running-locally#secrets)).
 
 | Var | Meaning |
 |---|---|
@@ -28,6 +28,7 @@ Read from the process environment (no `.env` loading). `RELAYER_PRIVATE_KEY`, `M
 | `FAUCET` | `true` turns on `POST /faucet`, dripping the `quote_asset` token the relayer holds. Testnet only: the relay refuses to start with it on mainnet. Default `false` |
 | `APP_ORIGINS` | Comma list of origins (`https://app.endline.trade`, no path or trailing slash) that may call `/faucet` and `/deposit-quote` from a browser. Default none: those two routes then answer no CORS, so only a page on the relay's own origin can use them |
 | `ONECLICK_JWT` | Optional 1Click Partner Portal JWT, sent as `X-API-Key` on `POST /deposit-quote`. Unset: quotes are forwarded without it and 1Click adds 0.25% to every deposit |
+| `NEAR_RPC_URLS` | Optional comma list of extra RPC endpoints, tried before `rpc_url` from the deploy file: fastest healthy first, a rate limit, 5xx or timeout cools one off, one on another network is never used ([Secrets](https://docs.endline.trade/developers/running-locally#secrets)) |
 
 ## User API (HTTP, JSON, CORS `*` except `/faucet` and `/deposit-quote`)
 

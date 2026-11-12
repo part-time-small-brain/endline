@@ -31,7 +31,7 @@ The RPC and contract ids come from `deploy/<NETWORK_ID>.json`. `buy` and `sell` 
 
 ## Env
 
-Read from the process environment. `MM_PRIVATE_KEY`, `MM_API_KEY`, `ALERT_WEBHOOK_URL`, `ORACLE_PRIVATE_KEY` and `SETTLER_PRIVATE_KEY` can come from a file instead: set `<NAME>_FILE` to its path, not both ([Secrets](https://docs.endline.trade/developers/running-locally#secrets)).
+Read from the process environment. `MM_PRIVATE_KEY`, `MM_API_KEY`, `ALERT_WEBHOOK_URL`, `ORACLE_PRIVATE_KEY`, `SETTLER_PRIVATE_KEY` and `NEAR_RPC_URLS` can come from a file instead: set `<NAME>_FILE` to its path, not both ([Secrets](https://docs.endline.trade/developers/running-locally#secrets)).
 
 | Var | Meaning |
 |---|---|
@@ -49,6 +49,7 @@ Read from the process environment. `MM_PRIVATE_KEY`, `MM_API_KEY`, `ALERT_WEBHOO
 | `MAX_VEGA_USD` | Max net vega per vol point, default `200` |
 | `ALERT_WEBHOOK_URL` | Optional. Monitor only: POSTs each alert, resolution and final notice as `{"text","content"}`: Slack and Discord incoming webhooks, or Telegram as `https://api.telegram.org/bot<token>/sendMessage?chat_id=<chat id>` |
 | `HEALTH_URL` | Optional. Monitor only: the relay's `/health`, directly or through the web origin, checked every minute (`uptime`, `quotes` alerts) |
+| `NEAR_RPC_URLS` | Optional, every command: comma list of extra RPC endpoints tried before `rpc_url`, fastest healthy first; a rate limit, 5xx or timeout cools one off, one on another network is never used |
 | `RELAYER_ACCOUNT_ID` | Monitor only, optional: the relay's gas payer, whose NEAR it watches |
 | `SETTLER_ACCOUNT_ID` | Settler only: its own account, holding only the NEAR it attaches (1 NEAR lasts months at one request per expiry) |
 | `SETTLER_PRIVATE_KEY` | Settler only: that account's full-access `ed25519:…` key (a function-call key can't attach the deposit) |

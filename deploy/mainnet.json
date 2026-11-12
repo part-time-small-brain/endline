@@ -1,6 +1,6 @@
 {
   "network": "mainnet",
-  "rpc_url": "https://rpc.mainnet.fastnear.com",
+  "rpc_url": "https://near.drpc.org",
   "owner": "endline.near",
   "intents_id": "intents.near",
   "options_id": "opt.endline.near",
