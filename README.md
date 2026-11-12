@@ -6,7 +6,7 @@ Pick where crypto prices end. Fund from any chain, see your payout before you si
 
 [App](https://app.endline.trade) · [Landing](https://endline.trade) · [Docs](https://docs.endline.trade) · [Architecture](https://docs.endline.trade/developers/architecture) · [Security model](https://docs.endline.trade/developers/security)
 
-The contract is not audited.
+The contract is not audited. Found a vulnerability? See [SECURITY.md](SECURITY.md), not a public issue.
 
 ## The problem
 
@@ -31,8 +31,6 @@ web ──HTTP──▶ relay ◀──WebSocket── market maker ──▶ De
 
 options contract ── request_settlement ──▶ OutLayer TEE (mainnet; testnet: our proposer) ── runs oracle WASM ──▶ 7 exchanges (+ Deribit check)
 ```
-
-Tracks: `defi`.
 
 ## Try it
 
@@ -81,6 +79,6 @@ cargo test -p options -p oracle
 
 The last line runs the contract against the real mainnet `intents.near` wasm in a local sandbox.
 
-Contributors and agents: read [AGENTS.md](AGENTS.md) first. Full stack on testnet: [Running locally](https://docs.endline.trade/developers/running-locally#full-stack-on-testnet).
+Contributors: [CONTRIBUTING.md](CONTRIBUTING.md). Agents: [AGENTS.md](AGENTS.md). Full stack on testnet: [Running locally](https://docs.endline.trade/developers/running-locally#full-stack-on-testnet).
 
 License: [MIT](LICENSE).
