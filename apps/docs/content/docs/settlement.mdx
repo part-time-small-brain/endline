@@ -23,22 +23,18 @@ Exact rules: [Oracle WASM](./developers/oracle.mdx).
 
 | Step | When |
 |---|---|
-| Market ends | Once a day at 08:00 UTC, shown in your time zone. Testnet also lists a 4-hourly end |
+| Market ends | Once a day at 08:00 UTC, shown in your time zone |
 | Selling back closes | 30 min before the end |
 | Price requested | From 5 min after the end, by our settler every 10 min until a price is in. Anyone can request it too |
 | Manual price allowed | From 6 h after the end |
 | Dispute window | 1 h |
 | Auto-collect sent | 1 to 2 min after final |
 
-Testnet: selling back closes 30 min before the end, as on mainnet, the price is proposed about 10 min after it and the dispute window is 2 min ([environments](./developers/architecture.mdx#environments)).
-
 The app shows "Waiting for the final price, usually about 1 h", then the proposed price and when it becomes final.
 
 ## Who computes it
 
 [OutLayer](https://outlayer.fastnear.com/docs/getting-started) runs the oracle WASM pinned in the contract by sha256, inside a TEE (Intel TDX), and the contract stores the price from OutLayer's callback. You also trust OutLayer's operator: the TEE is checked off-chain, not by the contract.
-
-On testnet, a proposer run by the team runs the same pinned WASM and proposes its result without a TEE.
 
 ## Dispute window
 

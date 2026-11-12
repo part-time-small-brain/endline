@@ -4,7 +4,7 @@ description: What protects your money, and what you still have to trust.
 ---
 
 <Callout type="warn" title="Read this first">
-  The options contract has not been audited. It runs on NEAR testnet today, where tokens are test tokens with no value.
+  The options contract has not been audited. Only put in what you can afford to lose.
 </Callout>
 
 ## What protects you
@@ -35,7 +35,6 @@ The owner controls the oracle accounts and the pinned oracle program, so it coul
 | You lose what you paid | Most options end at $0. A small or slow move your way can still lose |
 | Unaudited code | The options contract, relay and app haven't had an external audit. A bug could lose funds |
 | Oracle trust | The TEE is not checked on-chain, and the oracle account can propose any positive price. You trust the dispute window, our monitor and the owner's override to catch a wrong price in time |
-| Testnet oracle | Our proposer posts the price with our key, with no TEE. The same team account proposes and can override |
 | Relay | Collect and auto-collect go through our relay. If it's down, your payout is still owed, but you must send the exercise yourself and pay gas |
 | No upgrades | The contract can't be patched. A fix means a new deployment, and old markets still pay out |
 | Single market maker | Only ours quotes today. If it's offline you can't buy or sell back. Positions and payouts are unaffected |
