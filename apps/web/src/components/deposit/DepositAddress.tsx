@@ -12,7 +12,7 @@ const STEPS = ["Waiting for your transfer", "Transfer seen", "Converting to USDC
 const REACHED: Partial<Record<DepositStatus, number>> = { PENDING_DEPOSIT: 0, KNOWN_DEPOSIT_TX: 1, PROCESSING: 2, SUCCESS: 3 };
 const ONLY_USDC = "The app shows only USDC, so check your NEAR Intents wallet.";
 const EXPIRED: Partial<Record<DepositStage, string>> = {
-  late: "This address has expired. If you already sent, we're still checking for it.",
+  late: "This address has expired. If you already sent, we're still checking, and it arrives in your balance or comes back as a refund.",
   expired: "This address has expired. Get a new one.",
 };
 const PROBLEMS: Partial<Record<DepositStatus, (symbol: string) => string>> = {
@@ -44,7 +44,7 @@ export function DepositAddress({ deposit, status, stage, quoteDecimals, onBack }
 
   return (
     <div className="space-y-4">
-      {stage !== "seen" && stage !== "late" && (
+      {stage !== "seen" && (
         <button type="button" onClick={onBack} className="text-sm text-ink-2 hover:text-ink">
           <span aria-hidden="true">←</span> Back
         </button>

@@ -33,12 +33,18 @@ it("asks the relay for the quote so the partner key stays server side, and on a 
   expect(quote).toEqual({ depositAddress, amountIn, amountOut, timeEstimate, sendBefore: new Date(quotedAt + 60 * MINUTE).toISOString(), deadline, clockOffsetMs: 20 * MINUTE });
 });
 
-it("keeps an hour before refunds start even when a device clock 2.5 h slow sent a deadline only 30 min out", async () => {
-  deviceClock(quotedAt - 150 * MINUTE);
+it("keeps an hour before refunds start when a slow device clock shortened the deadline it sent", async () => {
+  deviceClock(quotedAt - 100 * MINUTE);
   relayAnswers(fixture.response);
   const { sendBefore, deadline } = await ask();
   expect(Date.parse(deadline) - Date.parse(sendBefore)).toBe(60 * MINUTE);
-  expect(Date.parse(sendBefore)).toBeLessThan(quotedAt);
+  expect(Date.parse(sendBefore) - quotedAt).toBe(20 * MINUTE);
+});
+
+it("refuses an address it could only offer for minutes, when the device clock is hours slow", async () => {
+  deviceClock(quotedAt - 150 * MINUTE);
+  relayAnswers(fixture.response);
+  await expect(ask()).rejects.toThrow("Your device clock looks wrong. Set it to the right time and try again.");
 });
 
 it.each([

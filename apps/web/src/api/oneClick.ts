@@ -33,6 +33,7 @@ const API = "https://1click.chaindefuser.com/v0";
 export const DEPOSIT_SYMBOLS = ["USDC", "USDT", "ETH", "BTC", "SOL"];
 export const MAX_DEPOSIT_UNITS = 10n ** 39n - 1n;
 const SEND_WINDOW_MS = 60 * 60_000;
+const MIN_SEND_MS = 15 * 60_000;
 const QUOTE_DEADLINE_MS = 3 * SEND_WINDOW_MS;
 // 1Click doesn't sign appFees, so a relay could add its own fee; legit routes cost well under this
 const MAX_LOSS = 0.03;
@@ -79,6 +80,7 @@ export function oneClick(relayUrl: string): OneClick {
       const quotedAt = Date.parse(parsed.timestamp);
       // a slow device clock shortens the deadline we sent, so still leave an hour before refunds start
       const sendBefore = Math.min(quotedAt + SEND_WINDOW_MS, Date.parse(body.deadline) - SEND_WINDOW_MS);
+      if (sendBefore - quotedAt < MIN_SEND_MS) throw new Error("Your device clock looks wrong. Set it to the right time and try again.");
       return { ...quote, sendBefore: new Date(sendBefore).toISOString(), deadline: body.deadline, clockOffsetMs: quotedAt - Date.now() };
     },
     async status(depositAddress) {

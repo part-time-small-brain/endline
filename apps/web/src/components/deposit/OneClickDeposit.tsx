@@ -25,9 +25,10 @@ function restore(key: string): PendingDeposit | undefined {
   }
 }
 
-function save(key: string, pending: PendingDeposit) {
+function save(key: string, pending: PendingDeposit, replace = false) {
   try {
-    localStorage.setItem(key, JSON.stringify(pending));
+    const saved = readPendingDeposit(localStorage.getItem(key) ?? "");
+    if (replace || !saved || saved.depositAddress === pending.depositAddress) localStorage.setItem(key, JSON.stringify(pending));
   } catch {}
 }
 
@@ -52,6 +53,7 @@ export function OneClickDeposit({ oneClick, accountId }: { oneClick: OneClick; a
   const now = useNow(1_000);
   const stage = pending && depositStage(status, pending, now);
   const done = stage === "done";
+  const polling = !done && !(stage === "expired" && status !== undefined);
   const root = useRef<HTMLDivElement>(null);
   const moveFocus = useRef(false);
 
@@ -60,7 +62,7 @@ export function OneClickDeposit({ oneClick, accountId }: { oneClick: OneClick; a
   }, [oneClick]);
 
   useEffect(() => {
-    if (!pending || done) return;
+    if (!pending || !polling) return;
     let alive = true;
     const check = () => oneClick.status(pending.depositAddress).then((next) => alive && setStatus(next), () => {});
     check();
@@ -69,7 +71,7 @@ export function OneClickDeposit({ oneClick, accountId }: { oneClick: OneClick; a
       alive = false;
       clearInterval(timer);
     };
-  }, [oneClick, pending, done]);
+  }, [oneClick, pending, polling]);
 
   useEffect(() => {
     if (!pending || !stage) return;
@@ -100,6 +102,7 @@ export function OneClickDeposit({ oneClick, accountId }: { oneClick: OneClick; a
     try {
       const next = { ...(await oneClick.quote(asset, units, accountId, config.quoteAsset)), asset };
       setStatus(undefined);
+      save(key, next, true);
       moveFocus.current = true;
       setPending(next);
     } catch (e) {
