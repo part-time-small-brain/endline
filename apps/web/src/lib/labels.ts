@@ -1,9 +1,7 @@
-import { capPrice, type ListedSeries, type Series, termsOf } from "@endline/sdk";
+import { capPrice, type ListedSeries, termsOf } from "@endline/sdk";
 import { formatPrice } from "./money.ts";
 
-export function seriesTitle(series: Pick<Series, "underlying" | "kind" | "strike">, quoteDecimals: number): string {
-  return `${series.underlying} ${series.kind === "call" ? "Up" : "Down"} ${formatPrice(BigInt(series.strike), quoteDecimals)}`;
-}
+export { seriesTitle } from "@endline/sdk";
 
 export function capLabel(series: ListedSeries, quoteDecimals: number): string {
   return `Capped at ${formatPrice(capPrice(termsOf(series)), quoteDecimals)}`;

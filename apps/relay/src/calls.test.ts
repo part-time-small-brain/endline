@@ -29,7 +29,8 @@ function setup(list = DAYS.flatMap((day) => [series(81_000, day), series(82_000,
   const fake = fakeChain(list);
   const dir = mkdtempSync(join(tmpdir(), "calls-"));
   const book = { marks: list.map((s) => mark(s)) };
-  const open = (path = dir) => new Calls(fake.chain, new Sessions(fake.chain, INTENTS), () => book.marks, path, maxCalls);
+  const notify = vi.fn();
+  const open = (path = dir) => new Calls(fake.chain, new Sessions(fake.chain, INTENTS), () => book.marks, notify, path, maxCalls);
   const calls = open();
   const call = (seriesId: string, account = "alice.near", signed = session(account), client = `ip-of-${account}`) => calls.add({ series_id: seriesId, signer: { standard: "nep413", signer_id: account }, session: signed }, client);
   const settle = async (expiry: number, price: number) => {
@@ -37,7 +38,7 @@ function setup(list = DAYS.flatMap((day) => [series(81_000, day), series(82_000,
     at(expiry + 3_960);
     await calls.score();
   };
-  return { ...fake, calls, call, settle, book, dir, open };
+  return { ...fake, calls, call, settle, book, dir, open, notify };
 }
 
 beforeEach(() => {
@@ -70,6 +71,7 @@ describe("free calls", () => {
     expect(await httpStatus(t.call(series(82_000).id))).toBe(409);
     at(E - 1_000);
     expect(await httpStatus(t.call(series(82_000).id, "bob.near"))).toBe(409);
+    expect(t.notify).toHaveBeenCalledOnce();
   });
 
   it("takes calls only on the next round, and closes them when the averaging window opens even where trading runs to a 60 s cutoff", async () => {
@@ -147,8 +149,11 @@ describe("free calls", () => {
     const write = vi.spyOn(JsonFile.prototype, "write").mockRejectedValueOnce(new Error("disk full"));
     await expect(t.call(series(81_000).id)).rejects.toThrow("disk full");
     expect(t.calls.byAccount("alice.near")).toEqual([]);
+    expect(t.notify).not.toHaveBeenCalled();
     write.mockRestore();
-    await expect(t.call(series(81_000).id)).resolves.toMatchObject({ account_id: "alice.near" });
+    const call = await t.call(series(81_000).id);
+    expect(call).toMatchObject({ account_id: "alice.near" });
+    expect(t.notify).toHaveBeenCalledExactlyOnceWith({ kind: "call", call });
   });
 
   it("needs $1 of USDC in the caller's intents balance, spending none of it", async () => {

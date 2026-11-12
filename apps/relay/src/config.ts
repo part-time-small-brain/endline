@@ -23,10 +23,11 @@ const Env = z
       .pipe(z.array(z.string().refine((url) => URL.canParse(url) && new URL(url).origin === url, "an origin like https://app.example.com: no path, no trailing slash"))),
     ONECLICK_JWT: z.string().min(1).optional(),
     NEAR_RPC_URLS: z.string().optional(),
+    ALERT_WEBHOOK_URL: z.url().optional(),
   })
   .refine((env) => env.NETWORK_ID === "testnet" || !env.FAUCET, { path: ["FAUCET"], message: "the faucet runs only on testnet" });
 
-const SECRETS = ["RELAYER_PRIVATE_KEY", "MM_API_KEYS", "ONECLICK_JWT", "NEAR_RPC_URLS"];
+const SECRETS = ["RELAYER_PRIVATE_KEY", "MM_API_KEYS", "ONECLICK_JWT", "NEAR_RPC_URLS", "ALERT_WEBHOOK_URL"];
 
 export type Config = z.infer<typeof Env> & Deployment;
 

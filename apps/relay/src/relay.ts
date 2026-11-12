@@ -22,6 +22,7 @@ import {
   toSign,
 } from "@endline/sdk";
 import type { z } from "zod";
+import type { Activity } from "./activity.ts";
 import { type Auctions, MAX_WAIT_MS } from "./auction.ts";
 import { type Bid, legs } from "./bid.ts";
 import type { Config } from "./config.ts";
@@ -71,6 +72,7 @@ interface RelayDeps {
   fills: Fills;
   auctions: Auctions;
   mms: MarketMakers;
+  notify: (activity: Activity) => void;
 }
 
 export const listed = (series: Series, contract: ContractConfig) => isListed(series, contract.quote_decimals);
@@ -226,6 +228,7 @@ export class Relay {
       at_ms: Date.now(),
     };
     await this.deps.fills.append(fill).catch((error) => console.error("fill not recorded", fill, error));
+    this.deps.notify({ kind: "trade", fill });
   }
 
   private expire(entry: Issued): void {

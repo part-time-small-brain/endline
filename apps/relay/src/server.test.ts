@@ -3,7 +3,7 @@ import { type AddressInfo, connect as rawConnect } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Quote, QuoteEvent } from "@endline/sdk";
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, onTestFinished, vi } from "vitest";
 import { WebSocket } from "ws";
 import { Auctions } from "./auction.ts";
 import { checkBid } from "./bid.ts";
@@ -13,20 +13,24 @@ import { Collector } from "./collect.ts";
 import { Faucet } from "./faucet.ts";
 import { Fills } from "./fills.ts";
 import { MmHub } from "./mm.ts";
+import { Notifier } from "./notifier.ts";
 import { OneClick } from "./oneClick.ts";
 import { Relay } from "./relay.ts";
 import { createRelayServer } from "./server.ts";
 import { DEPOSIT, fakeChain, INTENTS, mmSigned, OPTIONS, SERIES, SIGNED_QUOTE, session, USDC } from "./test-fakes.ts";
 
 const KEY = "test-key-0123456789";
+const WEBHOOK = "https://hooks.invalid/bot123:secret-token/sendMessage?chat_id=1";
 const { chain } = fakeChain([{ ...SERIES, expiry: Math.floor(Date.now() / 1000) + 86_400 }]);
+const notifier = new Notifier(WEBHOOK, "testnet", chain);
+const notify = notifier.post.bind(notifier);
 const fills = new Fills(mkdtempSync(join(tmpdir(), "relay-")));
 const auctions = new Auctions((event, mmId, response, receivedAt) => checkBid(chain, INTENTS, event, mmId, response, receivedAt));
 const hub = new MmHub([KEY], (mmId, response) => auctions.respond(mmId, response));
-const relay = new Relay({ config: { intents_id: INTENTS, options_id: OPTIONS, quote_asset: USDC }, chain, fills, auctions, mms: hub });
-const collector = new Collector(chain, { intents_id: INTENTS, options_id: OPTIONS }, new Claims(mkdtempSync(join(tmpdir(), "relay-"))), fills);
-const oneClick = new OneClick(DEPOSIT.destinationAsset, "jwt");
-const calls = new Calls(chain, relay.sessions, () => hub.marks.best(Date.now()), mkdtempSync(join(tmpdir(), "relay-")));
+const relay = new Relay({ config: { intents_id: INTENTS, options_id: OPTIONS, quote_asset: USDC }, chain, fills, auctions, mms: hub, notify });
+const collector = new Collector(chain, { intents_id: INTENTS, options_id: OPTIONS }, new Claims(mkdtempSync(join(tmpdir(), "relay-"))), fills, notify);
+const oneClick = new OneClick(DEPOSIT.destinationAsset, "jwt", { track: () => {} });
+const calls = new Calls(chain, relay.sessions, () => hub.marks.best(Date.now()), notify, mkdtempSync(join(tmpdir(), "relay-")));
 const server = createRelayServer(relay, fills, hub, collector, oneClick, calls);
 let base = "";
 const sockets: WebSocket[] = [];
@@ -278,7 +282,13 @@ describe("market maker socket", () => {
     await expect(connect(KEY, "/other")).rejects.toThrow();
   });
 
-  it("runs a full quote, publish and status round trip", async () => {
+  it("runs a full quote, publish and status round trip, answering while the trade's notification hangs", async () => {
+    const realFetch = globalThis.fetch;
+    const hook = vi.fn((_url: string) => new Promise<Response>(() => {}));
+    vi.stubGlobal("fetch", (url: string, init?: RequestInit) => (String(url) === WEBHOOK ? hook(url) : realFetch(url, init)));
+    onTestFinished(() => {
+      vi.unstubAllGlobals();
+    });
     const mm = await connect(KEY);
     const received: { method: string; params: unknown }[] = [];
     mm.on("message", (data) => {
@@ -305,6 +315,7 @@ describe("market maker socket", () => {
     expect(await (await fetch(`http://${base}/status/${quote.quote_id}`)).json()).toMatchObject({ status: "settled" });
     expect(await (await fetch(`http://${base}/fills/alice.test`)).json()).toMatchObject([{ quote_id: quote.quote_id }]);
     await expect.poll(() => received.map((m) => m.method)).toEqual(["quote", "quote_status"]);
+    await expect.poll(() => hook.mock.calls.length).toBe(1);
   });
 
   it("serves the best marks across connected market makers on GET /marks, with CORS, and drops a market maker's marks when it disconnects", async () => {

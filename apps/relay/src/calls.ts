@@ -1,5 +1,6 @@
 import { AccountId, Call, type CallRequest, callableAt, callPoints, FREE_CALLS_PER_ROUND, type Leaderboard, type Mark, nextRound, roundOf, SECONDS_PER_DAY, type Series, type Standing, termsOf } from "@endline/sdk";
 import { z } from "zod";
+import type { Activity } from "./activity.ts";
 import { FINAL_MARGIN_SEC } from "./collect.ts";
 import { JsonFile } from "./jsonFile.ts";
 import { HttpError, listed, open } from "./relay.ts";
@@ -34,6 +35,7 @@ export class Calls {
     private chain: Chain,
     private sessions: Sessions,
     private marks: () => Mark[],
+    private notify: (activity: Activity) => void,
     dir: string,
     private maxCalls = MAX_CALLS,
   ) {
@@ -82,6 +84,7 @@ export class Calls {
       this.state.calls = this.state.calls.filter((c) => c !== stored);
       throw error;
     }
+    this.notify({ kind: "call", call });
     return call;
   }
 

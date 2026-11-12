@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "exports": { ".": "./src/index.ts", "./deployment": "./src/deployment.ts", "./secrets": "./src/secrets.ts", "./rpc": "./src/rpc.ts" },
+  "exports": { ".": "./src/index.ts", "./deployment": "./src/deployment.ts", "./secrets": "./src/secrets.ts", "./rpc": "./src/rpc.ts", "./webhook": "./src/webhook.ts" },
   "scripts": {
     "test": "vitest run",
     "typecheck": "tsc --noEmit"

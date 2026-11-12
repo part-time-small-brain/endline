@@ -14,7 +14,7 @@ At startup the relay checks that the RPC is on `NETWORK_ID` and that `options_id
 
 ## Env
 
-Read from the process environment (no `.env` loading). `RELAYER_PRIVATE_KEY`, `MM_API_KEYS`, `ONECLICK_JWT` and `NEAR_RPC_URLS` can come from a file instead: set `<NAME>_FILE` to its path, not both ([Secrets](https://docs.endline.trade/developers/running-locally#secrets)).
+Read from the process environment (no `.env` loading). `RELAYER_PRIVATE_KEY`, `MM_API_KEYS`, `ONECLICK_JWT`, `NEAR_RPC_URLS` and `ALERT_WEBHOOK_URL` can come from a file instead: set `<NAME>_FILE` to its path, not both ([Secrets](https://docs.endline.trade/developers/running-locally#secrets)).
 
 | Var | Meaning |
 |---|---|
@@ -28,6 +28,7 @@ Read from the process environment (no `.env` loading). `RELAYER_PRIVATE_KEY`, `M
 | `FAUCET` | `true` turns on `POST /faucet`, dripping the `quote_asset` token the relayer holds. Testnet only: the relay refuses to start with it on mainnet. Default `false` |
 | `APP_ORIGINS` | Comma list of origins (`https://app.endline.trade`, no path or trailing slash) that may call `/faucet` and `/deposit-quote` from a browser. Default none: those two routes then answer no CORS, so only a page on the relay's own origin can use them |
 | `ONECLICK_JWT` | Optional 1Click Partner Portal JWT, sent as `X-API-Key` on `POST /deposit-quote`. Unset: quotes are forwarded without it and 1Click adds 0.25% to every deposit |
+| `ALERT_WEBHOOK_URL` | Optional. The monitor's webhook (Slack, Discord or Telegram `sendMessage` URL), where the relay posts user activity ([Notifications](#notifications)). Unset or an empty file: nothing is posted and deposits aren't followed |
 | `NEAR_RPC_URLS` | Optional comma list of extra RPC endpoints, routed together with `rpc_url` from the deploy file: fastest healthy one first, failed ones cooled off, wrong-network ones never used, sends never resent after an unclear failure ([Secrets](https://docs.endline.trade/developers/running-locally#secrets)) |
 
 ## User API (HTTP, JSON, CORS `*` except `/faucet` and `/deposit-quote`)
@@ -68,6 +69,19 @@ Both take only an exercise, exactly as the SDK's `exerciseOptions` builds and `t
 
 - `/execute`: the payload must expire between 2 and 10 minutes from now (the app signs for 7); needs a final price (`now ≥ final_at + 60 s`) and a total payout of at least $1 (one quote-asset unit times `10^quote_decimals`), so splitting a win into tiny exercises can't burn the relayer's gas. Simulated, then executed.
 - `/claims`: only for options the signer bought through this relay (net of sells, from `fills.jsonl`), one open claim per buy of that series, with a max payout of at least $1, so filling the queue costs one real trade per claim. A signer's open claims on a token can't add up to more than that or their intents balance of it; 100 open claims per signer, so one account can't fill the queue, 1,000 in total. Simulated, then stored in `DATA_DIR/claims.json`. Every minute the relay re-simulates every claim, drops the ones the verifier now refuses (tokens sold or already collected, deadline passed, nonce used), drops final ones that pay under $1 without sending them, and submits the rest once final (same rule).
+
+## Notifications
+
+With `ALERT_WEBHOOK_URL` set, the relay posts one plain-text message per event, as `{"text","content"}` like the monitor: the type's emoji, the network, a title, then the details with the full account id and, for transactions, a nearblocks link:
+
+| Event | When | Example |
+|---|---|---|
+| 🟢 Buy, 🟠 Sell back | A trade settles | `🟢 mainnet · Buy BTC Up $81,000, ends 13 Nov 08:00 UTC`<br/>`$1.88 for 0.005 BTC · alice.near · https://nearblocks.io/txns/…` |
+| 💰 Collect, Auto-collect | The relayer's exercise from `/execute` or a stored claim succeeds | `💰 mainnet · Collect $12.40`<br/>`0.005 × BTC Up $81,000, ends 13 Nov 08:00 UTC · alice.near · https://nearblocks.io/txns/…` |
+| 🎯 Free call | A call is stored | `🎯 mainnet · Free call BTC Up $81,000, ends 13 Nov 08:00 UTC`<br/>`pays up to 4.2× · alice.near` |
+| 💵 credited, ↩️ refunded, ❌ failed | 1Click's status for a deposit address the relay issued is `SUCCESS`, `REFUNDED` or `FAILED` | `💵 mainnet · Deposit credited`<br/>`1.0 SOL on sol for about $100 · alice.near` |
+
+Posting never holds up or changes an answer: messages are built after the trade, collect, call or deposit status is recorded and sent from a queue, 3 s apart (Telegram allows about 20 a minute in a group), at most 50 waiting (more are dropped and logged), 5 s timeout per post. Failures are logged without the URL. Token names come from 1Click's `/v0/tokens` (the asset id if it's down). Issuing an address posts nothing, since anyone can ask for one. The relay asks 1Click's `/v0/status` (without `ONECLICK_JWT`, so it never uses up the quote limit) about each issued address, 3 at a time: every 30 s once a deposit is on its way, every 2 min while nothing has arrived. It stops at the first final status, drops an address silently when nothing arrived by an hour after the request's `deadline`, and follows at most 200, dropping the oldest one nothing has reached (else the oldest) for a new one. Followed addresses live in memory only: a restart drops them, and their outcome is never posted.
 
 ## MM API (WebSocket `/mm`, header `Authorization: Bearer <api key>`)
 

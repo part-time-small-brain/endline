@@ -1,5 +1,6 @@
 import { isDeepStrictEqual } from "node:util";
 import { exerciseOptions, type Fill, longPayout, MIN_RELAYED_PAYOUT_USD, maxPayout, parseTokenId, readPayload, type Series, type Settlement, type SignedPayload, termsOf } from "@endline/sdk";
+import type { Activity } from "./activity.ts";
 import type { Claims } from "./claims.ts";
 import type { Config } from "./config.ts";
 import type { Fills } from "./fills.ts";
@@ -62,16 +63,20 @@ export class Collector {
     private config: Settings,
     private claims: Claims,
     private fills: Pick<Fills, "byAccount">,
+    private notify: (activity: Activity) => void,
   ) {}
 
   async execute(signed: SignedPayload): Promise<string> {
     const exercise = this.read(signed);
     if (exercise.deadlineMs > Date.now() + MAX_DEADLINE_MS) throw new HttpError(400, "an exercise sent now must expire within 10 minutes");
-    const total = await this.payout(await this.legs(exercise));
+    const legs = await this.legs(exercise);
+    const total = await this.payout(legs);
     if (total === undefined) throw new HttpError(409, "the final price is not settled yet");
     if (total === 0n) throw new HttpError(400, "these options pay nothing");
     if (total < (await this.minPayout())) throw new HttpError(400, "the relay pays gas only for payouts of at least $1: collect from a NEAR wallet");
-    return this.submit(signed, exercise, true);
+    const txHash = await this.submit(signed, exercise, true);
+    this.notify({ kind: "collect", accountId: exercise.signerId, legs, payout: total, txHash, auto: false });
+    return txHash;
   }
 
   async claim(signed: SignedPayload): Promise<void> {
@@ -107,12 +112,16 @@ export class Collector {
     for (const signed of this.claims.all()) {
       try {
         const exercise = this.read(signed);
-        const total = await this.payout(await this.legs(exercise));
+        const legs = await this.legs(exercise);
+        const total = await this.payout(legs);
         if (total === undefined) {
           await this.simulate(signed);
           continue;
         }
-        if (total >= (await this.minPayout())) await this.submit(signed, exercise, false);
+        if (total >= (await this.minPayout())) {
+          const txHash = await this.submit(signed, exercise, false);
+          this.notify({ kind: "collect", accountId: exercise.signerId, legs, payout: total, txHash, auto: true });
+        }
         await this.claims.remove(signed);
       } catch (error) {
         if (error instanceof HttpError && error.status !== 409) await this.claims.remove(signed);

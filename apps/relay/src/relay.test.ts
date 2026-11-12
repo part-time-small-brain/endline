@@ -40,14 +40,15 @@ function setup(mmCount = 1, behaviour: MmBehaviour = () => ({})) {
     },
   };
   const fills = new Fills(mkdtempSync(join(tmpdir(), "relay-")));
-  const relay = new Relay({ config: { intents_id: INTENTS, options_id: OPTIONS, quote_asset: USDC }, chain, fills, auctions, mms });
+  const notify = vi.fn();
+  const relay = new Relay({ config: { intents_id: INTENTS, options_id: OPTIONS, quote_asset: USDC }, chain, fills, auctions, mms, notify });
   const quote = async (request: QuoteRequest = buy) => {
     const pending = relay.quote(request);
     pending.catch(() => undefined);
     await vi.advanceTimersByTimeAsync(MAX_WAIT_MS);
     return pending;
   };
-  return { relay, quote, chain, executed, balances, statuses, events, fills };
+  return { relay, quote, chain, executed, balances, statuses, events, fills, notify };
 }
 
 function sign(quote: Quote, change: (unsigned: Unsigned) => Unsigned = (u) => u): SignedPayload {
@@ -74,7 +75,7 @@ describe("relay", () => {
   afterEach(() => vi.useRealTimers());
 
   it("issues the exact user leg and settles [mm, user] once", async () => {
-    const { relay, quote, executed, statuses, fills } = setup(3);
+    const { relay, quote, executed, statuses, fills, notify } = setup(3);
     const q = await quote();
     expect(q.premium).toBe(PREMIUM.toString());
     const user = readPayload(q.payload);
@@ -89,6 +90,7 @@ describe("relay", () => {
     expect(statuses).toEqual([update]);
     expect(fills.byAccount(USER)).toMatchObject([{ quote_id: q.quote_id, premium: "15000000", tx_hash: "tx1" }]);
     expect(fills.byAccount("bob.test")).toEqual([]);
+    expect(notify).toHaveBeenCalledExactlyOnceWith({ kind: "trade", fill: fills.byAccount(USER)[0] });
   });
 
   it("lists open series and those expired within the claim window, nothing older", async () => {
@@ -120,21 +122,23 @@ describe("relay", () => {
   });
 
   it("a seller gets the highest bid and an erc191 payload string", async () => {
-    const { relay, quote } = setup(2);
+    const { relay, quote, notify } = setup(2);
     const signer = { standard: "erc191" as const, signer_id: "0x00000000000000000000000000000000000000aa" };
     const q = await quote({ ...buy, side: "sell", signer, session: session(signer.signer_id, { standard: "erc191" }) });
     expect(q.premium).toBe((PREMIUM + 1n).toString());
     expect(q.pay).toEqual({ asset: OPTION, amount: "1000000" });
     expect(q.payload.standard).toBe("erc191");
     expect(await relay.publish({ quote_id: q.quote_id, signed: sign(q) })).toMatchObject({ status: "settled" });
+    expect(notify).toHaveBeenCalledExactlyOnceWith({ kind: "trade", fill: expect.objectContaining({ side: "sell", account_id: signer.signer_id, premium: q.premium }) });
   });
 
   it("settles only once under concurrent publishes", async () => {
-    const { relay, quote, executed } = setup();
+    const { relay, quote, executed, notify } = setup();
     const q = await quote();
     const results = await Promise.allSettled(Array.from({ length: 5 }, () => relay.publish({ quote_id: q.quote_id, signed: sign(q) })));
     expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
     expect(executed).toHaveLength(1);
+    expect(notify).toHaveBeenCalledOnce();
   });
 
   it("refuses a publish after sign_by_ms, then tells the MM the quote expired", async () => {
@@ -169,13 +173,14 @@ describe("relay", () => {
   });
 
   it("reports a failed settlement to the user and the MM, without a fill", async () => {
-    const { relay, quote, executed, statuses, fills } = setup();
+    const { relay, quote, executed, statuses, fills, notify } = setup();
     const q = await quote();
     const update = await relay.publish({ quote_id: q.quote_id, signed: { ...sign(q), signature: "ed25519:bad" } as SignedPayload });
     expect(update).toMatchObject({ status: "failed", reason: "invalid signature" });
     expect(statuses).toEqual([update]);
     expect(executed).toHaveLength(0);
     expect(fills.byAccount(USER)).toEqual([]);
+    expect(notify).not.toHaveBeenCalled();
     expect(await httpStatus(relay.publish({ quote_id: q.quote_id, signed: sign(q) }))).toBe(409);
   });
 

@@ -1,4 +1,5 @@
 import { afterEach, expect, it, vi } from "vitest";
+import { Deposits } from "./deposits.ts";
 import { OneClick } from "./oneClick.ts";
 import { HttpError } from "./relay.ts";
 import { DEPOSIT, SIGNED_QUOTE } from "./test-fakes.ts";
@@ -6,10 +7,12 @@ import { DEPOSIT, SIGNED_QUOTE } from "./test-fakes.ts";
 const USDC = DEPOSIT.destinationAsset;
 const HOUR_MS = 3_600_000;
 const CLIENT = "1.2.3.4";
+const deposits = { track: vi.fn() };
 
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
+  deposits.track.mockClear();
 });
 
 function upstream(status: number, body: string) {
@@ -25,18 +28,27 @@ async function failure(oneClick: OneClick, deposit: object = DEPOSIT, client = C
 }
 
 it("forwards a deposit quote with the partner key and returns 1Click's signed quote", async () => {
-  const oneClick = new OneClick(USDC, "partner-jwt");
+  const oneClick = new OneClick(USDC, "partner-jwt", deposits);
   const fetch = upstream(201, JSON.stringify(SIGNED_QUOTE));
   expect(await oneClick.quote(oneClick.schema.parse(DEPOSIT), CLIENT)).toEqual(SIGNED_QUOTE);
   const [url, init] = fetch.mock.calls[0] ?? [];
   expect(url).toBe("https://1click.chaindefuser.com/v0/quote");
   expect(init?.headers).toEqual({ "content-type": "application/json", "x-api-key": "partner-jwt" });
   expect(JSON.parse(String(init?.body))).toEqual(DEPOSIT);
+  expect(deposits.track).toHaveBeenCalledExactlyOnceWith(DEPOSIT, SIGNED_QUOTE);
+});
+
+it("answers the quote at once while following the deposit hangs", async () => {
+  vi.stubGlobal("fetch", async (url: string) => (url.endsWith("/quote") ? Response.json(SIGNED_QUOTE) : new Promise<Response>(() => {})));
+  const notifier = { on: true, post: vi.fn() };
+  const oneClick = new OneClick(USDC, "partner-jwt", new Deposits(notifier));
+  expect(await oneClick.quote(oneClick.schema.parse(DEPOSIT), CLIENT)).toEqual(SIGNED_QUOTE);
+  expect(notifier.post).not.toHaveBeenCalled();
 });
 
 it("sends no key header without a partner key", async () => {
   const fetch = upstream(200, JSON.stringify(SIGNED_QUOTE));
-  const oneClick = new OneClick(USDC, undefined);
+  const oneClick = new OneClick(USDC, undefined, deposits);
   await oneClick.quote(oneClick.schema.parse(DEPOSIT), CLIENT);
   expect(fetch.mock.calls[0]?.[1]?.headers).toEqual({ "content-type": "application/json" });
 });
@@ -50,8 +62,9 @@ it.each([
 ])("answers 1Click's HTTP %i as the relay's own error", async (status, body, relayStatus, message) => {
   vi.spyOn(console, "error").mockImplementation(() => {});
   upstream(status, body);
-  const error = await failure(new OneClick(USDC, "partner-jwt"));
+  const error = await failure(new OneClick(USDC, "partner-jwt", deposits));
   expect([error.status, error.message]).toEqual([relayStatus, expect.stringContaining(message)]);
+  expect(deposits.track).not.toHaveBeenCalled();
 });
 
 it.each([
@@ -63,19 +76,20 @@ it.each([
 ])("answers 502 for %s", async (_, response, deposit) => {
   vi.spyOn(console, "error").mockImplementation(() => {});
   upstream(201, JSON.stringify(response));
-  const error = await failure(new OneClick(USDC, "partner-jwt"), deposit);
+  const error = await failure(new OneClick(USDC, "partner-jwt", deposits), deposit);
   expect([error.status, error.message]).toEqual([502, expect.stringContaining("deposits are unavailable")]);
+  expect(deposits.track).not.toHaveBeenCalled();
 });
 
 it("answers 502 when 1Click is unreachable", async () => {
   vi.spyOn(console, "error").mockImplementation(() => {});
   vi.stubGlobal("fetch", () => Promise.reject(new TypeError("fetch failed")));
-  expect((await failure(new OneClick(USDC, "partner-jwt"))).status).toBe(502);
+  expect((await failure(new OneClick(USDC, "partner-jwt", deposits))).status).toBe(502);
 });
 
 it("caps quotes across all clients so many IPs can't burn the key", async () => {
   const fetch = upstream(200, JSON.stringify(SIGNED_QUOTE));
-  const oneClick = new OneClick(USDC, "partner-jwt");
+  const oneClick = new OneClick(USDC, "partner-jwt", deposits);
   for (let i = 0; i < 60; i++) await oneClick.quote(oneClick.schema.parse(DEPOSIT), `10.0.0.${i}`);
   expect((await failure(oneClick, DEPOSIT, "10.0.1.0")).status).toBe(503);
   expect(fetch).toHaveBeenCalledTimes(60);
@@ -83,7 +97,7 @@ it("caps quotes across all clients so many IPs can't burn the key", async () => 
 
 it("caps each client at 10 quotes a minute before the shared cap, so one client can't block the rest", async () => {
   const fetch = upstream(200, JSON.stringify(SIGNED_QUOTE));
-  const oneClick = new OneClick(USDC, "partner-jwt");
+  const oneClick = new OneClick(USDC, "partner-jwt", deposits);
   for (let i = 0; i < 10; i++) await oneClick.quote(oneClick.schema.parse(DEPOSIT), CLIENT);
   for (let i = 0; i < 60; i++) expect((await failure(oneClick)).status).toBe(429);
   expect(await oneClick.quote(oneClick.schema.parse(DEPOSIT), "5.6.7.8")).toEqual(SIGNED_QUOTE);
@@ -92,7 +106,7 @@ it("caps each client at 10 quotes a minute before the shared cap, so one client 
 
 it("gives a client its slot back when the shared cap refuses it, so it isn't blamed for others", async () => {
   upstream(200, JSON.stringify(SIGNED_QUOTE));
-  const oneClick = new OneClick(USDC, "partner-jwt");
+  const oneClick = new OneClick(USDC, "partner-jwt", deposits);
   for (let i = 0; i < 60; i++) await oneClick.quote(oneClick.schema.parse(DEPOSIT), `10.0.0.${i}`);
   for (let i = 0; i < 20; i++) expect((await failure(oneClick)).status).toBe(503);
 });
@@ -101,7 +115,7 @@ it.each([
   ["a NEP-141", "nep141:sol.omft.near"],
   ["a HOT omni NEP-245", "nep245:v2_1.omni.hot.tg:10_11111111111111111111"],
 ])("accepts %s origin asset", (_, originAsset) => {
-  expect(new OneClick(USDC, "partner-jwt").schema.safeParse({ ...DEPOSIT, originAsset }).success).toBe(true);
+  expect(new OneClick(USDC, "partner-jwt", deposits).schema.safeParse({ ...DEPOSIT, originAsset }).success).toBe(true);
 });
 
 it.each([
@@ -126,5 +140,5 @@ it.each([
   ["a past deadline", { deadline: new Date(Date.now() - 1_000).toISOString() }],
   ["a deadline over 24 h out", { deadline: new Date(Date.now() + 25 * HOUR_MS).toISOString() }],
 ])("refuses %s", (_, change) => {
-  expect(new OneClick(USDC, "partner-jwt").schema.safeParse({ ...DEPOSIT, ...change }).success).toBe(false);
+  expect(new OneClick(USDC, "partner-jwt", deposits).schema.safeParse({ ...DEPOSIT, ...change }).success).toBe(false);
 });

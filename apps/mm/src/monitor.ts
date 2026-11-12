@@ -1,4 +1,5 @@
 import { setTimeout as sleep } from "node:timers/promises";
+import { postWebhook } from "@endline/sdk/webhook";
 import { z } from "zod";
 import { type Alert, dedupe, MISSING_GRACE_SEC, pendingAlerts, reserveAlert, settlementAlert } from "./alerts.ts";
 import { ChainReader } from "./chain.ts";
@@ -146,24 +147,13 @@ function duration(ms: number): string {
   return h < 24 ? `${h} h ${min % 60} min` : `${Math.floor(h / 24)} d ${h % 24} h`;
 }
 
-const Sent = z.object({ result: z.object({ message_id: z.number() }) });
-
 async function notify(webhookUrl: string | undefined, line: string, message: string, replyTo?: number): Promise<{ messageId?: number | undefined } | undefined> {
   console.log(line);
   if (!webhookUrl) return {};
-  // only Telegram returns a message_id, so only Telegram ever gets reply_parameters
-  const reply = replyTo === undefined ? {} : { reply_parameters: { message_id: replyTo, allow_sending_without_reply: true } };
   try {
-    const res = await fetch(webhookUrl, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ text: message, content: message, ...reply }),
-      signal: AbortSignal.timeout(HTTP_TIMEOUT_MS),
-    });
-    if (res.ok) return { messageId: Sent.safeParse(await res.json().catch(() => undefined)).data?.result.message_id };
-    console.error(`monitor: webhook HTTP ${res.status}`);
+    return { messageId: await postWebhook(webhookUrl, message, replyTo) };
   } catch (e) {
     console.error(`monitor: webhook: ${e}`);
+    return undefined;
   }
-  return undefined;
 }
