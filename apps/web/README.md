@@ -39,7 +39,7 @@ Read by Vite from the shell or a `.env` file.
 | `VITE_MOCK` | `1` = in-browser mock, other vars ignored except `VITE_NETWORK=testnet` (testnet ids and a mock faucet instead of 1Click) |
 | `VITE_RELAY_URL` | RFQ relay base URL (`apps/relay`). Optional: defaults to the page's own origin (relay paths proxied on the same host). On another origin, the relay's `APP_ORIGINS` must list the app's, or the faucet and deposits fail |
 | `VITE_APP_URL` | Origin the app runs at, e.g. `https://app.endline.trade`. Optional: unset, the landing is `/` and the app `/app` on one origin |
-| `VITE_NETWORK` | `mainnet` or `testnet` (wallets, explorer links; 1Click only on mainnet). Bundles the RPC, intents and options contract ids and quote asset from `deploy/<VITE_NETWORK>.json` at build time. No file (mainnet today): the app says it isn't configured |
+| `VITE_NETWORK` | `mainnet` or `testnet` (wallets, explorer links; 1Click only on mainnet). Bundles the RPC, intents and options contract ids and quote asset from `deploy/<VITE_NETWORK>.json` at build time. No file: the app says it isn't configured |
 
 ## Where data comes from
 

@@ -2,6 +2,7 @@ import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import mainnet from "../../../deploy/mainnet.json" with { type: "json" };
 import testnet from "../../../deploy/testnet.json" with { type: "json" };
 import { loadConfig } from "./config.ts";
 
@@ -58,7 +59,7 @@ describe("contract ids", () => {
     expect(loadConfig({ ...ENV, ...stale })).toMatchObject({ rpc_url: testnet.rpc_url, intents_id: testnet.intents_id, options_id: testnet.options_id, quote_asset: testnet.quote_asset });
   });
 
-  it("refuses a network without a deploy file: mainnet until deploy/mainnet.json exists", () => {
-    expect(() => loadConfig({ ...ENV, NETWORK_ID: "mainnet" })).toThrow("no deploy/mainnet.json");
+  it("takes mainnet's ids from deploy/mainnet.json, never testnet's", () => {
+    expect(loadConfig({ ...ENV, NETWORK_ID: "mainnet" })).toMatchObject({ network: "mainnet", rpc_url: mainnet.rpc_url, intents_id: "intents.near", options_id: mainnet.options_id, quote_asset: mainnet.quote_asset });
   });
 });
