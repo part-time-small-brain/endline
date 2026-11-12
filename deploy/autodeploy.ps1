@@ -1,6 +1,6 @@
 param([Parameter(Mandatory)][ValidateSet('testnet', 'mainnet')][string]$Network)
 
-$Ref = @{ testnet = 'main'; mainnet = 'mainnet' }[$Network]
+$Ref = @{ testnet = 'staging'; mainnet = 'main' }[$Network]
 $Repo = Split-Path -Parent $PSScriptRoot
 $Log = Join-Path (Split-Path -Parent $Repo) "endline-$Network-deploy.log"
 Set-Location $Repo
