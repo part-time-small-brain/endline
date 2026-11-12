@@ -67,7 +67,7 @@ Each command runs in its own shell after the `export` line. Write market maker i
 pnpm --filter @endline/mm start propose [--once]    # testnet proposer: NETWORK_ID, ORACLE_ACCOUNT_ID, ORACLE_PRIVATE_KEY
 pnpm --filter @endline/mm start monitor [--once]    # read-only alerts: NETWORK_ID; optional RELAYER_ACCOUNT_ID, MM_ACCOUNT_ID, ALERT_WEBHOOK_URL, HEALTH_URL
 pnpm --filter @endline/mm start settle [--once]     # mainnet settler, deploy/mainnet.json: SETTLER_ACCOUNT_ID, SETTLER_PRIVATE_KEY
-pnpm --filter @endline/mm start positions           # market maker balances, greeks, net delta: the market maker's env
+pnpm --filter @endline/mm start positions           # market maker balances, greeks, net delta (market maker env)
 ```
 
 ## Docker

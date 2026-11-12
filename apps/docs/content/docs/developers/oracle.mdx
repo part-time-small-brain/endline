@@ -78,6 +78,6 @@ The run uses the latest 08:00 UTC fixing at least one minute in the past. Logic 
 
 | Item | State |
 |---|---|
-| Pinned WASM | Read `url`, `sha256` and `outlayer_id` from `get_oracle_wasm` on `opt.endline.near` (mainnet, `outlayer.near`) or `opt6.near-options-dev.testnet` |
+| Pinned WASM | Read `url`, `sha256` and `outlayer_id` from `get_oracle_wasm` on `opt.endline.near` (mainnet) or `opt6.near-options-dev.testnet` |
 | Execution | Testnet uses the proposer below. Mainnet runs the pinned WASM on `outlayer.near` (fallback oracle account `oracle.endline.near`) |
 | Testnet proposer | `pnpm --filter @endline/mm start propose`: refuses a mainnet RPC, downloads the pinned WASM, checks its sha256 every minute before running it, runs it in wasmtime and calls `propose_settlement` once `oracle_window_sec` has passed. Same code and sources, no TEE attestation |
