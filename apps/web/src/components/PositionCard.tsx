@@ -1,6 +1,6 @@
 import { Check } from "@phosphor-icons/react";
 import type { ReactNode } from "react";
-import { pnlOf, type PositionView, valueOf } from "../app/usePositions.ts";
+import { pnlOf, type PositionView, tooSmallToSell, valueOf } from "../app/usePositions.ts";
 import { useCollect } from "../hooks/useCollect.ts";
 import { capLabel, seriesTitle } from "../lib/labels.ts";
 import { formatPct, formatUsd, toNumber } from "../lib/money.ts";
@@ -38,7 +38,8 @@ export function PositionCard({ view, quoteDecimals, nowSec, onSellBack }: Props)
   const ended = series.expiry <= nowSec;
   const pill = PILLS[view.status];
   const card = (view.status === "collect" || view.status === "paid") && view.settlement ? bestWin([view], view.settlement.price, quoteDecimals) : undefined;
-  const sellable = view.status === "active" && series.quotable;
+  const tooSmall = tooSmallToSell(view, quoteDecimals);
+  const sellable = view.status === "active" && series.quotable && !tooSmall;
   const valueLabel = view.status === "active" ? "Value now" : view.status === "paid" ? "Collected" : "Payout";
 
   return (
@@ -78,7 +79,7 @@ export function PositionCard({ view, quoteDecimals, nowSec, onSellBack }: Props)
 
       {(view.status === "active" || view.status === "closed") && (
         <Button tone="ghost" size="lg" disabled={!sellable} onClick={() => onSellBack(view)}>
-          {sellable ? "Sell back" : view.status === "closed" ? "Sell back closed" : "Sell back unavailable"}
+          {sellable ? "Sell back" : view.status === "closed" ? "Sell back closed" : tooSmall ? "Worth under $1, too small to sell back" : "Sell back unavailable"}
         </Button>
       )}
       {view.status === "collect" && (

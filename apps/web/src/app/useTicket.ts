@@ -12,6 +12,8 @@ const DEFAULT_BUDGET_USD = 25n;
 const REFERENCE_BUDGET_USD = 50n;
 const KINDS = ["call", "put"] as const;
 
+export type BudgetChoice = bigint | "max" | undefined;
+
 const strikeOf = (s: ListedSeries) => BigInt(s.strike);
 const byStrike = (a: ListedSeries, b: ListedSeries) => (strikeOf(a) < strikeOf(b) ? -1 : 1);
 
@@ -28,15 +30,23 @@ export function useTicket(nowSec: number) {
   const [kindChoice, setKind] = useState<OptionKind>();
   const [expiryChoice, setExpiry] = useState<number>();
   const [seriesChoice, setSeries] = useState(() => link.get("series") ?? undefined);
-  const [budget, setBudget] = useState(() => parseBudget(link.get("pay") ?? "", quoteDecimals) ?? DEFAULT_BUDGET_USD * unit);
+  const [budgetChoice, setBudget] = useState<BudgetChoice>(() => (link.get("pay") === "max" ? "max" : (parseBudget(link.get("pay") ?? "", quoteDecimals) ?? undefined)));
 
   const chosen = open.find((s) => s.id === seriesChoice);
   const symbol = symbolChoice && symbols.includes(symbolChoice) ? symbolChoice : (chosen?.underlying ?? symbols[0] ?? "");
 
   const kind = kindChoice ?? chosen?.kind ?? "call";
   const markOf = (s: ListedSeries) => data.marks?.[s.id];
-  const price = (s: ListedSeries, amount = budget) => ticket(s, amount, markOf(s));
-  const priced = open.filter((s) => price(s, unit).size > 0n);
+  const priced = open.filter((s) => ticket(s, unit, markOf(s)).size > 0n);
+  const ceiling = priced.filter((s) => s.underlying === symbol).reduce((most, s) => {
+    const { maxCost } = ticket(s, unit, markOf(s));
+    return maxCost > most ? maxCost : most;
+  }, 0n);
+  const atMax = budgetChoice === "max" || (budgetChoice === undefined && ceiling > 0n && ceiling < DEFAULT_BUDGET_USD * unit);
+  const picked = typeof budgetChoice === "bigint";
+  const budget = atMax ? ceiling : typeof budgetChoice === "bigint" ? budgetChoice : DEFAULT_BUDGET_USD * unit;
+  const invalid = !atMax && budget < unit;
+  const price = (s: ListedSeries, amount: bigint = budget): Ticket => ticket(s, amount, markOf(s));
   const expiries = [...new Set(priced.filter((s) => s.underlying === symbol && s.kind === kind).map((s) => s.expiry))]
     .sort((a, b) => a - b)
     .slice(0, EXPIRY_CHIPS);
@@ -58,6 +68,7 @@ export function useTicket(nowSec: number) {
   const balanced = balancedIn(strikes, kind);
   const series = strikes.find((s) => s.id === seriesChoice) ?? balanced;
   const current = series && price(series);
+  const spend = current?.capped ? current.cost : budget;
   const target = series ? strikeOf(series) : spot;
   const dates = expiries.map((end) => {
     const candidates = priced.filter((s) => s.underlying === symbol && s.kind === kind && s.expiry === end).sort(byStrike);
@@ -96,7 +107,7 @@ export function useTicket(nowSec: number) {
         : undefined;
 
   return {
-    data, quoteDecimals, balance, unit, symbols, symbol, kind, expiry, budget,
+    data, quoteDecimals, balance, unit, symbols, symbol, kind, expiry, budget, atMax, picked, invalid, spend, ceiling,
     setSymbol, setKind, setExpiry, setSeries, setBudget,
     spotNumber, spot, history, odds, usdOf, payoutAt, up, strikes, choices,
     series, current, vol, reference, sides, first, empty, expiries, dates, notice, priced, loading,

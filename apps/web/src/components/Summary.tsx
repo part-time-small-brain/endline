@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { formatPrice } from "../lib/money.ts";
+import { formatPrice, minTrade } from "../lib/money.ts";
 import { capNote, type GoodCase, type Ticket } from "../lib/ticket.ts";
 import { LABEL } from "./label.ts";
 import { Money } from "./Money.tsx";
@@ -8,13 +8,14 @@ interface Props {
   up: boolean;
   ticket: Ticket;
   budget: bigint;
+  picked: boolean;
   quoteDecimals: number;
   symbol: string;
   goodCase: GoodCase | null;
 }
 
-export function Summary({ up, ticket, budget, quoteDecimals, symbol, goodCase }: Props) {
-  const note = capNote(ticket, budget, quoteDecimals);
+export function Summary({ up, ticket, budget, picked, quoteDecimals, symbol, goodCase }: Props) {
+  const note = capNote(ticket, budget, picked, quoteDecimals);
   return (
     <div className="flex flex-col gap-3">
       <dl aria-label="Summary" className={`grid rounded-md shadow-[inset_0_0_0_1px_var(--rule)] ${goodCase ? "grid-cols-2" : "grid-cols-1"}`}>
@@ -37,7 +38,7 @@ export function Summary({ up, ticket, budget, quoteDecimals, symbol, goodCase }:
         <div className="flex gap-1.5">
           <dt>Sell back now</dt>
           <dd className="font-semibold text-ink">
-            <Money value={ticket.cashOut} decimals={quoteDecimals} />
+            {ticket.cashOut >= minTrade(quoteDecimals) ? <Money value={ticket.cashOut} decimals={quoteDecimals} /> : "—"}
           </dd>
         </div>
       </dl>
