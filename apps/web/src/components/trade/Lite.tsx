@@ -36,7 +36,7 @@ function Meter({ chance, lit, className }: { chance: number; lit: string; classN
 
 export function Lite({ state, nowSec, action, stickyAction }: Props) {
   const {
-    data, quoteDecimals, unit, symbol, symbols, kind, expiry, budget, ceiling,
+    data, quoteDecimals, unit, symbol, symbols, kind, expiry, budget, atMax, spend,
     setSymbol, setKind, setExpiry, setSeries, setBudget,
     spot, up, strikes, series, current, sides, empty, dates, odds,
   } = state;
@@ -44,7 +44,7 @@ export function Lite({ state, nowSec, action, stickyAction }: Props) {
   const valid = current && current.size > 0n;
   const payout = valid ? maxPayout(current.terms, current.size) : undefined;
   const multiple = valid ? payoutMultiple(current) : undefined;
-  const note = current && capNote(current, budget, ceiling, quoteDecimals);
+  const note = current && capNote(current, budget, atMax, quoteDecimals);
   const strike = series ? BigInt(series.strike) : undefined;
   const pinned = stickyAction ? "[@media(min-height:44rem)]:scroll-mb-40" : "";
   const chip = `relative inline-flex min-h-11 max-w-full items-center gap-[0.25em] rounded-md border px-[0.4em] py-[0.08em] align-middle leading-tight font-semibold transition-colors ${pinned} ${legend}`;
@@ -55,7 +55,6 @@ export function Lite({ state, nowSec, action, stickyAction }: Props) {
   const picked = (selected: boolean) => (selected ? "bg-side-field shadow-[inset_0_0_0_1px_var(--side)]" : "hover:bg-well");
   const move = (price: bigint) => spot !== undefined && spot > 0n ? formatPct(toNumber(price - spot, quoteDecimals) / toNumber(spot, quoteDecimals)) : "—";
   const endLabel = expiry !== undefined ? `${dayLabel(expiry, nowSec)} ${formatClock(expiry)}` : "Choose date";
-  const spend = current?.capped ? current.cost : budget;
   const amountLabel = spend >= unit ? formatUsd(spend, quoteDecimals, "up").replace(/\.00$/, "") : "—";
   const priceLabel = strike !== undefined ? formatPrice(strike, quoteDecimals) : "—";
   const spotLabel = spot !== undefined ? formatPrice(spot, quoteDecimals) : "—";
@@ -224,7 +223,7 @@ export function Lite({ state, nowSec, action, stickyAction }: Props) {
               I put{" "}
               <span className="whitespace-nowrap">
                 <Popover fit preferAbove label="Trade amount" description={amountLabel} button={<>{amountLabel}<Caret /></>} buttonClassName={`${slot} min-w-[4.5rem] before:content-['Amount']`} panelClassName={panel}>
-                  <AmountPicker value={budget} max={current?.maxCost} ceiling={ceiling} quoteDecimals={quoteDecimals} onChange={setBudget} />
+                  <AmountPicker value={budget} atMax={atMax} max={current?.maxCost} quoteDecimals={quoteDecimals} onChange={setBudget} />
                 </Popover>
                 ,
               </span>{" "}

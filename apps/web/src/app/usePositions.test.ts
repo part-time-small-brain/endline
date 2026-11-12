@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { holding, positions } from "./usePositions.ts";
+import { holding, positions, tooSmallToSell } from "./usePositions.ts";
 
 const NOW = 1_800_000_000;
 const series = {
@@ -25,6 +25,13 @@ const data = (marks: Record<string, { series_id: string; ask: string; bid?: stri
 const valueOf = (marks: Parameters<typeof data>[0]) => positions(data(marks), NOW)?.[0]?.valueNow;
 
 describe("positions", () => {
+  it("can't sell back a position worth under $1, the least a market maker quotes", () => {
+    const at = (bid: string | undefined) => positions(data(bid === undefined ? {} : { "BTC-X": { series_id: "BTC-X", ask: "400000000", bid, max_size: "100000000", vol: 0.4 } }), NOW)?.[0];
+    expect(tooSmallToSell(at("3990000")!, 6)).toBe(true);
+    expect(tooSmallToSell(at("4000000")!, 6)).toBe(false);
+    expect(tooSmallToSell(at(undefined)!, 6)).toBe(false);
+  });
+
   it("value an active position at the market maker's bid, $0 without a bid, and unknown without a mark or while marks fail", () => {
     expect(valueOf({ "BTC-X": { series_id: "BTC-X", ask: "400000000", bid: "380000000", max_size: "100000000", vol: 0.4 } })).toBe(95_000_000n);
     expect(valueOf({ "BTC-X": { series_id: "BTC-X", ask: "400000000", max_size: "100000000", vol: 0.4 } })).toBe(0n);

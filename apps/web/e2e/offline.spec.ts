@@ -467,7 +467,8 @@ test("a long shot sizes to what one trade may pay out, and Pro and Lite say why 
     };
   });
   await page.route("**/fills/*", (route) => route.fulfill({ json: [] }));
-  await live(page, () => [{ series_id: "BTC-5NOV26-81000_83000-C", ask: String(40 * USD), max_size: String(10 ** 8), vol: 0.4 }]);
+  let ask = 40 * USD;
+  await live(page, () => [{ series_id: "BTC-5NOV26-81000_83000-C", ask: String(ask), max_size: String(10 ** 8), vol: 0.4 }]);
   await page.route(RPC, (route) => {
     const params = route.request().postDataJSON().params;
     const args = JSON.parse(Buffer.from(params.args_base64, "base64").toString());
@@ -476,13 +477,22 @@ test("a long shot sizes to what one trade may pay out, and Pro and Lite say why 
   });
   await page.getByRole("button", { name: "Connect", exact: true }).click();
   await page.getByRole("button", { name: /Ethereum wallet/ }).click();
-  await expect(page.getByRole("radiogroup", { name: "You pay" }).getByRole("radio")).toHaveText(["$5", "$10", "$25", "Max", "Other"]);
+  await expect(page.getByRole("radiogroup", { name: "You pay" }).getByRole("radio")).toHaveText(["$5", "$10", "$25", "Max $40", "Other"]);
   await expect(page.getByRole("radio", { name: "$25", exact: true })).toHaveAttribute("aria-checked", "true");
-  await page.getByRole("radio", { name: "Max", exact: true }).click();
+  await page.getByRole("radio", { name: "Max $40", exact: true }).click();
   await expect.poll(() => money(term(page, "Max loss"))).toBe(40);
   await expect.poll(() => money(term(page, /^If BTC ends above /))).toBe(2_000);
+  await expect(page.getByRole("button", { name: "Buy Up · $40", exact: true })).toBeVisible();
   const why = page.getByText("One trade pays out at most $2,000, so this costs $40.", { exact: true });
   await expect(why).toHaveCount(0);
+  ask = 50 * USD;
+  await page.clock.fastForward(60_000);
+  await expect.poll(() => money(term(page, "Max loss"))).toBe(50);
+  await expect(page.getByRole("radio", { name: "Max $50", exact: true })).toHaveAttribute("aria-checked", "true");
+  await expect(page.getByText("One trade pays out at most $2,000, so this costs $50.", { exact: true })).toHaveCount(0);
+  ask = 40 * USD;
+  await page.clock.fastForward(60_000);
+  await expect.poll(() => money(term(page, "Max loss"))).toBe(40);
   await page.getByRole("radio", { name: "Other", exact: true }).click();
   await page.getByRole("textbox", { name: "Amount in dollars" }).fill("100");
   await expect.poll(() => money(term(page, "Max loss"))).toBe(40);
@@ -523,7 +533,7 @@ test("a second listed asset brings the asset picker back in every mode, and a sw
     await page.getByRole("radio", { name: "$50", exact: true }).click();
     await assets.getByRole("radio", { name: /^SOL/ }).click();
     await expect(assets.getByRole("radio", { name: /^SOL/ })).toHaveAttribute("aria-checked", "true");
-    await expect(page.getByRole("radio", { name: "Max", exact: true })).toHaveAttribute("aria-checked", "true");
+    await expect(page.getByRole("radio", { name: /^Max / })).toHaveAttribute("aria-checked", "true");
     await expect(term(page, /^If SOL ends above /)).toBeVisible();
     await assets.getByRole("radio", { name: /^BTC/ }).click();
     await expect(page.getByRole("radio", { name: "$50", exact: true })).toHaveAttribute("aria-checked", "true");
@@ -686,7 +696,7 @@ test.describe("Tap", () => {
     });
     await page.getByRole("button", { name: "Connect", exact: true }).click();
     await page.getByRole("button", { name: /Ethereum wallet/ }).click();
-    await page.getByRole("radio", { name: "Max", exact: true }).click();
+    await page.getByRole("radio", { name: /^Max / }).click();
     await page.getByRole("table").getByRole("button", { name: /^Up · BTC ends above \$81,000 · .* · pays up to 50\.0×$/ }).click();
     await expect.poll(() => asked[0]).toBe(String(10 ** 8));
   });
