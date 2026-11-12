@@ -123,5 +123,5 @@ near --quiet contract call-function as-transaction $opt set_oracle_wasm json-arg
 near --quiet contract call-function as-transaction intents.near add_public_key json-args '{"public_key":"$mm_pk"}' prepaid-gas '30 Tgas' attached-deposit '1 yoctoNEAR' sign-as $mm $(admin MM_BACKUP_PRIVATE_KEY)
 
 # 6. After step 3 checks out, save as deploy/mainnet.json
-{"network":"mainnet","rpc_url":"https://near.drpc.org","owner":"$root","intents_id":"intents.near","options_id":"$opt","quote_asset":"nep141:$usdc","accounts":{"oracle":"$oracle","relayer":"$relayer","settler":"$settler","market_maker":"$mm"}}
+{"network":"mainnet","rpc_url":"https://near.drpc.org","rpc_fallbacks":["https://rpc.intea.rs","https://rpc.mainnet.near.org"],"owner":"$root","intents_id":"intents.near","options_id":"$opt","quote_asset":"nep141:$usdc","accounts":{"oracle":"$oracle","relayer":"$relayer","settler":"$settler","market_maker":"$mm"}}
 EOF

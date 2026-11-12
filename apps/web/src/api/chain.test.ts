@@ -1,7 +1,10 @@
 import { afterEach, expect, it, vi } from "vitest";
 import { rpcChain } from "./chain.ts";
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.restoreAllMocks();
+});
 
 const views: Record<string, unknown> = {
   get_config: { owner_id: "owner.near", intents_id: "intents.near", quote_asset: "nep141:usdc.near", quote_decimals: 6, timing: { period_sec: 86_400, offset_sec: 28_800, write_cutoff_sec: 1_800 }, paused: false },
@@ -54,5 +57,31 @@ it("returns a contract's own error from the first endpoint instead of asking the
 
 it("shows a plain message, never a provider's upsell, when no endpoint answers", async () => {
   vi.stubGlobal("fetch", vi.fn(async () => new Response('{"error":"Rate limits exceeded. For higher rate limits get a subscription"}', { status: 429 })));
-  await expect(rpcChain(["https://a.rpc", "https://b.rpc"], "intents.near", "opt.near").contract()).rejects.toThrow("NEAR isn't answering right now. Trying again in a minute.");
+  await expect(rpcChain(["https://a.rpc", "https://b.rpc"], "intents.near", "opt.near").contract()).rejects.toThrow("NEAR isn't answering right now. Try again in a minute.");
+});
+
+it("gives up on an endpoint after 5 s and starts from the one that answered next time", async () => {
+  const timers: AbortController[] = [];
+  vi.spyOn(AbortSignal, "timeout").mockImplementation((ms) => {
+    expect(ms).toBe(5_000);
+    const controller = new AbortController();
+    timers.push(controller);
+    return controller.signal;
+  });
+  const asked: string[] = [];
+  vi.stubGlobal(
+    "fetch",
+    vi.fn((url: string, init?: RequestInit) => {
+      asked.push(url);
+      if (url === "https://b.rpc") return Promise.resolve(answer(salt));
+      return new Promise((_, reject) => init?.signal?.addEventListener("abort", () => reject(init.signal?.reason)));
+    }),
+  );
+  const chain = rpcChain(["https://a.rpc", "https://b.rpc"], "intents.near", "opt.near");
+  const first = chain.salt();
+  await vi.waitFor(() => expect(timers).toHaveLength(1));
+  timers[0]?.abort(new Error("timed out"));
+  expect(await first).toEqual(Uint8Array.from([10, 11, 12, 13]));
+  await chain.salt();
+  expect(asked).toEqual(["https://a.rpc", "https://b.rpc", "https://b.rpc"]);
 });

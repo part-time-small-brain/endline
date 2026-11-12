@@ -78,6 +78,7 @@ roles = ("oracle", "relayer", "market_maker", "demo_user")
 json.dump({
     "network": "testnet",
     "rpc_url": "https://rpc.testnet.fastnear.com",
+    "rpc_fallbacks": old.get("rpc_fallbacks", []),
     "owner": root,
     "intents_id": intents,
     "options_id": opt,

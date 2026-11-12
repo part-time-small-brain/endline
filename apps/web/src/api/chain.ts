@@ -23,15 +23,18 @@ export interface Chain {
 }
 
 export function rpcChain(rpcUrls: string[], intentsId: string, optionsId: string): Chain {
+  let first = 0;
+
   async function view(contract: string, method: string, args: object): Promise<unknown> {
-    for (const url of rpcUrls) {
-      const answer = await ask(url, contract, method, args).catch(() => undefined);
+    for (const at of rpcUrls.map((_, i) => (first + i) % rpcUrls.length)) {
+      const answer = await ask(rpcUrls[at] ?? "", contract, method, args).catch(() => undefined);
       if (answer?.result) {
+        first = at;
         if (!answer.result.result) throw new Error(answer.result.error ?? `${method} failed`);
         return JSON.parse(new TextDecoder().decode(new Uint8Array(answer.result.result)));
       }
     }
-    throw new Error("NEAR isn't answering right now. Trying again in a minute.");
+    throw new Error("NEAR isn't answering right now. Try again in a minute.");
   }
 
   async function ask(url: string, contract: string, method: string, args: object): Promise<RpcAnswer> {
