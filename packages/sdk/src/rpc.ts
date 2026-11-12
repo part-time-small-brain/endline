@@ -1,4 +1,16 @@
 import { JsonRpcProvider } from "near-api-js";
+import {
+  DoesNotTrackShardError,
+  GarbageCollectedBlockError,
+  InternalHandlerError,
+  InternalRpcError,
+  NodeIsSyncingError,
+  NoNewBlocksError,
+  NoSyncedBlocksError,
+  NotSyncedYetError,
+  RpcError,
+  UnavailableShardError,
+} from "near-api-js/rpc-errors";
 
 const READ_TIMEOUT_MS = 5_000;
 const LONG_TIMEOUT_MS = 30_000;
@@ -8,8 +20,8 @@ const PASSES = 3;
 const MAX_PASS_WAIT_MS = 5_000;
 const SEND_METHODS = new Set(["send_tx", "broadcast_tx_commit", "broadcast_tx_async"]);
 const LONG_METHODS = new Set([...SEND_METHODS, "tx", "EXPERIMENTAL_tx_status"]);
-const TRANSPORT_STATUS = new Set([408, 429, 500, 502, 503, 504]);
-const ENDPOINT_ERROR = /Unknown RPC error|JSON RPC response must include|NO_SYNCED_BLOCKS|NoSyncedBlocks|NODE_IS_SYNCING|NodeIsSyncing|NOT_SYNCED_YET|NotSyncedYet|UNAVAILABLE_SHARD|UnavailableShard|DOES_NOT_TRACK_SHARD|DoesNotTrackShard|GARBAGE_COLLECTED_BLOCK|GarbageCollectedBlock/;
+const NODE_ERRORS = [DoesNotTrackShardError, GarbageCollectedBlockError, InternalHandlerError, InternalRpcError, NodeIsSyncingError, NoNewBlocksError, NoSyncedBlocksError, NotSyncedYetError, UnavailableShardError];
+const HEADER_NAME = /^[A-Za-z0-9-]+$/;
 
 export interface Rpc {
   urls: string[];
@@ -30,17 +42,29 @@ type Failure = "chain" | "refused" | "unclear";
 
 export function rpcUrls(fallback: string, extra: string | undefined): string[] {
   const listed = (extra ?? "").split(",").map((url) => url.trim()).filter((url) => url !== "");
-  for (const url of listed) if (!URL.canParse(url) || !url.startsWith("https://")) throw new Error(`NEAR_RPC_URLS entry ${URL.canParse(url) ? new URL(url).host : "?"} must be an https URL`);
+  for (const url of listed) {
+    const host = URL.canParse(url) ? new URL(url).host : "?";
+    if (!URL.canParse(url) || !url.startsWith("https://")) throw new Error(`NEAR_RPC_URLS entry ${host} must be an https URL`);
+    if (Object.keys(fragmentHeaders(url)).some((name) => !HEADER_NAME.test(name))) throw new Error(`NEAR_RPC_URLS entry ${host} has a bad header name in its #fragment`);
+  }
   return [...new Set([...listed, fallback])];
 }
 
 function failure(e: unknown): Failure {
-  if (!(e instanceof Error)) return "unclear";
-  const cause = (e as { cause?: unknown }).cause;
-  if (cause === 429 || /rate limit|too many requests/i.test(e.message)) return "refused";
-  if (typeof cause === "number" && TRANSPORT_STATUS.has(cause)) return "unclear";
-  if (e.name === "TimeoutError" || e instanceof SyntaxError || (e instanceof TypeError && /fetch failed/i.test(e.message))) return "unclear";
-  return ENDPOINT_ERROR.test(`${e.name} ${e.message} ${typeof cause === "object" ? JSON.stringify(cause) : ""}`) ? "unclear" : "chain";
+  if (e instanceof Error && (e as { cause?: unknown }).cause === 429) return "refused";
+  if (!(e instanceof RpcError) || NODE_ERRORS.some((type) => e instanceof type)) return "unclear";
+  return e.constructor === RpcError && e.message === "Unknown RPC error" ? "unclear" : "chain";
+}
+
+function fragmentHeaders(url: string): Record<string, string> {
+  const fragment = new URL(url).hash.slice(1);
+  if (fragment === "") return {};
+  return Object.fromEntries(
+    fragment.split("&").map((pair) => {
+      const at = pair.indexOf("=");
+      return at < 0 ? [decodeURIComponent(pair), ""] : [decodeURIComponent(pair.slice(0, at)), decodeURIComponent(pair.slice(at + 1))];
+    }),
+  );
 }
 
 function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
@@ -53,7 +77,7 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
 
 function endpointOf(url: string): Endpoint {
   const parsed = new URL(url);
-  const headers = Object.fromEntries(new URLSearchParams(parsed.hash.slice(1)));
+  const headers = fragmentHeaders(url);
   parsed.hash = "";
   return { provider: new JsonRpcProvider({ url: parsed.toString(), headers }, { retries: 1 }), host: parsed.host, latencyMs: 0, failures: 0, cooledAt: 0, coolUntil: 0 };
 }
