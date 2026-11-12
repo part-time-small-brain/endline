@@ -281,6 +281,15 @@ export function createMockServices(config: Config): Services {
       { assetId: "nep141:pol-usdc", symbol: "USDC", blockchain: "pol", decimals: 6, price: 1 },
       { assetId: "nep141:bsc-usdc", symbol: "USDC", blockchain: "bsc", decimals: 6, price: 1 },
       { assetId: "nep141:avax-usdc", symbol: "USDC", blockchain: "avax", decimals: 6, price: 1 },
+      { assetId: "nep245:v2_1.omni.hot.tg:10_usdc", symbol: "USDC", blockchain: "op", decimals: 6, price: 1 },
+      { assetId: "nep245:v2_1.omni.hot.tg:10_eth", symbol: "ETH", blockchain: "op", decimals: 18, price: 2_000 },
+      { assetId: "nep245:v2_1.omni.hot.tg:534352_eth", symbol: "ETH", blockchain: "scroll", decimals: 18, price: 2_000 },
+      { assetId: "nep245:v2_1.omni.hot.tg:196_usdc", symbol: "USDC", blockchain: "xlayer", decimals: 6, price: 1 },
+      { assetId: "nep245:v2_1.omni.hot.tg:143_usdc", symbol: "USDC", blockchain: "monad", decimals: 6, price: 1 },
+      { assetId: "nep245:v2_1.omni.hot.tg:1117_usdt", symbol: "USDT", blockchain: "ton", decimals: 6, price: 1 },
+      { assetId: "nep141:miden-usdt", symbol: "USDT", blockchain: "miden", decimals: 6, price: 1 },
+      { assetId: "1cs_v1:aptos:aptos-fa:0xbtc", symbol: "BTC", blockchain: "aptos", decimals: 8, price: 80_000 },
+      { assetId: "1cs_v1:starknet:erc20:0xsol", symbol: "SOL", blockchain: "starknet", decimals: 9, price: 150 },
     ],
     async quote(asset, amount, recipient) {
       await sleep(600);

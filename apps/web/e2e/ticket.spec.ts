@@ -192,18 +192,18 @@ test("Add funds starts on USDC, lists its cheapest networks first and prices the
   const get = sheet.getByRole("button", { name: "Get deposit address" });
   await expectOptions(tokens, ["USDC", "USDT", "ETH", "BTC", "SOL"]);
   await expect(tokens.first()).toHaveAttribute("aria-checked", "true");
-  await expectOptions(networks, ["Base", "Arbitrum", "Solana", "Polygon", "BNB Chain", "Avalanche", "Ethereum", "Gnosis", "Sui", "Aptos"]);
+  await expectOptions(networks, ["Base", "Arbitrum", "Optimism", "Solana", "Polygon", "BNB Chain", "Avalanche", "Ethereum", "Gnosis", "Sui", "Aptos", "X Layer", "Monad"]);
   await expect(networks.first()).toHaveAttribute("aria-checked", "true");
   await expect(get).toBeInViewport();
 
   await networks.filter({ hasText: "Ethereum" }).click();
   await sheet.getByRole("radio", { name: "BTC", exact: true }).click();
-  await expectOptions(networks, ["Bitcoin"]);
-  await expect(networks).toHaveAttribute("aria-checked", "true");
+  await expectOptions(networks, ["Bitcoin", "Aptos"]);
+  await expect(networks.first()).toHaveAttribute("aria-checked", "true");
   await amount.fill("0.01");
   await expect(sheet.getByText(/^≈/)).toHaveText("≈ $800");
   await sheet.getByRole("radio", { name: "ETH", exact: true }).click();
-  await expectOptions(networks, ["Base", "Ethereum", "Abstract", "Robinhood Chain"]);
+  await expectOptions(networks, ["Base", "Optimism", "Ethereum", "Abstract", "Robinhood Chain", "Scroll"]);
   await expect(networks.first()).toHaveAttribute("aria-checked", "true");
   await expect(sheet.getByText(/^≈/)).toHaveText("≈ $20.00");
   for (const text of ["", "abc", "0.0000000000000000001"]) {
@@ -211,6 +211,10 @@ test("Add funds starts on USDC, lists its cheapest networks first and prices the
     await expect(sheet.getByText(/^≈/)).toHaveCount(0);
     await expect(get).toBeDisabled();
   }
+  await sheet.getByRole("radio", { name: "USDT", exact: true }).click();
+  await expectOptions(networks, ["Ethereum", "Tron", "Aptos", "TON", "Miden"]);
+  await sheet.getByRole("radio", { name: "SOL", exact: true }).click();
+  await expectOptions(networks, ["Solana", "Starknet"]);
 
   await sheet.getByRole("radio", { name: "USDC", exact: true }).click();
   const tooLarge = sheet.getByText("That amount is too large.");

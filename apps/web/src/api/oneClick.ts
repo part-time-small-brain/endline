@@ -1,4 +1,4 @@
-import { verifyDepositQuote } from "@endline/sdk";
+import { DEPOSIT_ORIGIN, verifyDepositQuote } from "@endline/sdk";
 import { z } from "zod";
 
 export const DepositAsset = z.object({ assetId: z.string(), symbol: z.string(), blockchain: z.string(), decimals: z.number().int(), price: z.number() });
@@ -32,6 +32,8 @@ export interface OneClick {
 const API = "https://1click.chaindefuser.com/v0";
 export const DEPOSIT_SYMBOLS = ["USDC", "USDT", "ETH", "BTC", "SOL"];
 export const MAX_DEPOSIT_UNITS = 10n ** 39n - 1n;
+// near deposits are a plain transfer, stellar needs a memo, hypercore can't refund into intents
+const HIDDEN_CHAINS = ["near", "stellar", "hypercore"];
 const SEND_WINDOW_MS = 60 * 60_000;
 const MIN_SEND_MS = 15 * 60_000;
 const QUOTE_DEADLINE_MS = 3 * SEND_WINDOW_MS;
@@ -52,7 +54,7 @@ export function oneClick(relayUrl: string): OneClick {
   return {
     async assets() {
       const tokens = (await request(z.array(z.unknown()), `${API}/tokens`)).flatMap((token) => DepositAsset.safeParse(token).data ?? []);
-      return tokens.filter((token) => DEPOSIT_SYMBOLS.includes(token.symbol) && token.assetId.startsWith("nep141:") && token.blockchain !== "near");
+      return tokens.filter((token) => DEPOSIT_SYMBOLS.includes(token.symbol) && DEPOSIT_ORIGIN.test(token.assetId) && !HIDDEN_CHAINS.includes(token.blockchain));
     },
     async quote(asset, amount, recipient, destinationAsset) {
       const body = {

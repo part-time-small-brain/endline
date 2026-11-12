@@ -1,4 +1,4 @@
-import { AccountId, verifyDepositQuote } from "@endline/sdk";
+import { AccountId, DEPOSIT_ORIGIN, verifyDepositQuote } from "@endline/sdk";
 import { z } from "zod";
 import { parseJson } from "./json.ts";
 import { rateLimit } from "./limit.ts";
@@ -16,7 +16,7 @@ const depositQuote = (quoteAsset: string) =>
       dry: z.literal(false),
       swapType: z.literal("EXACT_INPUT"),
       slippageTolerance: z.number().int().min(0).max(100),
-      originAsset: z.string().startsWith("nep141:"),
+      originAsset: z.string().regex(DEPOSIT_ORIGIN),
       depositType: z.literal("ORIGIN_CHAIN"),
       destinationAsset: z.literal(quoteAsset),
       amount: z.string().regex(/^[1-9][0-9]{0,38}$/),
