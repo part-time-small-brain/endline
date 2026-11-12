@@ -2,6 +2,7 @@ import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import mainnet from "../../../deploy/mainnet.json" with { type: "json" };
 import testnet from "../../../deploy/testnet.json" with { type: "json" };
 import { loadConfig, loadMonitorConfig, loadProposerConfig, loadRelayConfig, loadSettlerConfig } from "./config.ts";
 
@@ -73,10 +74,10 @@ describe("config", () => {
     expect(() => loadMonitorConfig({ NETWORK_ID: "testnet", ALERT_WEBHOOK_URL_FILE: file("bad", leaked) })).toThrow(expect.objectContaining({ message: expect.not.stringContaining("secret-token") }));
   });
 
-  it("refuses a network without a deploy file: mainnet, and so settle, until deploy/mainnet.json exists", () => {
-    expect(() => loadConfig({ ...ENV, NETWORK_ID: "mainnet" })).toThrow("no deploy/mainnet.json");
-    expect(() => loadMonitorConfig({ NETWORK_ID: "mainnet" })).toThrow("no deploy/mainnet.json");
-    expect(() => loadProposerConfig({ NETWORK_ID: "mainnet", ORACLE_ACCOUNT_ID: "oracle.near", ORACLE_PRIVATE_KEY: KEY })).toThrow("no deploy/mainnet.json");
-    expect(() => loadSettlerConfig({ SETTLER_ACCOUNT_ID: "settler.near", SETTLER_PRIVATE_KEY: KEY })).toThrow("no deploy/mainnet.json");
+  it("takes mainnet's ids from deploy/mainnet.json for every command, settle included", () => {
+    const ids = { rpcUrl: mainnet.rpc_url, intentsId: "intents.near", optionsId: mainnet.options_id };
+    expect(loadConfig({ ...ENV, NETWORK_ID: "mainnet" })).toMatchObject(ids);
+    expect(loadMonitorConfig({ NETWORK_ID: "mainnet" })).toMatchObject(ids);
+    expect(loadSettlerConfig({ SETTLER_ACCOUNT_ID: "settler.near", SETTLER_PRIVATE_KEY: KEY })).toMatchObject({ rpcUrl: ids.rpcUrl, optionsId: ids.optionsId });
   });
 });

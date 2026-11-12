@@ -39,7 +39,7 @@ Read from the process environment. `MM_PRIVATE_KEY`, `MM_API_KEY`, `ALERT_WEBHOO
 | `MM_API_KEY` | One of the relay's `MM_API_KEYS`, sent as `Authorization: Bearer <key>`. Quoting only |
 | `MM_ACCOUNT_ID` | Signer of quotes and writes. Monitor: optional, watches its NEAR for gas |
 | `MM_PRIVATE_KEY` | `ed25519:…` key registered for `MM_ACCOUNT_ID` on `intents_id` |
-| `NETWORK_ID` | `mainnet` or `testnet`, every command but `settle`. Picks `deploy/<NETWORK_ID>.json`, the only source of `rpc_url`, `intents_id` (the verifier; the monitor watches its NEAR) and `options_id`. No file (mainnet today): the command won't start. The monitor also uses it in the printed `near` commands |
+| `NETWORK_ID` | `mainnet` or `testnet`, every command but `settle`. Picks `deploy/<NETWORK_ID>.json`, the only source of `rpc_url`, `intents_id` (the verifier; the monitor watches its NEAR) and `options_id`. No file: the command won't start. The monitor also uses it in the printed `near` commands |
 | `SPREAD_VOL_POINTS` | Vol shock priced into each side, default `2` |
 | `MIN_PREMIUM_USD` | Default `1`. Asks are floored to it, bids below it are refused |
 | `MAX_TRADE_USD` | Max payout (contracts × width) per quote, default `2000`, at most `1e9`. The lister reads it too, to keep that much USDC free: set it the same for both |

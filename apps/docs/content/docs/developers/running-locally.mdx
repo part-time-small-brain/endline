@@ -72,7 +72,7 @@ pnpm --filter @endline/mm start positions           # market maker balances, gre
 
 ## Docker
 
-`deploy/` has the Dockerfile and compose file. The hosting box runs it once per network as the compose project `endline-<NETWORK_ID>`, each from its own checkout with its own env file (`deploy/.env.<network>`, template: `deploy/env.example`), images (`endline-app:<network>`), subnet, relay volume, Cloudflare tunnel and [secrets](#secrets). Mainnet runs once `deploy/mainnet.json` exists. The landing, the app and these docs are static sites on Cloudflare Pages.
+`deploy/` has the Dockerfile and compose file. The hosting box runs it once per network as the compose project `endline-<NETWORK_ID>`, each from its own checkout with its own env file (`deploy/.env.<network>`, template: `deploy/env.example`), images (`endline-app:<network>`), subnet, relay volume, Cloudflare tunnel and [secrets](#secrets). The landing, the app and these docs are static sites on Cloudflare Pages.
 
 | | testnet | mainnet |
 |---|---|---|

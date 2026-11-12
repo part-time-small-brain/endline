@@ -1,4 +1,5 @@
 import { afterEach, expect, it, vi } from "vitest";
+import mainnet from "../../../deploy/mainnet.json" with { type: "json" };
 import testnet from "../../../deploy/testnet.json" with { type: "json" };
 import { loadConfig } from "./config.ts";
 
@@ -33,6 +34,7 @@ it("takes the contract ids from deploy/<VITE_NETWORK>.json, never from env", () 
   expect(loadConfig({ ...ENV, ...stale })).toMatchObject({ network: "testnet", rpcUrl: testnet.rpc_url, intentsId: testnet.intents_id, optionsId: testnet.options_id, quoteAsset: testnet.quote_asset });
 });
 
-it("refuses a network without a deploy file: mainnet until deploy/mainnet.json exists", () => {
-  expect(() => loadConfig({ VITE_NETWORK: "mainnet" })).toThrow("no deploy/mainnet.json");
+it("builds mainnet from deploy/mainnet.json, never testnet's", () => {
+  vi.stubGlobal("window", { location: { origin: "https://app.endline.trade" } });
+  expect(loadConfig({ VITE_NETWORK: "mainnet", VITE_RELAY_URL: "https://api.endline.trade" })).toMatchObject({ network: "mainnet", rpcUrl: mainnet.rpc_url, intentsId: "intents.near", optionsId: mainnet.options_id, quoteAsset: mainnet.quote_asset });
 });
