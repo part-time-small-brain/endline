@@ -35,9 +35,12 @@ test("an invalid Other amount never trades the previous amount", async ({ page }
   await expect(buy).toBeEnabled();
 });
 
-const expectNames = async (radios: Locator, names: string[]) => {
+const expectOptions = async (radios: Locator, names: string[]) => {
   await expect(radios).toHaveCount(names.length);
-  for (const [i, name] of names.entries()) await expect(radios.nth(i)).toHaveAccessibleName(name);
+  for (const [i, name] of names.entries()) {
+    await expect(radios.nth(i)).toHaveAccessibleName(name);
+    await expect(radios.nth(i).locator("img")).toHaveCount(1);
+  }
 };
 
 const openAddFunds = async (page: Page) => {
@@ -187,20 +190,20 @@ test("Add funds starts on USDC, lists its cheapest networks first and prices the
   const networks = sheet.getByRole("radiogroup", { name: "Network" }).getByRole("radio");
   const amount = sheet.getByRole("textbox", { name: "Amount to deposit" });
   const get = sheet.getByRole("button", { name: "Get deposit address" });
-  await expectNames(tokens, ["USDC", "USDT", "ETH", "BTC", "SOL"]);
+  await expectOptions(tokens, ["USDC", "USDT", "ETH", "BTC", "SOL"]);
   await expect(tokens.first()).toHaveAttribute("aria-checked", "true");
-  await expectNames(networks, ["Base", "Arbitrum", "Solana", "Polygon", "BNB Chain", "Avalanche", "Ethereum", "Gnosis"]);
+  await expectOptions(networks, ["Base", "Arbitrum", "Optimism", "Solana", "Polygon", "BNB Chain", "Avalanche", "Ethereum", "Gnosis", "Sui", "Aptos", "X Layer", "Monad"]);
   await expect(networks.first()).toHaveAttribute("aria-checked", "true");
   await expect(get).toBeInViewport();
 
   await networks.filter({ hasText: "Ethereum" }).click();
   await sheet.getByRole("radio", { name: "BTC", exact: true }).click();
-  await expectNames(networks, ["Bitcoin"]);
-  await expect(networks).toHaveAttribute("aria-checked", "true");
+  await expectOptions(networks, ["Bitcoin"]);
+  await expect(networks.first()).toHaveAttribute("aria-checked", "true");
   await amount.fill("0.01");
   await expect(sheet.getByText(/^≈/)).toHaveText("≈ $800");
   await sheet.getByRole("radio", { name: "ETH", exact: true }).click();
-  await expectNames(networks, ["Base", "Ethereum", "Abstract"]);
+  await expectOptions(networks, ["Base", "Optimism", "Ethereum", "Abstract", "Robinhood Chain", "Scroll"]);
   await expect(networks.first()).toHaveAttribute("aria-checked", "true");
   await expect(sheet.getByText(/^≈/)).toHaveText("≈ $20.00");
   for (const text of ["", "abc", "0.0000000000000000001"]) {
@@ -208,6 +211,10 @@ test("Add funds starts on USDC, lists its cheapest networks first and prices the
     await expect(sheet.getByText(/^≈/)).toHaveCount(0);
     await expect(get).toBeDisabled();
   }
+  await sheet.getByRole("radio", { name: "USDT", exact: true }).click();
+  await expectOptions(networks, ["Ethereum", "Tron", "Aptos", "TON", "Miden"]);
+  await sheet.getByRole("radio", { name: "SOL", exact: true }).click();
+  await expectOptions(networks, ["Solana"]);
 
   await sheet.getByRole("radio", { name: "USDC", exact: true }).click();
   const tooLarge = sheet.getByText("That amount is too large.");

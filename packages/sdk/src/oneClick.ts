@@ -3,6 +3,7 @@ import { sha256 } from "@noble/hashes/sha2.js";
 import { base58 } from "@scure/base";
 import { z } from "zod";
 
+export const DEPOSIT_ORIGIN = /^(nep141|nep245):/;
 const ONE_CLICK_KEY = base58.decode("reYaWhvwu8Jzo3WUM3zhn6VrhuMEF4eADL17qtRVifc");
 const SIGNED_FIELDS = ["amountIn", "amountInFormatted", "amountInUsd", "minAmountIn", "amountOut", "amountOutFormatted", "amountOutUsd", "minAmountOut"];
 const SIGNED_IF_SET = ["depositAddress", "depositMemo", "deadline", "timeWhenInactive", "timeEstimate", "refundFee", "withdrawFee"];
