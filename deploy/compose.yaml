@@ -17,13 +17,13 @@ services:
   mm:
     <<: *app
     command: pnpm --filter @endline/mm start
-    environment: [NETWORK_ID, MM_ACCOUNT_ID, MM_PRIVATE_KEY_FILE=/run/secrets/MM_PRIVATE_KEY, MM_API_KEY_FILE=/run/secrets/MM_API_KEY, RELAY_WS_URL=ws://relay:8787/mm]
+    environment: [NETWORK_ID, MM_ACCOUNT_ID, MM_PRIVATE_KEY_FILE=/run/secrets/MM_PRIVATE_KEY, MM_API_KEY_FILE=/run/secrets/MM_API_KEY, RELAY_WS_URL=ws://relay:8787/mm, SPREAD_VOL_POINTS, MIN_PREMIUM_USD, MAX_TRADE_USD, MAX_SERIES_USD, MAX_DELTA_USD, MAX_VEGA_USD, RESERVE_USD]
     secrets: [MM_PRIVATE_KEY, MM_API_KEY]
     depends_on: [relay]
   lister:
     <<: *app
     command: pnpm --filter @endline/mm start list
-    environment: [NETWORK_ID, MM_ACCOUNT_ID, MM_PRIVATE_KEY_FILE=/run/secrets/MM_PRIVATE_KEY]
+    environment: [NETWORK_ID, MM_ACCOUNT_ID, MM_PRIVATE_KEY_FILE=/run/secrets/MM_PRIVATE_KEY, SPREAD_VOL_POINTS, MIN_PREMIUM_USD, MAX_TRADE_USD, MAX_SERIES_USD, MAX_DELTA_USD, MAX_VEGA_USD, RESERVE_USD]
     secrets: [MM_PRIVATE_KEY]
   monitor:
     <<: *app
