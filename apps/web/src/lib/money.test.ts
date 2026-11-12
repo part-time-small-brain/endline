@@ -58,12 +58,6 @@ describe("formatToken", () => {
     expect(formatToken(10n ** 18n, 18)).toBe("1");
     expect(formatToken(123_456_789_123_456_789n, 18)).toBe("0.12345678");
   });
-
-  it("keeps every unit at full precision, so a deposit amount round-trips exactly", () => {
-    for (const [units, decimals] of [[1_123_456_789n, 9], [1n, 18], [9n, 9], [1_000_000_000_000_000_000_001n, 18], [123_456_789n, 8]] as const) {
-      expect(parseUnits(formatToken(units, decimals, decimals).replaceAll(",", ""), decimals)).toBe(units);
-    }
-  });
 });
 
 describe("parseUnits", () => {

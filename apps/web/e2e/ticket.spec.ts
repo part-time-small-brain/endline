@@ -62,6 +62,8 @@ test("deposit addresses match the selected chain, and so does the warning", asyn
     await send.getByRole("button", { name: "Copy amount", exact: true }).click();
     await expect(send.getByRole("button", { name: "Copied", exact: true })).toBeVisible();
     expect(await page.evaluate(() => navigator.clipboard.readText())).toBe("1000");
+    await page.clock.runFor(2_000);
+    await expect(send.getByRole("button", { name: "Copy amount", exact: true })).toBeVisible();
     await expect(sheet.getByText(/^Only send/)).toHaveText(`Only send USDC on ${chain}. Anything else may be lost.`);
     await sheet.getByRole("button", { name: "Back" }).click();
   }
@@ -89,20 +91,64 @@ test("the amount to send and copy is exact to the token's last decimal", async (
   }
 });
 
-test("an address past its send-by time is replaced and forgotten when nothing was sent", async ({ page }) => {
+const PENDING_KEY = "pending-deposit:demo.near";
+const saved = (page: Page) => page.evaluate((key) => localStorage.getItem(key), PENDING_KEY);
+const store = (page: Page, value: string) => page.evaluate(([key, stored]) => localStorage.setItem(key, stored), [PENDING_KEY, value] as const);
+const savedAddress = async (page: Page) => JSON.parse((await saved(page)) ?? "null")?.depositAddress;
+
+test("an address past its send-by time is hidden but still checked until refunds are done, then forgotten when nothing was sent", async ({ page }) => {
   await connectDemo(page);
-  const deadline = new Date((await page.evaluate(() => Date.now())) + 60_000).toISOString();
-  const pending = { depositAddress: "0x00000000000000000000000000000000000000aa", amountIn: "25000000", amountOut: "24975000", timeEstimate: 35, deadline, asset: { assetId: "nep141:base-usdc", symbol: "USDC", blockchain: "base", decimals: 6, price: 1 } };
-  await page.evaluate((value) => localStorage.setItem("pending-deposit:demo.near", value), JSON.stringify(pending));
+  const now = await page.evaluate(() => Date.now());
+  const at = (ms: number) => new Date(now + ms).toISOString();
+  const pending = { depositAddress: "0x00000000000000000000000000000000000000aa", amountIn: "25000000", amountOut: "24975000", timeEstimate: 35, sendBefore: at(60_000), deadline: at(60_000 + 2 * 3_600_000), clockOffsetMs: 0, asset: { assetId: "nep141:base-usdc", symbol: "USDC", blockchain: "base", decimals: 6, price: 1 } };
+  await store(page, JSON.stringify(pending));
   const sheet = await openAddFunds(page);
   await expect(sheet.locator("code")).toHaveText(pending.depositAddress);
   await page.clock.runFor(61_000);
-  await expect(sheet.getByText("This address has expired. Get a new one.")).toBeVisible();
-  await expect(sheet.locator("code")).toHaveCount(0);
-  await expect(sheet.getByRole("img", { name: "Deposit address QR code" })).toHaveCount(0);
-  await expect.poll(() => page.evaluate(() => localStorage.getItem("pending-deposit:demo.near"))).toBeNull();
+  await expect(sheet.getByRole("status")).toHaveText("This address has expired. If you already sent, we're still checking for it.");
+  for (const gone of [sheet.locator("code"), sheet.getByRole("img", { name: "Deposit address QR code" }), sheet.getByRole("button", { name: /^Copy/ }), sheet.getByRole("button", { name: "Back" })]) await expect(gone).toHaveCount(0);
+  await page.clock.fastForward(2 * 3_600_000 + 35_000 + 10 * 60_000 - 3_000);
+  await expect(sheet.getByRole("status")).toHaveText("This address has expired. If you already sent, we're still checking for it.");
+  expect(await savedAddress(page)).toBe(pending.depositAddress);
+  await page.clock.runFor(3_000);
+  await expect(sheet.getByRole("status")).toHaveText("This address has expired. Get a new one.");
+  await expect.poll(() => saved(page)).toBeNull();
   await sheet.getByRole("button", { name: "Back" }).click();
   await expect(sheet.getByRole("button", { name: "Get deposit address" })).toBeVisible();
+});
+
+test("a transfer seen after the send-by time stays saved and shows its progress", async ({ page }) => {
+  await connectDemo(page);
+  let sheet = await openAddFunds(page);
+  await sheet.getByRole("textbox", { name: "Amount to deposit" }).fill("25");
+  await sheet.getByRole("button", { name: "Get deposit address" }).click();
+  await expect(sheet.locator("code")).toBeVisible();
+  await sheet.getByRole("button", { name: "Close", exact: true }).click();
+  await page.evaluate((key) => {
+    const pending = JSON.parse(localStorage.getItem(key) ?? "{}");
+    localStorage.setItem(key, JSON.stringify({ ...pending, sendBefore: new Date(Date.now() - 1_000).toISOString() }));
+  }, PENDING_KEY);
+  const address = await savedAddress(page);
+
+  sheet = await openAddFunds(page);
+  await expect(sheet.getByRole("status")).toHaveText(/^This address has expired\. If you already sent/);
+  await page.clock.runFor(6_000);
+  await expect(sheet.locator("[aria-current=step]")).toHaveText(/^(Transfer seen|Converting to USDC)$/);
+  await expect(sheet.locator("code")).toHaveCount(0);
+  expect(await savedAddress(page)).toBe(address);
+});
+
+test("Back in a tab with an older address leaves the newer one another tab saved", async ({ page }) => {
+  await connectDemo(page);
+  const sheet = await openAddFunds(page);
+  await sheet.getByRole("textbox", { name: "Amount to deposit" }).fill("25");
+  await sheet.getByRole("button", { name: "Get deposit address" }).click();
+  await expect(sheet.locator("code")).toBeVisible();
+  const newer = JSON.stringify({ ...JSON.parse((await saved(page)) ?? "{}"), depositAddress: "0x00000000000000000000000000000000000000bb" });
+  await store(page, newer);
+  await sheet.getByRole("button", { name: "Back" }).click();
+  await expect(sheet.getByRole("button", { name: "Get deposit address" })).toBeVisible();
+  expect(await saved(page)).toBe(newer);
 });
 
 test("Add funds starts on USDC, lists its cheapest networks first and prices the amount", async ({ page }) => {
@@ -133,6 +179,18 @@ test("Add funds starts on USDC, lists its cheapest networks first and prices the
     await expect(sheet.getByText(/^≈/)).toHaveCount(0);
     await expect(get).toBeDisabled();
   }
+
+  await sheet.getByRole("radio", { name: "USDC", exact: true }).click();
+  const tooLarge = sheet.getByText("That amount is too large.");
+  await amount.fill(`${"9".repeat(33)}.999999`);
+  await expect(tooLarge).toHaveCount(0);
+  await expect(get).toBeEnabled();
+  for (const text of [`1${"0".repeat(33)}`, "9".repeat(300)]) {
+    await amount.fill(text);
+    await expect(tooLarge).toBeVisible();
+    await expect(sheet.getByText(/^≈/)).toHaveCount(0);
+    await expect(get).toBeDisabled();
+  }
 });
 
 test("a deposit reopens on its address until it is credited, Back drops it, and Back hides once the transfer is seen", async ({ page }) => {
@@ -146,10 +204,12 @@ test("a deposit reopens on its address until it is credited, Back drops it, and 
   sheet = await openAddFunds(page);
   await expect(sheet.locator("code")).toHaveText(address ?? "");
   await expect(sheet.locator("[aria-current=step]")).toHaveText("Waiting for your transfer");
-  await expect(sheet.getByRole("button", { name: "Back" })).toBeVisible();
+  await sheet.getByRole("button", { name: "Back" }).focus();
   await page.clock.runFor(6_000);
   await expect(sheet.locator("[aria-current=step]")).toHaveText("Transfer seen");
   await expect(sheet.getByRole("button", { name: "Back" })).toHaveCount(0);
+  await expect(sheet.getByRole("heading", { name: "Deposit of 25 USDC on Base" })).toBeFocused();
+  for (const gone of [sheet.locator("code"), sheet.getByRole("img", { name: "Deposit address QR code" }), sheet.getByRole("button", { name: /^Copy/ }), sheet.getByText(/^Only send/), sheet.getByText("Send before")]) await expect(gone).toHaveCount(0);
   await page.clock.runFor(14_000);
   await expect(sheet.locator("[aria-current=step]")).toHaveText(/^Credited/);
   await expect.poll(() => money(page.locator("header number-flow-react:visible"))).toBe(274);

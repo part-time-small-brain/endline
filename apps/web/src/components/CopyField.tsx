@@ -1,7 +1,14 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+
+const COPIED_MS = 2_000;
 
 export function CopyButton({ value, what }: { value: string; what: string }) {
   const [copied, setCopied] = useState(false);
+  useEffect(() => {
+    if (!copied) return;
+    const timer = setTimeout(() => setCopied(false), COPIED_MS);
+    return () => clearTimeout(timer);
+  }, [copied]);
   return (
     <button
       type="button"

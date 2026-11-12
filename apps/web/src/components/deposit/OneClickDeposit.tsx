@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useApp } from "../../app/context.ts";
 import { useData } from "../../app/data.tsx";
-import type { DepositAsset, DepositStatus, OneClick } from "../../api/oneClick.ts";
+import { type DepositAsset, type DepositStatus, MAX_DEPOSIT_UNITS, type OneClick } from "../../api/oneClick.ts";
 import { useNow } from "../../hooks/useNow.ts";
 import { depositMenu } from "../../lib/depositMenu.ts";
 import { formatUsd, parseUnits, toNumber, toUnits } from "../../lib/money.ts";
@@ -25,10 +25,15 @@ function restore(key: string): PendingDeposit | undefined {
   }
 }
 
-function remember(key: string, pending: PendingDeposit | undefined) {
+function save(key: string, pending: PendingDeposit) {
   try {
-    if (pending) localStorage.setItem(key, JSON.stringify(pending));
-    else localStorage.removeItem(key);
+    localStorage.setItem(key, JSON.stringify(pending));
+  } catch {}
+}
+
+function forget(key: string, depositAddress: string) {
+  try {
+    if (readPendingDeposit(localStorage.getItem(key) ?? "")?.depositAddress === depositAddress) localStorage.removeItem(key);
   } catch {}
 }
 
@@ -45,7 +50,7 @@ export function OneClickDeposit({ oneClick, accountId }: { oneClick: OneClick; a
   const [error, setError] = useState<string>();
   const [busy, setBusy] = useState(false);
   const now = useNow(1_000);
-  const stage = pending && depositStage(status, pending.deadline, now);
+  const stage = pending && depositStage(status, pending, now);
   const done = stage === "done";
   const root = useRef<HTMLDivElement>(null);
   const moveFocus = useRef(false);
@@ -67,10 +72,11 @@ export function OneClickDeposit({ oneClick, accountId }: { oneClick: OneClick; a
   }, [oneClick, pending, done]);
 
   useEffect(() => {
-    if (!stage || keepsDeposit(stage, status)) return;
-    remember(key, undefined);
+    if (!pending || !stage) return;
+    if (keepsDeposit(stage, status)) return save(key, pending);
+    forget(key, pending.depositAddress);
     if (status === "SUCCESS") reload();
-  }, [stage, status, key, reload]);
+  }, [pending, stage, status, key, reload]);
 
   useEffect(() => {
     if (!moveFocus.current) return;
@@ -81,8 +87,11 @@ export function OneClickDeposit({ oneClick, accountId }: { oneClick: OneClick; a
   const menu = assets && depositMenu(assets);
   const token = menu?.find((t) => t.symbol === symbol) ?? menu?.[0];
   const asset = token?.networks.find((a) => a.assetId === assetId) ?? token?.networks[0];
-  const units = asset ? parseUnits(amount, asset.decimals) : null;
-  const usd = asset && units ? formatUsd(toUnits(toNumber(units, asset.decimals) * asset.price, 2), 2) : undefined;
+  const parsed = asset ? parseUnits(amount, asset.decimals) : null;
+  const tooLarge = parsed !== null && parsed > MAX_DEPOSIT_UNITS;
+  const units = tooLarge ? null : parsed;
+  const dollars = asset && units ? toNumber(units, asset.decimals) * asset.price : NaN;
+  const usd = Number.isFinite(dollars) ? formatUsd(toUnits(dollars, 2), 2) : undefined;
 
   const start = async () => {
     if (!asset || !units) return;
@@ -90,7 +99,6 @@ export function OneClickDeposit({ oneClick, accountId }: { oneClick: OneClick; a
     setError(undefined);
     try {
       const next = { ...(await oneClick.quote(asset, units, accountId, config.quoteAsset)), asset };
-      remember(key, next);
       setStatus(undefined);
       moveFocus.current = true;
       setPending(next);
@@ -102,7 +110,7 @@ export function OneClickDeposit({ oneClick, accountId }: { oneClick: OneClick; a
   };
 
   const back = () => {
-    remember(key, undefined);
+    if (pending) forget(key, pending.depositAddress);
     setStatus(undefined);
     moveFocus.current = true;
     setPending(undefined);
@@ -155,6 +163,7 @@ export function OneClickDeposit({ oneClick, accountId }: { oneClick: OneClick; a
           <span className="text-ink-2">{asset?.symbol}</span>
         </label>
         {usd && <p className="text-sm text-ink-2">≈ {usd}</p>}
+        {tooLarge && <p className="text-sm text-danger">That amount is too large.</p>}
       </div>
       {error && <p className="text-sm text-danger">{error}</p>}
       <div className="sticky bottom-0 bg-surface pt-2">

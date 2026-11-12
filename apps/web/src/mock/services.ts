@@ -26,7 +26,8 @@ const PLAYERS: [string, number, number, number][] = [
   ["pike.near", -100, 0, 0],
 ];
 const DEPOSIT_STEP_MS = 4_000;
-const DEPOSIT_DEADLINE_MS = 60 * 60_000;
+const DEPOSIT_SEND_WINDOW_MS = 60 * 60_000;
+const DEPOSIT_DEADLINE_MS = 3 * DEPOSIT_SEND_WINDOW_MS;
 const FAUCET_AMOUNT = 100_000_000n;
 
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
@@ -281,8 +282,10 @@ export function createMockServices(config: Config): Services {
       await sleep(600);
       const depositAddress = asset.blockchain === "sol" ? base58.encode(randomBytes(32)) : `0x${Array.from(randomBytes(20), (b) => b.toString(16).padStart(2, "0")).join("")}`;
       const amountOut = toUnits(toNumber(amount, asset.decimals) * asset.price * 0.999, QUOTE_DECIMALS);
-      deposits.set(depositAddress, { startedAt: Date.now(), amount: amountOut, account: recipient, credited: false });
-      return { depositAddress, amountIn: amount.toString(), amountOut: amountOut.toString(), timeEstimate: 35, deadline: new Date(Date.now() + DEPOSIT_DEADLINE_MS).toISOString() };
+      const now = Date.now();
+      deposits.set(depositAddress, { startedAt: now, amount: amountOut, account: recipient, credited: false });
+      const at = (ms: number) => new Date(now + ms).toISOString();
+      return { depositAddress, amountIn: amount.toString(), amountOut: amountOut.toString(), timeEstimate: 35, sendBefore: at(DEPOSIT_SEND_WINDOW_MS), deadline: at(DEPOSIT_DEADLINE_MS), clockOffsetMs: 0 };
     },
     async status(depositAddress) {
       const deposit = deposits.get(depositAddress);

@@ -2,7 +2,10 @@ import { afterEach, expect, it, vi } from "vitest";
 import fixture from "../../../../testdata/oneclick-quote.json" with { type: "json" };
 import { oneClick } from "./oneClick.ts";
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.useRealTimers();
+});
 
 const asset = { assetId: fixture.request.originAsset, symbol: "SOL", blockchain: "sol", decimals: 9, price: 100.54 };
 const ask = () => oneClick("https://app.test/").quote(asset, BigInt(fixture.request.amount), fixture.request.recipient, fixture.request.destinationAsset);
@@ -12,7 +15,12 @@ const relayAnswers = (body: unknown) => {
   return fetch;
 };
 
-it("asks the relay for the quote so the partner key stays server side, and shows it with the refund deadline it sent once 1Click's signature checks out", async () => {
+const MINUTE = 60_000;
+const quotedAt = Date.parse(fixture.response.timestamp);
+const deviceClock = (ms: number) => vi.useFakeTimers({ now: ms, toFake: ["Date"] });
+
+it("asks the relay for the quote so the partner key stays server side, and on a device clock 20 min slow gives an hour from 1Click's quote time to send, with refunds 3 h after the request", async () => {
+  deviceClock(quotedAt - 20 * MINUTE);
   const fetch = relayAnswers(fixture.response);
   const { depositAddress, amountIn, amountOut, timeEstimate } = fixture.response.quote;
   const quote = await ask();
@@ -21,10 +29,16 @@ it("asks the relay for the quote so the partner key stays server side, and shows
   expect(init).toMatchObject({ method: "POST", headers: { "content-type": "application/json" } });
   const { deadline, ...body } = JSON.parse(String(init?.body));
   expect(body).toEqual(fixture.request);
-  const ahead = Date.parse(deadline) - Date.now();
-  expect(ahead).toBeGreaterThan(0);
-  expect(ahead).toBeLessThanOrEqual(24 * 60 * 60_000);
-  expect(quote).toEqual({ depositAddress, amountIn, amountOut, timeEstimate, deadline });
+  expect(Date.parse(deadline) - Date.now()).toBe(180 * MINUTE);
+  expect(quote).toEqual({ depositAddress, amountIn, amountOut, timeEstimate, sendBefore: new Date(quotedAt + 60 * MINUTE).toISOString(), deadline, clockOffsetMs: 20 * MINUTE });
+});
+
+it("keeps an hour before refunds start even when a device clock 2.5 h slow sent a deadline only 30 min out", async () => {
+  deviceClock(quotedAt - 150 * MINUTE);
+  relayAnswers(fixture.response);
+  const { sendBefore, deadline } = await ask();
+  expect(Date.parse(deadline) - Date.parse(sendBefore)).toBe(60 * MINUTE);
+  expect(Date.parse(sendBefore)).toBeLessThan(quotedAt);
 });
 
 it.each([
@@ -58,6 +72,11 @@ it("still reads tokens and deposit status straight from 1Click", async () => {
   await client.assets();
   expect(await client.status("0xdep")).toBe("SUCCESS");
   expect(fetch.mock.calls.map(([url]) => url)).toEqual(["https://1click.chaindefuser.com/v0/tokens", "https://1click.chaindefuser.com/v0/status?depositAddress=0xdep"]);
+});
+
+it("reads a status it doesn't know as still waiting rather than failing every check", async () => {
+  vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ status: "SOMETHING_NEW" }), { status: 200 })));
+  expect(await oneClick("https://app.test").status("0xdep")).toBe("PENDING_DEPOSIT");
 });
 
 it("drops a token 1Click lists without a price instead of failing every deposit", async () => {

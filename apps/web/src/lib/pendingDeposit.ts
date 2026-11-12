@@ -6,9 +6,10 @@ export const pendingDepositKey = (accountId: string) => `pending-deposit:${accou
 const PendingDeposit = DepositQuote.extend({ asset: DepositAsset });
 export type PendingDeposit = z.infer<typeof PendingDeposit>;
 
-export type DepositStage = "waiting" | "expired" | "seen" | "done";
+export type DepositStage = "waiting" | "late" | "expired" | "seen" | "done";
 
 const DONE: DepositStatus[] = ["SUCCESS", "REFUNDED", "FAILED"];
+const GRACE_MS = 10 * 60_000;
 
 const json = (text: string): unknown => {
   try {
@@ -22,10 +23,12 @@ export function readPendingDeposit(stored: string): PendingDeposit | undefined {
   return PendingDeposit.safeParse(json(stored)).data;
 }
 
-export function depositStage(status: DepositStatus | undefined, deadline: string, nowMs: number): DepositStage {
+export function depositStage(status: DepositStatus | undefined, deposit: PendingDeposit, nowMs: number): DepositStage {
   if (status && DONE.includes(status)) return "done";
   if (status && status !== "PENDING_DEPOSIT") return "seen";
-  return nowMs >= Date.parse(deadline) ? "expired" : "waiting";
+  const at = nowMs + deposit.clockOffsetMs;
+  if (at < Date.parse(deposit.sendBefore)) return "waiting";
+  return at < Date.parse(deposit.deadline) + deposit.timeEstimate * 1000 + GRACE_MS ? "late" : "expired";
 }
 
-export const keepsDeposit = (stage: DepositStage, status: DepositStatus | undefined) => stage === "waiting" || stage === "seen" || (stage === "expired" && status === undefined);
+export const keepsDeposit = (stage: DepositStage, status: DepositStatus | undefined) => stage !== "done" && (stage !== "expired" || status === undefined);

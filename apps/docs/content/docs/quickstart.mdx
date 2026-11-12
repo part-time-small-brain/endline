@@ -15,9 +15,9 @@ description: Fund, pick Up or Down, choose an amount, and get paid automatically
 Add funds shows your balance, then two steps:
 
 1. Pick what you send (USDC, USDT, ETH, BTC or SOL) and its network. Cheaper networks come first. Enter the amount, check the dollar estimate, and tap Get deposit address.
-2. Send exactly that amount, on that network, to the address or QR code shown. Anything else may be lost. Send it before the time under Send before, one hour after you get the address. After that the sheet drops the address and you get a new one. The sheet shows how long the transfer takes and each stage: waiting, transfer seen, converting to USDC, credited.
+2. Send exactly that amount, on that network, to the address or QR code shown. Anything else may be lost. Send it before the time under Send before, one hour after you get the address. After that the sheet hides the address but keeps checking for a transfer you already sent. The sheet shows how long the transfer takes and each stage: waiting, transfer seen, converting to USDC, credited.
 
-It arrives as USDC. Close the sheet any time: it reopens on the same deposit until it's credited or refunded, or the send-by time passes with nothing sent. Failed or short deposits are refunded to your NEAR Intents account in the token you sent. The app shows only USDC, so check a refund in your NEAR Intents wallet. From a NEAR wallet, it's one transaction.
+It arrives as USDC. Close the sheet any time: it reopens on the same deposit until it's credited or refunded, or a little over 2 hours after the send-by time if nothing was sent. Failed or short deposits are refunded to your NEAR Intents account in the token you sent, so don't top up a short one. The app shows only USDC, so check a refund in your NEAR Intents wallet. From a NEAR wallet, it's one transaction.
 
 Fund before you trade: you only get prices your balance covers.
 

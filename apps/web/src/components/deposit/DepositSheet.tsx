@@ -41,7 +41,7 @@ export function DepositSheet({ wallet, onClose }: { wallet: Wallet; onClose: () 
           <Chips label="Deposit source" columns="grid grid-cols-2" value={source} onChange={setChoice} options={sources} />
         </div>
       )}
-      {source === "chain" && services.oneClick && <OneClickDeposit oneClick={services.oneClick} accountId={wallet.accountId} />}
+      {source === "chain" && services.oneClick && <OneClickDeposit key={wallet.accountId} oneClick={services.oneClick} accountId={wallet.accountId} />}
       {source === "near" && wallet.call && <NearDeposit call={wallet.call} />}
     </Sheet>
   );
