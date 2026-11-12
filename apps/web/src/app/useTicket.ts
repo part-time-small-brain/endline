@@ -28,15 +28,20 @@ export function useTicket(nowSec: number) {
   const [kindChoice, setKind] = useState<OptionKind>();
   const [expiryChoice, setExpiry] = useState<number>();
   const [seriesChoice, setSeries] = useState(() => link.get("series") ?? undefined);
-  const [budget, setBudget] = useState(() => parseBudget(link.get("pay") ?? "", quoteDecimals) ?? DEFAULT_BUDGET_USD * unit);
+  const [budgetChoice, setBudget] = useState(() => parseBudget(link.get("pay") ?? "", quoteDecimals) ?? undefined);
 
   const chosen = open.find((s) => s.id === seriesChoice);
   const symbol = symbolChoice && symbols.includes(symbolChoice) ? symbolChoice : (chosen?.underlying ?? symbols[0] ?? "");
 
   const kind = kindChoice ?? chosen?.kind ?? "call";
   const markOf = (s: ListedSeries) => data.marks?.[s.id];
-  const price = (s: ListedSeries, amount = budget) => ticket(s, amount, markOf(s));
-  const priced = open.filter((s) => price(s, unit).size > 0n);
+  const priced = open.filter((s) => ticket(s, unit, markOf(s)).size > 0n);
+  const ceiling = priced.reduce((most, s) => {
+    const { maxCost } = ticket(s, unit, markOf(s));
+    return maxCost > most ? maxCost : most;
+  }, 0n);
+  const budget = budgetChoice ?? (ceiling > 0n && ceiling < DEFAULT_BUDGET_USD * unit ? ceiling : DEFAULT_BUDGET_USD * unit);
+  const price = (s: ListedSeries, amount: bigint = budget): Ticket => ticket(s, amount, markOf(s));
   const expiries = [...new Set(priced.filter((s) => s.underlying === symbol && s.kind === kind).map((s) => s.expiry))]
     .sort((a, b) => a - b)
     .slice(0, EXPIRY_CHIPS);
@@ -96,7 +101,7 @@ export function useTicket(nowSec: number) {
         : undefined;
 
   return {
-    data, quoteDecimals, balance, unit, symbols, symbol, kind, expiry, budget,
+    data, quoteDecimals, balance, unit, symbols, symbol, kind, expiry, budget, ceiling,
     setSymbol, setKind, setExpiry, setSeries, setBudget,
     spotNumber, spot, history, odds, usdOf, payoutAt, up, strikes, choices,
     series, current, vol, reference, sides, first, empty, expiries, dates, notice, priced, loading,

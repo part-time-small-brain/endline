@@ -52,6 +52,10 @@ export function parseUnits(text: string, decimals: number): bigint | null {
 
 const MIN_BUDGET_CENTS = 100n;
 
+export function minTrade(quoteDecimals: number): bigint {
+  return (MIN_BUDGET_CENTS * 10n ** BigInt(quoteDecimals)) / 100n;
+}
+
 export function parseBudget(text: string, quoteDecimals: number): bigint | null {
   const cents = parseUnits(text, 2);
   return cents === null || cents < MIN_BUDGET_CENTS ? null : (cents * 10n ** BigInt(quoteDecimals)) / 100n;

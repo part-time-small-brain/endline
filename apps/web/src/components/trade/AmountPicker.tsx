@@ -1,30 +1,36 @@
 import { X } from "@phosphor-icons/react";
 import { useId, useState } from "react";
 import { formatToken, parseBudget } from "../../lib/money.ts";
+import { amountChoices, maxBinds } from "../../lib/ticket.ts";
 import { Chips } from "../Chips.tsx";
 import { Field } from "./Field.tsx";
 
 interface Props {
   value: bigint;
+  max: bigint | undefined;
+  ceiling: bigint;
   quoteDecimals: number;
   onChange: (amount: bigint) => void;
 }
 
-const PRESETS = [10, 25, 50, 100];
 const RESET_TO = 1;
 const OTHER = "other";
+const MAX = "max";
 
-export function AmountPicker({ value, quoteDecimals, onChange }: Props) {
+export function AmountPicker({ value, max, ceiling, quoteDecimals, onChange }: Props) {
   const unit = 10n ** BigInt(quoteDecimals);
-  const presets = PRESETS.map((dollars) => BigInt(dollars) * unit);
-  const [editing, setEditing] = useState(() => !presets.includes(value));
+  const capped = maxBinds(max, unit);
+  const dollars = amountChoices(max, unit);
+  const presets = dollars.map((d) => BigInt(d) * unit);
+  const atMax = capped && value >= max;
+  const [editing, setEditing] = useState(() => !presets.includes(value) && !atMax);
   const [custom, setCustom] = useState(() => (editing ? formatToken(value, quoteDecimals, 2) : ""));
   const errorId = useId();
   const invalid = editing && parseBudget(custom, quoteDecimals) === null;
   const close = () => {
     setEditing(false);
     setCustom("");
-    onChange(presets[RESET_TO] ?? value);
+    onChange(presets[RESET_TO] ?? presets.at(-1) ?? ceiling);
   };
 
   return (
@@ -55,14 +61,16 @@ export function AmountPicker({ value, quoteDecimals, onChange }: Props) {
         <Chips
           label="You pay"
           columns="grid grid-cols-3 min-[375px]:grid-cols-5 *:px-1 *:text-center"
-          value={value.toString()}
+          value={atMax ? MAX : value.toString()}
           onChange={(v) => {
+            if (v === MAX) return onChange(ceiling);
             if (v !== OTHER) return onChange(BigInt(v));
             setEditing(true);
             onChange(0n);
           }}
           options={[
-            ...PRESETS.map((dollars, i) => ({ value: String(presets[i]), label: <span className="font-display text-lg">${dollars}</span> })),
+            ...dollars.map((d, i) => ({ value: String(presets[i]), label: <span className="font-display text-lg">${d}</span> })),
+            ...(capped ? [{ value: MAX, label: <span className="text-sm">Max</span> }] : []),
             { value: OTHER, label: <span className="text-sm">Other</span> },
           ]}
         />

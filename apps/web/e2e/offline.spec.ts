@@ -476,17 +476,33 @@ test("a long shot sizes to what one trade may pay out, and Pro and Lite say why 
   });
   await page.getByRole("button", { name: "Connect", exact: true }).click();
   await page.getByRole("button", { name: /Ethereum wallet/ }).click();
-  await page.getByRole("radio", { name: "$100", exact: true }).click();
+  await expect(page.getByRole("radiogroup", { name: "You pay" }).getByRole("radio")).toHaveText(["$5", "$10", "$25", "Max", "Other"]);
+  await expect(page.getByRole("radio", { name: "$25", exact: true })).toHaveAttribute("aria-checked", "true");
+  await page.getByRole("radio", { name: "Max", exact: true }).click();
   await expect.poll(() => money(term(page, "Max loss"))).toBe(40);
   await expect.poll(() => money(term(page, /^If BTC ends above /))).toBe(2_000);
   const why = page.getByText("One trade pays out at most $2,000, so this costs $40.", { exact: true });
+  await expect(why).toHaveCount(0);
+  await page.getByRole("radio", { name: "Other", exact: true }).click();
+  await page.getByRole("textbox", { name: "Amount in dollars" }).fill("100");
+  await expect.poll(() => money(term(page, "Max loss"))).toBe(40);
   await expect(why).toBeVisible();
   await page.getByRole("button", { name: "Lite", exact: true }).click();
-  await expect(page.getByRole("button", { name: "Trade amount", exact: true })).toHaveText("$100");
+  await expect(page.getByRole("button", { name: "Trade amount", exact: true })).toHaveText("$40");
   await expect(page.getByLabel("Maximum payout", { exact: true })).toHaveText("$2,000");
   await expect(why).toBeVisible();
   await (await openPopover(page, "Trade amount")).getByRole("radio", { name: "$25", exact: true }).click();
   await expect(why).toHaveCount(0);
+});
+
+test("a sell-back worth under $1, which no market maker buys, shows no price", async ({ page }) => {
+  let bid = USD;
+  await live(page, () => [{ series_id: "BTC-5NOV26-81000_83000-C", ask: String(40 * USD), bid: String(bid), max_size: String(10 ** 8), vol: 0.4 }]);
+  await expect.poll(() => money(term(page, "Max loss"))).toBe(25);
+  await expect(term(page, "Sell back now")).toHaveText("—");
+  bid = 2 * USD;
+  await page.clock.fastForward(60_000);
+  await expect.poll(() => money(term(page, "Sell back now"))).toBe(1.25);
 });
 
 test("a second listed asset brings the asset picker back in every mode, and a switch keeps the stake", async ({ page }) => {
@@ -507,8 +523,11 @@ test("a second listed asset brings the asset picker back in every mode, and a sw
     await page.getByRole("radio", { name: "$50", exact: true }).click();
     await assets.getByRole("radio", { name: /^SOL/ }).click();
     await expect(assets.getByRole("radio", { name: /^SOL/ })).toHaveAttribute("aria-checked", "true");
-    await expect(page.getByRole("radio", { name: "$50", exact: true })).toHaveAttribute("aria-checked", "true");
+    await expect(page.getByRole("radio", { name: "Max", exact: true })).toHaveAttribute("aria-checked", "true");
     await expect(term(page, /^If SOL ends above /)).toBeVisible();
+    await assets.getByRole("radio", { name: /^BTC/ }).click();
+    await expect(page.getByRole("radio", { name: "$50", exact: true })).toHaveAttribute("aria-checked", "true");
+    await assets.getByRole("radio", { name: /^SOL/ }).click();
     await page.getByRole("button", { name: "Tap", exact: true }).click();
     await expect(assets.getByRole("radio")).toHaveCount(2);
     await page.getByRole("button", { name: "Lite", exact: true }).click();
@@ -667,7 +686,7 @@ test.describe("Tap", () => {
     });
     await page.getByRole("button", { name: "Connect", exact: true }).click();
     await page.getByRole("button", { name: /Ethereum wallet/ }).click();
-    await page.getByRole("radio", { name: "$100", exact: true }).click();
+    await page.getByRole("radio", { name: "Max", exact: true }).click();
     await page.getByRole("table").getByRole("button", { name: /^Up · BTC ends above \$81,000 · .* · pays up to 50\.0×$/ }).click();
     await expect.poll(() => asked[0]).toBe(String(10 ** 8));
   });

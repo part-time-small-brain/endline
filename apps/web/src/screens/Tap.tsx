@@ -42,7 +42,7 @@ interface Props {
 }
 
 export function Tap({ state, nowSec, views, onConnect, onAddFunds, onQuote }: Props) {
-  const { data, quoteDecimals, symbols, symbol, budget, setSymbol, setBudget, spot, spotNumber, history, first, priced, loading, empty } = state;
+  const { data, quoteDecimals, symbols, symbol, budget, ceiling, setSymbol, setBudget, spot, spotNumber, history, first, priced, loading, empty } = state;
   const { wallet } = useWallet();
   const calls = useCalls();
   const [free, setFreeState] = useState(storedFree);
@@ -212,7 +212,7 @@ export function Tap({ state, nowSec, views, onConnect, onAddFunds, onQuote }: Pr
         </p>
       </section>
 
-      <TapMode free={free} left={left} budget={budget} quoteDecimals={quoteDecimals} onFree={setFree} onBudget={setBudget} />
+      <TapMode free={free} left={left} budget={budget} ceiling={ceiling} quoteDecimals={quoteDecimals} onFree={setFree} onBudget={setBudget} />
       {free && <FreeCalls calls={data.calls ?? []} accountId={wallet?.accountId} nowSec={nowSec} quoteDecimals={quoteDecimals} />}
     </div>
   );
