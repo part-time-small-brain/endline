@@ -10,7 +10,7 @@ The contract is not audited.
 
 ## The problem
 
-Crypto options trade on centralized venues or inside one chain's DeFi, and an options chain (strikes, greeks, margin) is unreadable for most people. Endline turns an option into "BTC Up $81,000 by tomorrow, pay $25", shows the most you can lose and win before you sign, and, with auto-collect on, pays a win of $1 or more into your balance without another signature.
+Crypto options trade on centralized venues or inside one chain's DeFi, and an options chain (strikes, greeks, margin) is unreadable for most people. Endline turns an option into "BTC Up $81,000 by tomorrow, pay $5", shows the most you can lose and win before you sign, and, with auto-collect on, pays a win of $1 or more into your balance without another signature.
 
 ## How NEAR fits
 
@@ -39,11 +39,11 @@ Tracks: `defi`.
 1. Open the app. Lite starts with one editable sentence: end time, above or below, price to beat, amount and capped payout. Max loss and estimated chance stay visible. Lite / Pro / Tap in the header opens the chart ticket or the tap grid: rows of prices to beat, columns of end dates, tap a cell to buy it.
 2. Click Connect and pick a wallet.
    - Ethereum wallet (e.g. MetaMask): nothing else to set up.
-   - NEAR wallet (e.g. Meteor, Intear, Nightly): a "One-time setup" card asks you to click Enable, one transaction that lets the wallet sign trades on NEAR Intents.
+   - NEAR wallet (e.g. Meteor, Intear, Nightly): a "One-time setup" card asks you to click Enable, one transaction that lets the wallet sign trades on NEAR Intents, so the account needs a little NEAR for gas.
 
    The header shows your balance.
 3. Click Add funds and deposit USDC, USDT, ETH, BTC or SOL from any chain. It arrives as USDC in your NEAR Intents balance.
-4. Tap the sentence slots: an end date, above, a price to beat and an amount. One trade pays out at most $10 while the contract is unaudited, so pick a small amount. The first time, your wallet asks for one signature that proves the wallet is yours for 24 h (no funds move). The confirm sheet then shows the firm price, the exact swap you'll sign and a countdown. Click "Buy for $X" and sign. You see "You're in" and can turn on auto-collect (one more signature).
+4. Tap the sentence slots: an end date, above, a price to beat and an amount. One trade pays out at most $10 while the contract is unaudited; a bigger amount is cut to that and the ticket shows "One trade pays out at most $10, so this costs $Y". Click "Buy Up · $X". The first time, your wallet asks for one signature that proves the wallet is yours for 24 h (no funds move). The confirm sheet then shows the firm price, the exact swap you'll sign and a countdown. Click "Buy for $X" and sign. You see "You're in" and can turn on auto-collect (one more signature).
 5. Open Positions. The position shows Paid, Value now and P&L. Click "Sell back", then "Sell back for $X", and sign: the USDC lands in your balance.
 6. Settlement: markets end daily at 08:00 UTC. The final price (median of 7 exchanges) is requested from 5 minutes after the end and is final after a 1 h dispute window. A win of $1 or more with auto-collect is paid into your balance 1 to 2 minutes after final; otherwise the position shows Collect.
 
@@ -51,7 +51,7 @@ Without a wallet: `pnpm install && VITE_MOCK=1 pnpm --filter @endline/web dev`, 
 
 ## Deployed
 
-| | |
+| | Mainnet |
 |---|---|
 | Options contract | `opt.endline.near`, owner `endline.near`, no access keys, code hash `D6Y3uQ1gvt6AUU2j9TCkwLFnnAMbVGL1RcboyzsUSwCg` (reproducible build of `1339f7c`) |
 | Intents | `intents.near` |
