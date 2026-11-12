@@ -11,7 +11,7 @@ export const FINAL_MARGIN_SEC = 60;
 const MAX_CLAIMS = 1_000;
 const MAX_CLAIMS_PER_ACCOUNT = 100;
 const MAX_DEADLINE_MS = 10 * 60_000;
-// intents rechecks the deadline on-chain, and near-api-js retries a send for up to ~85 s: a payload that expires first burns our gas
+// intents rechecks the deadline on-chain, and a send through the RPC router can take up to ~100 s: a payload that expires first burns our gas
 const MIN_DEADLINE_MS = 2 * 60_000;
 
 interface Exercise {

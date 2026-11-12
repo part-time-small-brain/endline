@@ -1,21 +1,28 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { RoutedRpcProvider, rpcUrls } from "./rpc.ts";
 
-type Behaviour = { network?: string; status?: number; body?: unknown; hang?: boolean; delayMs?: number };
+type Behaviour = { network?: string; status?: number | number[]; body?: unknown; hang?: boolean; delayMs?: number; statusProbe?: number };
 
 function stubRpc(behaviours: Record<string, Behaviour>) {
-  const calls: { host: string; method: string }[] = [];
+  const calls: { host: string; method: string; headers: Record<string, string> }[] = [];
+  const served: Record<string, number> = {};
   vi.stubGlobal(
     "fetch",
-    vi.fn(async (url: string, init: { body: string }) => {
+    vi.fn(async (url: string, init: { body: string; headers: Record<string, string> }) => {
       const host = new URL(url).host;
       const { method, id } = JSON.parse(init.body);
-      calls.push({ host, method });
+      calls.push({ host, method, headers: init.headers });
       const b = behaviours[host] ?? {};
-      if (method === "status") return Response.json({ jsonrpc: "2.0", id, result: { chain_id: b.network ?? "mainnet" } });
+      if (method === "status") {
+        if (b.statusProbe) return new Response('{"message":"forbidden"}', { status: b.statusProbe });
+        return Response.json({ jsonrpc: "2.0", id, result: { chain_id: b.network ?? "mainnet" } });
+      }
       if (b.hang) return new Promise(() => {});
       if (b.delayMs) await new Promise((r) => setTimeout(r, b.delayMs));
-      if (b.status && b.status !== 200) return new Response('{"error":{"code":-429,"message":"Rate limits exceeded"}}', { status: b.status });
+      const n = served[host] ?? 0;
+      served[host] = n + 1;
+      const status = Array.isArray(b.status) ? b.status[n] : b.status;
+      if (status && status !== 200) return new Response(`https://${host}/key-${host} unavailable`, { status });
       return Response.json(b.body ?? { jsonrpc: "2.0", id, result: { host } });
     }),
   );
@@ -24,6 +31,7 @@ function stubRpc(behaviours: Record<string, Behaviour>) {
 
 const rpc = (...hosts: string[]) => ({ urls: hosts.map((h) => `https://${h}/key-${h}`), network: "mainnet" });
 const block = async (p: RoutedRpcProvider) => (await p.sendJsonRpc("block", { finality: "final" })) as { host: string };
+const sent = (calls: { host: string; method: string }[], method: string) => calls.filter((c) => c.method === method).map((c) => c.host);
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -49,15 +57,15 @@ describe("RoutedRpcProvider", () => {
     const p = new RoutedRpcProvider(rpc("a.rpc", "b.rpc"), log);
     expect((await block(p)).host).toBe("b.rpc");
     expect((await block(p)).host).toBe("b.rpc");
-    expect(calls.filter((c) => c.host === "a.rpc" && c.method === "block")).toHaveLength(1);
-    expect(log).toHaveBeenCalledWith(expect.stringMatching(/^rpc a\.rpc failed \(429\), cooling 2 s$/));
+    expect(sent(calls, "block").filter((h) => h === "a.rpc")).toHaveLength(1);
+    expect(log).toHaveBeenCalledWith("rpc a.rpc failed (429), cooling 2 s");
   });
 
   it("returns a chain's own error from the first endpoint instead of asking another", async () => {
     const calls = stubRpc({ "a.rpc": { body: { jsonrpc: "2.0", id: 1, error: { name: "HANDLER_ERROR", cause: { name: "UNKNOWN_ACCOUNT", info: {} }, code: -32000, message: "Server error", data: "account nope.near does not exist" } } } });
     const p = new RoutedRpcProvider(rpc("a.rpc", "b.rpc"), vi.fn());
-    await expect(block(p)).rejects.toThrow();
-    expect(calls.filter((c) => c.method === "block").map((c) => c.host)).toEqual(["a.rpc"]);
+    await expect(p.viewAccount({ accountId: "nope.near" })).rejects.toMatchObject({ name: "AccountDoesNotExistError" });
+    expect(sent(calls, "query")).toEqual(["a.rpc"]);
   });
 
   it("never sends a request to an endpoint on another network", async () => {
@@ -70,28 +78,73 @@ describe("RoutedRpcProvider", () => {
     expect(log).toHaveBeenCalledWith("rpc a.rpc is on testnet, not mainnet: never used");
   });
 
+  it("skips an endpoint whose network check is refused, such as a revoked key, instead of failing every call", async () => {
+    stubRpc({ "a.rpc": { statusProbe: 403 } });
+    const p = new RoutedRpcProvider(rpc("a.rpc", "b.rpc"), vi.fn());
+    expect((await block(p)).host).toBe("b.rpc");
+  });
+
+  it("fails over on an answer that isn't the chain's, like an unknown error body or a syncing node", async () => {
+    const odd = { jsonrpc: "2.0", id: 1, error: { code: 30, message: "Request timeout on the free tier" } };
+    const syncing = { jsonrpc: "2.0", id: 1, error: { name: "HANDLER_ERROR", cause: { name: "NO_SYNCED_BLOCKS" }, code: -32000, message: "Server error" } };
+    for (const body of [odd, syncing]) {
+      stubRpc({ "a.rpc": { body }, "b.rpc": {} });
+      expect((await block(new RoutedRpcProvider(rpc("a.rpc", "b.rpc"), vi.fn()))).host).toBe("b.rpc");
+    }
+  });
+
   it("moves on from an endpoint that hangs", async () => {
     vi.useFakeTimers();
     stubRpc({ "a.rpc": { hang: true } });
     const p = new RoutedRpcProvider(rpc("a.rpc", "b.rpc"), vi.fn());
     const result = block(p);
-    await vi.advanceTimersByTimeAsync(15_000);
+    await vi.advanceTimersByTimeAsync(5_000);
     expect((await result).host).toBe("b.rpc");
   });
 
-  it("still tries the endpoint that recovers soonest when every one is cooling", async () => {
-    const calls = stubRpc({ "a.rpc": { status: 503 }, "b.rpc": { status: 429 } });
-    const p = new RoutedRpcProvider(rpc("a.rpc", "b.rpc"), vi.fn());
-    await expect(block(p)).rejects.toThrow();
-    await expect(block(p)).rejects.toThrow();
-    expect(calls.filter((c) => c.method === "block")).toHaveLength(4);
+  it("retries a lone endpoint after its cooldown instead of failing on one 503", async () => {
+    vi.useFakeTimers();
+    const calls = stubRpc({ "a.rpc": { status: [503, 200] } });
+    const result = block(new RoutedRpcProvider(rpc("a.rpc"), vi.fn()));
+    await vi.advanceTimersByTimeAsync(2_000);
+    expect((await result).host).toBe("a.rpc");
+    expect(sent(calls, "block")).toEqual(["a.rpc", "a.rpc"]);
   });
 
-  it("logs hosts, never the key in the path", async () => {
+  it("throws the endpoint's host, never its key, once every endpoint failed", async () => {
+    vi.useFakeTimers();
+    stubRpc({ "a.rpc": { status: 503 }, "b.rpc": { status: 502 } });
+    const log = vi.fn();
+    const result = block(new RoutedRpcProvider(rpc("a.rpc", "b.rpc"), log)).catch((e: Error) => e);
+    await vi.advanceTimersByTimeAsync(20_000);
+    const error = await result;
+    expect(error).toMatchObject({ name: "RpcEndpointError" });
+    expect(String((error as Error).message)).toMatch(/^rpc [ab]\.rpc failed \(50[23]\)$/);
+    expect(`${(error as Error).message} ${log.mock.calls.flat().join(" ")}`).not.toContain("key-");
+  });
+
+  it("never resends a transaction after an unclear failure, but does after a refusal", async () => {
+    const tx = (p: RoutedRpcProvider) => p.sendJsonRpc("send_tx", { signed_tx_base64: "AA==", wait_until: "FINAL" });
+    let calls = stubRpc({ "a.rpc": { status: 503 }, "b.rpc": {} });
+    await expect(tx(new RoutedRpcProvider(rpc("a.rpc", "b.rpc"), vi.fn()))).rejects.toMatchObject({ name: "RpcEndpointError" });
+    expect(sent(calls, "send_tx")).toEqual(["a.rpc"]);
+    calls = stubRpc({ "a.rpc": { status: 429 }, "b.rpc": {} });
+    expect(await tx(new RoutedRpcProvider(rpc("a.rpc", "b.rpc"), vi.fn()))).toEqual({ host: "b.rpc" });
+    expect(sent(calls, "send_tx")).toEqual(["a.rpc", "b.rpc"]);
+  });
+
+  it("counts a burst of failures from one spike as one, so a busy endpoint isn't benched for minutes", async () => {
     stubRpc({ "a.rpc": { status: 429 } });
     const log = vi.fn();
-    await block(new RoutedRpcProvider(rpc("a.rpc", "b.rpc"), log));
-    expect(log.mock.calls.flat().join(" ")).not.toContain("key-");
+    const p = new RoutedRpcProvider(rpc("a.rpc", "b.rpc"), log);
+    await Promise.all(Array.from({ length: 10 }, () => block(p)));
+    expect(log.mock.calls.flat().filter((m) => String(m).startsWith("rpc a.rpc"))).toEqual(["rpc a.rpc failed (429), cooling 2 s"]);
+  });
+
+  it("sends a key given in the URL fragment as a header, and never the fragment itself", async () => {
+    const calls = stubRpc({});
+    await block(new RoutedRpcProvider({ urls: ["https://h.rpc/full#x-api-key=secret"], network: "mainnet" }, vi.fn()));
+    expect(calls.at(-1)).toMatchObject({ host: "h.rpc", headers: expect.objectContaining({ "x-api-key": "secret" }) });
   });
 
   it("tries each endpoint once, then sends traffic to the one that answered faster", async () => {

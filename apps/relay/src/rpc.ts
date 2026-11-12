@@ -10,7 +10,7 @@ const EXECUTE_GAS = 300_000_000_000_000n;
 const FT_TRANSFER_CALL_GAS = 100_000_000_000_000n;
 const PAGE = 200;
 const OUTCOME_POLL_MS = 3_000;
-const PAST_DEADLINE_MS = 5_000;
+const PAST_DEADLINE_MS = 60_000;
 
 const Simulation = z.object({ invariant_violated: z.unknown().optional() });
 type Simulation = z.infer<typeof Simulation>;

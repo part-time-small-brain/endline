@@ -220,12 +220,12 @@ describe("relay", () => {
     const q = await quote();
     const deadline = Date.parse(readPayload(q.payload).deadline);
     vi.spyOn(chain, "finalTimeMs").mockImplementation(async () => {
-      if (Date.now() > deadline + 5_000 && Date.now() < deadline + 12_000) throw new Error("rpc down");
+      if (Date.now() > deadline + 60_000 && Date.now() < deadline + 67_000) throw new Error("rpc down");
       return Date.now() - 1_000;
     });
     let update: unknown;
     void relay.publish({ quote_id: q.quote_id, signed: sign(q) }).then((u) => (update = u));
-    await vi.advanceTimersByTimeAsync(deadline + 11_000 - Date.now());
+    await vi.advanceTimersByTimeAsync(deadline + 66_000 - Date.now());
     expect(update).toBeUndefined();
     expect(relay.status(q.quote_id).status).toBe("settling");
     expect(statuses).toEqual([]);

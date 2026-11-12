@@ -82,7 +82,7 @@ describe("txStatus", () => {
 
 describe("ranTx", () => {
   afterEach(() => vi.useRealTimers());
-  const expired = session("alice.test", { deadlineMs: Date.now() - 60_000 });
+  const expired = session("alice.test", { deadlineMs: Date.now() - 120_000 });
   const chainWith = (txStatus: Chain["txStatus"]) => ({ txStatus, finalTimeMs: async () => Date.now() }) as unknown as Chain;
 
   it("returns a transaction that ran even while another one can't be read", async () => {
