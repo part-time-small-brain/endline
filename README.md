@@ -4,7 +4,7 @@
 
 Pick where crypto prices end. Fund from any chain, see your payout before you sign, never get liquidated. Each position is a European, cash-settled option, fully backed in USDC, that lives and trades inside NEAR Intents.
 
-**[App](https://app.endline.trade)** · [Landing](https://endline.trade) · [Docs](https://docs.endline.trade) · [Architecture](https://docs.endline.trade/developers/architecture) · [Security model](https://docs.endline.trade/developers/security)
+[App](https://app.endline.trade) · [Landing](https://endline.trade) · [Docs](https://docs.endline.trade) · [Architecture](https://docs.endline.trade/developers/architecture) · [Security model](https://docs.endline.trade/developers/security)
 
 The contract is not audited.
 

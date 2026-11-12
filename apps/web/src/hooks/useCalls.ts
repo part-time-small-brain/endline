@@ -14,7 +14,7 @@ const SHOWN_MS = 3_000;
 export type CallState = { status: "busy" } | { status: "done" } | { status: "failed" };
 
 function messageOf(error: unknown, wallet: Wallet): string {
-  if (error instanceof RelayError && error.status === 401) return wallet.kind === "near" ? "Your wallet couldn't sign in. Enable it first if you haven't, the one-time step before your first buy, then tap again." : "Your wallet couldn't sign in. Tap again to sign in again.";
+  if (error instanceof RelayError && error.status === 401) return wallet.kind === "near" ? "Your wallet couldn't sign in. If you haven't yet, tap Enable (the one-time setup before your first buy), then tap again." : "Your wallet couldn't sign in. Tap again to sign in again.";
   const text = error instanceof RelayError && !error.message.startsWith("relay returned") ? error.message : "That call didn't go through. Try again.";
   return `${text.charAt(0).toUpperCase()}${text.slice(1).replace(/\.?$/, ".")}`;
 }

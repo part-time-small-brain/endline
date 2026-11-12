@@ -5,7 +5,7 @@ const QUESTIONS = [
   ["How is this different from a yes or no market?", "A yes or no market pays a fixed amount. Here the payout grows the further the price ends past your line, up to a cap two price steps out."],
   ["When do markets end?", "Daily at 08:00 UTC, shown in your time zone."],
   ["Can I sell before the end?", "Yes, at the market maker's price, until 30 minutes before the end."],
-  ["Do I have to collect?", "Turn on auto collect when you buy and the payout arrives on its own. Otherwise, tap Collect in the app."],
+  ["Do I have to collect?", "Turn on auto-collect when you buy and the payout arrives on its own. Otherwise, tap Collect in the app."],
   ["What does it cost?", "The market maker's spread is in the price you see. There is no trading fee."],
   ["Is my position private?", "No. Option balances on NEAR Intents are public."],
 ] as const;
