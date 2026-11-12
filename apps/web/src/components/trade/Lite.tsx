@@ -3,7 +3,7 @@ import { CaretDown, Info } from "@phosphor-icons/react";
 import type { ReactNode } from "react";
 import type { useTicket } from "../../app/useTicket.ts";
 import { assetName } from "../../lib/labels.ts";
-import { formatChance, formatMultiple, formatPct, formatPrice, formatUsd, toNumber, toUnits } from "../../lib/money.ts";
+import { formatChance, formatMultiple, formatPct, formatPrice, formatUsd, minTrade, toNumber, toUnits } from "../../lib/money.ts";
 import { capNote, payoutMultiple } from "../../lib/ticket.ts";
 import { dayLabel, formatClock, formatUtc } from "../../lib/time.ts";
 import { Brackets } from "../Brackets.tsx";
@@ -36,7 +36,7 @@ function Meter({ chance, lit, className }: { chance: number; lit: string; classN
 
 export function Lite({ state, nowSec, action, stickyAction }: Props) {
   const {
-    data, quoteDecimals, unit, symbol, symbols, kind, expiry, budget,
+    data, quoteDecimals, unit, symbol, symbols, kind, expiry, budget, atMax, picked: asked, spend,
     setSymbol, setKind, setExpiry, setSeries, setBudget,
     spot, up, strikes, series, current, sides, empty, dates, odds,
   } = state;
@@ -44,7 +44,7 @@ export function Lite({ state, nowSec, action, stickyAction }: Props) {
   const valid = current && current.size > 0n;
   const payout = valid ? maxPayout(current.terms, current.size) : undefined;
   const multiple = valid ? payoutMultiple(current) : undefined;
-  const note = current && capNote(current, budget, quoteDecimals);
+  const note = current && capNote(current, budget, asked, quoteDecimals);
   const strike = series ? BigInt(series.strike) : undefined;
   const pinned = stickyAction ? "[@media(min-height:44rem)]:scroll-mb-40" : "";
   const chip = `relative inline-flex min-h-11 max-w-full items-center gap-[0.25em] rounded-md border px-[0.4em] py-[0.08em] align-middle leading-tight font-semibold transition-colors ${pinned} ${legend}`;
@@ -55,7 +55,7 @@ export function Lite({ state, nowSec, action, stickyAction }: Props) {
   const picked = (selected: boolean) => (selected ? "bg-side-field shadow-[inset_0_0_0_1px_var(--side)]" : "hover:bg-well");
   const move = (price: bigint) => spot !== undefined && spot > 0n ? formatPct(toNumber(price - spot, quoteDecimals) / toNumber(spot, quoteDecimals)) : "—";
   const endLabel = expiry !== undefined ? `${dayLabel(expiry, nowSec)} ${formatClock(expiry)}` : "Choose date";
-  const amountLabel = budget >= unit ? formatUsd(budget, quoteDecimals).replace(/\.00$/, "") : "—";
+  const amountLabel = spend >= unit ? formatUsd(spend, quoteDecimals, "up").replace(/\.00$/, "") : "—";
   const priceLabel = strike !== undefined ? formatPrice(strike, quoteDecimals) : "—";
   const spotLabel = spot !== undefined ? formatPrice(spot, quoteDecimals) : "—";
   const chanceLabel = series ? formatChance(odds(series)) : "—";
@@ -223,7 +223,7 @@ export function Lite({ state, nowSec, action, stickyAction }: Props) {
               I put{" "}
               <span className="whitespace-nowrap">
                 <Popover fit preferAbove label="Trade amount" description={amountLabel} button={<>{amountLabel}<Caret /></>} buttonClassName={`${slot} min-w-[4.5rem] before:content-['Amount']`} panelClassName={panel}>
-                  <AmountPicker value={budget} quoteDecimals={quoteDecimals} onChange={setBudget} />
+                  {current ? <AmountPicker value={budget} atMax={atMax} max={current.maxCost} quoteDecimals={quoteDecimals} onChange={setBudget} /> : <p className="px-3 py-2 text-ink-2">{empty}</p>}
                 </Popover>
                 ,
               </span>{" "}
@@ -281,7 +281,7 @@ export function Lite({ state, nowSec, action, stickyAction }: Props) {
               Max loss <strong className="text-[0.8125rem] font-medium tracking-normal text-ink">{valid ? formatUsd(current.cost, quoteDecimals, "up").replace(/\.00$/, "") : "—"}</strong>
             </span>
             <span>
-              Sell back now <strong className="text-[0.8125rem] font-medium tracking-normal text-ink">{valid ? formatUsd(current.cashOut, quoteDecimals) : "—"}</strong>
+              Sell back now <strong className="text-[0.8125rem] font-medium tracking-normal text-ink">{valid && current.cashOut >= minTrade(quoteDecimals) ? formatUsd(current.cashOut, quoteDecimals) : "—"}</strong>
             </span>
           </div>
           <div className="mt-3 w-full *:w-full">{action}</div>

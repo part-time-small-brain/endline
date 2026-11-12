@@ -24,20 +24,21 @@ export function Hero({ nowSec }: { nowSec: number }) {
   const { paths } = useApp().config;
   const reduce = useReducedMotion();
   const state = useTicket(nowSec);
-  const { data, symbol, up, series, current, budget, unit, quoteDecimals, notice, loading } = state;
+  const { data, symbol, up, series, current, budget, atMax, picked, invalid, spend, quoteDecimals, notice, loading } = state;
   const waiting = (!data.listing && !data.listingError) || (!notice && loading);
-  const label = `Try ${symbol} ${up ? "Up" : "Down"} for ${formatUsd(budget, quoteDecimals).replace(/\.00$/, "")}`;
+  const label = `Try ${symbol} ${up ? "Up" : "Down"} for ${formatUsd(spend, quoteDecimals, "up").replace(/\.00$/, "")}`;
+  const pay = atMax ? { pay: "max" } : picked ? { pay: formatToken(budget, quoteDecimals, 2).replaceAll(",", "") } : {};
   const action = !series ? (
     <Link href={paths.trade} className={PRIMARY}>
       Open app
     </Link>
   ) : current && current.size > 0n ? (
-    <Link href={`${paths.trade}?${new URLSearchParams({ series: series.id, pay: formatToken(budget, quoteDecimals, 2).replaceAll(",", "") })}`} className={PRIMARY}>
+    <Link href={`${paths.trade}?${new URLSearchParams({ series: series.id, ...pay })}`} className={PRIMARY}>
       {label}
     </Link>
   ) : (
     <Button size="lg" disabled>
-      {budget < unit ? "Enter a valid amount" : label}
+      {invalid ? "Enter a valid amount" : label}
     </Button>
   );
 

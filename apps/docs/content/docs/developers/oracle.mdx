@@ -72,12 +72,12 @@ The run uses the latest 08:00 UTC fixing at least one minute in the past. Logic 
 ## Pinning a new WASM
 
 1. `scripts/oracle-smoke.sh <you>.testnet` builds the WASM, uploads it to IPFS via Pinata, checks the gateway serves the exact bytes, prints `url` and `sha256`, and runs it once on `outlayer.testnet`. Needs a Pinata JWT in `PINATA_JWT` and the account key in the near CLI legacy keychain.
-2. The owner pins it: `set_oracle_wasm({"oracle_wasm":{"outlayer_id":"outlayer.testnet","url":"…","sha256":"…"}})` with 1 yocto.
+2. The owner pins it: `set_oracle_wasm({"oracle_wasm":{"outlayer_id":"outlayer.testnet","url":"…","sha256":"…"}})` with 1 yocto. On mainnet the `outlayer_id` is `outlayer.near` and the new WASM takes effect 6 h later.
 
-## Testnet status
+## Status
 
 | Item | State |
 |---|---|
-| Pinned WASM | Read the current `url`, `sha256` and `outlayer_id` from `get_oracle_wasm` on `opt6.near-options-dev.testnet` |
+| Pinned WASM | Read `url`, `sha256` and `outlayer_id` from `get_oracle_wasm` on `opt.endline.near` (mainnet) or `opt6.near-options-dev.testnet` |
 | Execution | Testnet uses the proposer below. Mainnet runs the pinned WASM on `outlayer.near` (fallback oracle account `oracle.endline.near`) |
 | Testnet proposer | `pnpm --filter @endline/mm start propose`: refuses a mainnet RPC, downloads the pinned WASM, checks its sha256 every minute before running it, runs it in wasmtime and calls `propose_settlement` once `oracle_window_sec` has passed. Same code and sources, no TEE attestation |

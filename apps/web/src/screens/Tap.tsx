@@ -42,7 +42,7 @@ interface Props {
 }
 
 export function Tap({ state, nowSec, views, onConnect, onAddFunds, onQuote }: Props) {
-  const { data, quoteDecimals, symbols, symbol, budget, setSymbol, setBudget, spot, spotNumber, history, first, priced, loading, empty } = state;
+  const { data, quoteDecimals, symbols, symbol, budget, atMax, picked, ceiling, setSymbol, setBudget, spot, spotNumber, history, first, priced, loading, empty } = state;
   const { wallet } = useWallet();
   const calls = useCalls();
   const [free, setFreeState] = useState(storedFree);
@@ -56,7 +56,7 @@ export function Tap({ state, nowSec, views, onConnect, onAddFunds, onQuote }: Pr
     if (!wallet) return onConnect();
     if (free) return calls.call(series);
     if (data.balance !== undefined && data.balance < ticket.cost) return onAddFunds();
-    onQuote({ wallet, series, side: "buy", size: ticket.size, budget });
+    onQuote({ wallet, series, side: "buy", size: ticket.size, ...(picked ? { budget } : {}) });
   };
   const callable = (s: ListedSeries) => s.quotable && callableAt(s.expiry, nowSec);
   const callRound = nextRound((data.listing?.series ?? []).filter(callable).map((s) => s.expiry));
@@ -212,7 +212,7 @@ export function Tap({ state, nowSec, views, onConnect, onAddFunds, onQuote }: Pr
         </p>
       </section>
 
-      <TapMode free={free} left={left} budget={budget} quoteDecimals={quoteDecimals} onFree={setFree} onBudget={setBudget} />
+      <TapMode free={free} left={left} budget={budget} atMax={atMax} ceiling={ceiling} quoteDecimals={quoteDecimals} onFree={setFree} onBudget={setBudget} />
       {free && <FreeCalls calls={data.calls ?? []} accountId={wallet?.accountId} nowSec={nowSec} quoteDecimals={quoteDecimals} />}
     </div>
   );

@@ -34,7 +34,7 @@ export function Trade({ mode, nowSec, views, onConnect, onAddFunds, onQuote }: P
   const { wallet } = useWallet();
   const state = useTicket(nowSec);
   const {
-    data, quoteDecimals, unit, balance, symbols, symbol, kind, expiry, budget,
+    data, quoteDecimals, balance, symbols, symbol, kind, expiry, budget, atMax, picked, invalid, spend,
     setSymbol, setKind, setExpiry, setSeries, setBudget,
     spotNumber, spot, history, usdOf, payoutAt, up, strikes, choices,
     series, current, vol, reference, sides, first, empty, expiries, notice,
@@ -48,8 +48,8 @@ export function Trade({ mode, nowSec, views, onConnect, onAddFunds, onQuote }: P
       Add funds to buy
     </Button>
   ) : (
-    <Button size="lg" tone={up ? "up" : "down"} disabled={!current || current.size === 0n} onClick={() => wallet && series && current && onQuote({ wallet, series, side: "buy", size: current.size, budget })}>
-      {budget < unit ? "Enter a valid amount" : `Buy ${up ? "Up" : "Down"} · ${formatUsd(budget, quoteDecimals).replace(/\.00$/, "")}`}
+    <Button size="lg" tone={up ? "up" : "down"} disabled={!current || current.size === 0n} onClick={() => wallet && series && current && onQuote({ wallet, series, side: "buy", size: current.size, ...(picked ? { budget } : {}) })}>
+      {invalid ? "Enter a valid amount" : `Buy ${up ? "Up" : "Down"}${spend > 0n ? ` · ${formatUsd(spend, quoteDecimals, "up").replace(/\.00$/, "")}` : ""}`}
     </Button>
   );
 
@@ -117,8 +117,8 @@ export function Trade({ mode, nowSec, views, onConnect, onAddFunds, onQuote }: P
                     quoteDecimals={quoteDecimals}
                     onChange={(index) => setSeries(strikes[index]?.id)}
                   />
-                  <AmountPicker value={budget} quoteDecimals={quoteDecimals} onChange={setBudget} />
-                  <Summary up={up} ticket={current} budget={budget} quoteDecimals={quoteDecimals} symbol={symbol} goodCase={goodCase(current)} />
+                  <AmountPicker value={budget} atMax={atMax} max={current.maxCost} quoteDecimals={quoteDecimals} onChange={setBudget} />
+                  <Summary up={up} ticket={current} budget={budget} picked={picked} quoteDecimals={quoteDecimals} symbol={symbol} goodCase={goodCase(current)} />
                 </>
               )}
               <div className="fixed inset-x-0 bottom-0 z-30 bg-page/90 px-4 pt-3 pb-[max(1.5rem,env(safe-area-inset-bottom))] backdrop-blur-lg lg:static lg:bg-transparent lg:p-0 lg:backdrop-blur-none">

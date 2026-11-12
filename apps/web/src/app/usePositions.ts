@@ -1,5 +1,6 @@
 import { type Fill, type ListedSeries, longPayout, termsOf } from "@endline/sdk";
 import { useMemo } from "react";
+import { minTrade } from "../lib/money.ts";
 import { type PositionStatus, positionStatus, type SettlementView, seriesStatus } from "../lib/status.ts";
 import { type AppData, settlementKey, useData } from "./data.tsx";
 
@@ -44,6 +45,10 @@ export function positions({ listing, balances, fills, settlements, marks, timing
 
 export function valueOf(view: PositionView): bigint | undefined {
   return view.valueNow ?? (view.status === "active" || view.status === "settling" || view.status === "closed" ? undefined : view.payout);
+}
+
+export function tooSmallToSell(view: PositionView, quoteDecimals: number): boolean {
+  return view.valueNow !== undefined && view.valueNow < minTrade(quoteDecimals);
 }
 
 export function pnlOf(view: PositionView): bigint | undefined {

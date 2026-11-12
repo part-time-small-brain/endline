@@ -23,30 +23,30 @@ Size is how much of the asset your option tracks: what you pay divided by the pr
 
 <Callout title="Made-up prices">These numbers show the math. Real prices come from the market maker.</Callout>
 
-BTC Up: you pay $20.00, K is $110,000, the cap is $112,000 and one whole-BTC option costs $1,000, so size is 0.02 BTC.
+BTC Up: you pay $5.00, K is $110,000, the cap is $112,000 and one whole-BTC option costs $1,000, so size is 0.005 BTC.
 
 | Final BTC | Payout | Profit |
 |---|---|---|
-| $109,000 | $0.00 | −$20.00 |
-| $110,000 | $0.00 | −$20.00 |
-| $111,000 | $20.00 | $0.00 (breakeven) |
-| $111,500 | $30.00 | +$10.00 |
-| $112,000 | $40.00 | +$20.00 (the cap) |
-| $120,000 | $40.00 | +$20.00 |
+| $109,000 | $0.00 | −$5.00 |
+| $110,000 | $0.00 | −$5.00 |
+| $111,000 | $5.00 | $0.00 (breakeven) |
+| $111,500 | $7.50 | +$2.50 |
+| $112,000 | $10.00 | +$5.00 (the cap) |
+| $120,000 | $10.00 | +$5.00 |
 
-At $115,000 the BTC Up pays 0.02 × min(115,000 − 110,000, 2,000) = $40.00 in USDC, rounded down to the smallest USDC unit.
+At $115,000 the BTC Up pays 0.005 × min(115,000 − 110,000, 2,000) = $10.00 in USDC, rounded down to the smallest USDC unit.
 
-BTC Down: you pay $25.00, K is $100,000, the cap is $98,000 and one whole-BTC option costs $1,250, so size is 0.02 BTC.
+BTC Down: you pay $6.25, K is $100,000, the cap is $98,000 and one whole-BTC option costs $1,250, so size is 0.005 BTC.
 
 | Final BTC | Payout | Profit |
 |---|---|---|
-| $101,000 | $0.00 | −$25.00 |
-| $100,000 | $0.00 | −$25.00 |
-| $98,750 | $25.00 | $0.00 (breakeven) |
-| $98,000 | $40.00 | +$15.00 (the cap) |
-| $95,000 | $40.00 | +$15.00 |
+| $101,000 | $0.00 | −$6.25 |
+| $100,000 | $0.00 | −$6.25 |
+| $98,750 | $6.25 | $0.00 (breakeven) |
+| $98,000 | $10.00 | +$3.75 (the cap) |
+| $95,000 | $10.00 | +$3.75 |
 
-It can pay at most 0.02 × $2,000 = $40. That $40 in USDC was locked in the contract before you bought.
+It can pay at most 0.005 × $2,000 = $10. That $10 in USDC was locked in the contract before you bought.
 
 ## Fully collateralized
 

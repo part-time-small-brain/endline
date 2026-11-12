@@ -1,6 +1,6 @@
 import { longPayout } from "@endline/sdk";
 import { describe, expect, it } from "vitest";
-import { capNote, goodCase, payoutMultiple, type Ticket, ticket } from "./ticket.ts";
+import { amountChoices, capNote, maxBinds, goodCase, payoutMultiple, type Ticket, ticket } from "./ticket.ts";
 
 const BTC = 10n ** 8n;
 const USD = 10n ** 6n;
@@ -17,6 +17,7 @@ const ticketOf = (kind: "call" | "put", strike: bigint, width: bigint, size: big
   terms: { kind, strike, width, unit: BTC },
   size,
   cost,
+  maxCost: cost,
   capped: false,
   breakeven: null,
   cashOut: 0n,
@@ -108,11 +109,58 @@ describe("payoutMultiple", () => {
 
 describe("capNote", () => {
   const series = { id: "BTC-X", underlying: "BTC", kind: "call" as const, strike: (81_000n * USD).toString(), width: (2_000n * USD).toString(), expiry: 1_800_000_000, underlying_decimals: 8 };
-  const capped = (budget: bigint, ask: bigint) => capNote(ticket(series, budget, { series_id: series.id, ask: ask.toString(), max_size: BTC.toString(), vol: 0.4 }), budget, 6);
+  const capped = (budget: bigint, ask: bigint, picked = true) => capNote(ticket(series, budget, { series_id: series.id, ask: ask.toString(), max_size: BTC.toString(), vol: 0.4 }), budget, picked, 6);
 
   it("says why a capped ticket costs less than the stake, and stays quiet when it doesn't or the cost reads as the stake", () => {
     expect(capped(100n * USD, 40n * USD)).toBe("One trade pays out at most $2,000, so this costs $40.");
     expect(capped(25n * USD, 40n * USD)).toBeUndefined();
     expect(capped(100n * USD, 100n * USD - 1n)).toBeUndefined();
+  });
+
+  it("stays quiet unless the trader asked for that amount, so Max and the default never explain themselves", () => {
+    expect(capped(70n * USD, 40n * USD, false)).toBeUndefined();
+    expect(capped(70n * USD, 40n * USD, true)).toBe("One trade pays out at most $2,000, so this costs $40.");
+  });
+});
+
+describe("amountChoices", () => {
+  const usd = (...dollars: number[]) => dollars.map((d) => BigInt(Math.round(d * 100)) * (USD / 100n));
+
+  it("offers only amounts one trade can actually spend once the max is $100 or less", () => {
+    expect(amountChoices(1_880_000n, USD)).toEqual(usd(1));
+    expect(amountChoices(7_190_000n, USD)).toEqual(usd(1, 2, 5));
+    expect(amountChoices(10n * USD, USD)).toEqual(usd(1, 2, 5));
+    expect(amountChoices(30n * USD, USD)).toEqual(usd(5, 10, 25));
+    expect(amountChoices(100n * USD, USD)).toEqual(usd(10, 25, 50));
+    expect(amountChoices(USD, USD)).toEqual([]);
+    expect([USD, 7_190_000n, 100n * USD].every((max) => maxBinds(max, USD))).toBe(true);
+  });
+
+  it("keeps the usual amounts while no max is known or it's above $100", () => {
+    for (const max of [undefined, 0n, 100n * USD + 1n, 1_400n * USD]) {
+      expect(amountChoices(max, USD)).toEqual(usd(10, 25, 50, 100));
+      expect(maxBinds(max, USD)).toBe(false);
+    }
+  });
+
+  it("keeps an amount picked on another market in the list, in order, so the pick stays visible", () => {
+    expect(amountChoices(1_400n * USD, USD, 5n * USD)).toEqual(usd(5, 10, 25, 50, 100));
+    expect(amountChoices(30n * USD, USD, 2_500_000n)).toEqual(usd(2.5, 5, 10, 25));
+    expect(amountChoices(30n * USD, USD, 10n * USD)).toEqual(usd(5, 10, 25));
+  });
+
+  it("never adds an amount at or over the max, which Max already covers, or an invalid one", () => {
+    expect(amountChoices(30n * USD, USD, 30n * USD)).toEqual(usd(5, 10, 25));
+    expect(amountChoices(30n * USD, USD, 50n * USD)).toEqual(usd(5, 10, 25));
+    expect(amountChoices(30n * USD, USD, 0n)).toEqual(usd(5, 10, 25));
+  });
+});
+
+describe("ticket maxCost", () => {
+  it("is what the largest allowed size costs, whatever the budget", () => {
+    const series = { id: "BTC-X", underlying: "BTC", kind: "call" as const, strike: (81_000n * USD).toString(), width: (2_000n * USD).toString(), expiry: 1_800_000_000, underlying_decimals: 8 };
+    const mark = { series_id: series.id, ask: (400n * USD).toString(), max_size: (BTC / 200n).toString(), vol: 0.4 };
+    expect(ticket(series, USD, mark).maxCost).toBe(2n * USD);
+    expect(ticket(series, 1_000n * USD, mark)).toMatchObject({ maxCost: 2n * USD, cost: 2n * USD, capped: true });
   });
 });
