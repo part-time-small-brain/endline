@@ -2,8 +2,8 @@ import { postWebhook } from "@endline/sdk/webhook";
 import { type Activity, type Network, render } from "./activity.ts";
 import type { Chain } from "./rpc.ts";
 
-// Telegram allows about one message a second per chat
-const GAP_MS = 1_000;
+// Telegram allows about 20 messages a minute in a group
+const GAP_MS = 3_000;
 const MAX_WAITING = 50;
 
 export class Notifier {
@@ -23,10 +23,12 @@ export class Notifier {
   post(activity: Activity): void {
     const url = this.webhookUrl;
     if (url === undefined) return;
-    void this.text(activity).then(
-      (text) => this.enqueue(url, text),
-      (error: unknown) => console.error(`notify: can't describe a ${activity.kind}`, error),
-    );
+    void this.text(activity)
+      .then(
+        (text) => this.enqueue(url, text),
+        (error: unknown) => console.error(`notify: can't describe a ${activity.kind}`, error),
+      )
+      .catch(console.error);
   }
 
   private async text(activity: Activity): Promise<string> {

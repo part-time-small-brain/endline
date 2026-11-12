@@ -9,20 +9,19 @@ export interface Deposit {
   amountOut: bigint;
   deadlineMs: number;
   status?: string;
+  nextAt?: number;
 }
 
 export type Activity =
   | { kind: "trade"; fill: Fill }
   | { kind: "collect"; accountId: string; legs: { series: Series; amount: bigint }[]; payout: bigint; txHash: string; auto: boolean }
   | { kind: "call"; call: Call }
-  | { kind: "deposit"; deposit: Deposit; outcome: "issued" | "SUCCESS" | "REFUNDED" | "FAILED" | "expired" };
+  | { kind: "deposit"; deposit: Deposit; outcome: "SUCCESS" | "REFUNDED" | "FAILED" };
 
 const DEPOSIT_TITLES = {
-  issued: ["📥", "Deposit address issued"],
   SUCCESS: ["💵", "Deposit credited"],
   REFUNDED: ["↩️", "Deposit refunded"],
   FAILED: ["❌", "Deposit failed"],
-  expired: ["⌛", "Deposit expired"],
 } as const;
 
 const utc = new Intl.DateTimeFormat("en-GB", { timeZone: "UTC", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
@@ -52,8 +51,7 @@ export function render(network: Network, activity: Activity, listing: ReadonlyMa
     case "deposit": {
       const { deposit, outcome } = activity;
       const [icon, title] = DEPOSIT_TITLES[outcome];
-      const last = outcome === "expired" ? [`last status ${deposit.status ?? "unknown"}`] : [];
-      return message(icon, title, [`${deposit.sent} for about ${usd(deposit.amountOut)}`, deposit.accountId, ...last]);
+      return message(icon, title, [`${deposit.sent} for about ${usd(deposit.amountOut)}`, deposit.accountId]);
     }
   }
 }

@@ -1,11 +1,12 @@
 import { z } from "zod";
 import type { Deposit } from "./activity.ts";
 import type { Notifier } from "./notifier.ts";
-import { ONECLICK_API, partnerHeaders, TIMEOUT_MS } from "./oneClick.ts";
+import { ONECLICK_API, TIMEOUT_MS } from "./oneClick.ts";
 
 const GRACE_MS = 60 * 60_000;
 const MAX_TRACKED = 200;
 const CONCURRENCY = 3;
+const WAITING_EVERY_MS = 2 * 60_000;
 const TERMINAL = ["SUCCESS", "REFUNDED", "FAILED"] as const;
 
 const Issued = z.object({ quote: z.object({ depositAddress: z.string().min(1), amountInFormatted: z.string(), amountOut: z.string().regex(/^\d+$/) }) });
@@ -22,24 +23,23 @@ export class Deposits {
   private pending = new Map<string, Deposit>();
   private tokens: Promise<Map<string, string>> | undefined;
 
-  constructor(
-    private apiKey: string | undefined,
-    private notifier: Pick<Notifier, "on" | "post">,
-  ) {}
+  constructor(private notifier: Pick<Notifier, "on" | "post">) {}
 
   track(request: Request, response: unknown): void {
     const quote = Issued.safeParse(response).data?.quote;
     if (!this.notifier.on || !quote) return;
-    void this.tokenName(request.originAsset).then((token) => {
-      const deposit = { address: quote.depositAddress, accountId: request.recipient, sent: `${quote.amountInFormatted} ${token}`, amountOut: BigInt(quote.amountOut), deadlineMs: Date.parse(request.deadline) };
-      this.notifier.post({ kind: "deposit", deposit, outcome: "issued" });
-      if (this.pending.size < MAX_TRACKED) this.pending.set(deposit.address, deposit);
-      else console.error(`deposits: already tracking ${MAX_TRACKED}, not following ${deposit.address}`);
-    });
+    void this.tokenName(request.originAsset)
+      .then((token) => {
+        const oldest = this.pending.size >= MAX_TRACKED ? this.pending.keys().next().value : undefined;
+        if (oldest !== undefined) this.pending.delete(oldest);
+        this.pending.set(quote.depositAddress, { address: quote.depositAddress, accountId: request.recipient, sent: `${quote.amountInFormatted} ${token}`, amountOut: BigInt(quote.amountOut), deadlineMs: Date.parse(request.deadline) });
+      })
+      .catch(console.error);
   }
 
   async poll(): Promise<void> {
-    const due = [...this.pending.values()];
+    const now = Date.now();
+    const due = [...this.pending.values()].filter((deposit) => (deposit.nextAt ?? 0) <= now);
     const work = async (): Promise<void> => {
       for (let deposit = due.shift(); deposit !== undefined; deposit = due.shift()) await this.check(deposit);
     };
@@ -52,14 +52,15 @@ export class Deposits {
     } catch (error) {
       console.error(`deposits: 1click status of ${deposit.address}: ${error}`);
     }
-    const outcome = TERMINAL.find((status) => status === deposit.status) ?? (Date.now() > deposit.deadlineMs + GRACE_MS ? "expired" : undefined);
-    if (outcome === undefined) return;
-    this.pending.delete(deposit.address);
-    this.notifier.post({ kind: "deposit", deposit, outcome });
+    const outcome = TERMINAL.find((status) => status === deposit.status);
+    const waiting = deposit.status === undefined || deposit.status === "PENDING_DEPOSIT";
+    if (outcome !== undefined || (waiting && Date.now() > deposit.deadlineMs + GRACE_MS)) this.pending.delete(deposit.address);
+    if (outcome !== undefined) return this.notifier.post({ kind: "deposit", deposit, outcome });
+    deposit.nextAt = waiting ? Date.now() + WAITING_EVERY_MS : 0;
   }
 
   private async status(address: string): Promise<string> {
-    const response = await fetch(`${ONECLICK_API}/status?depositAddress=${encodeURIComponent(address)}`, { headers: partnerHeaders(this.apiKey), signal: AbortSignal.timeout(TIMEOUT_MS) });
+    const response = await fetch(`${ONECLICK_API}/status?depositAddress=${encodeURIComponent(address)}`, { signal: AbortSignal.timeout(TIMEOUT_MS) });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     return Status.parse(await response.json()).status;
   }

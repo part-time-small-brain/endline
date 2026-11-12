@@ -31,8 +31,6 @@ const depositQuote = (quoteAsset: string) =>
 
 type DepositQuoteRequest = z.infer<ReturnType<typeof depositQuote>>;
 
-export const partnerHeaders = (apiKey: string | undefined) => (apiKey ? { "x-api-key": apiKey } : {});
-
 export class OneClick {
   readonly schema: ReturnType<typeof depositQuote>;
   private allow = rateLimit(MAX_QUOTES_PER_MINUTE, 60_000);
@@ -58,7 +56,7 @@ export class OneClick {
     try {
       const response = await fetch(`${ONECLICK_API}/quote`, {
         method: "POST",
-        headers: { "content-type": "application/json", ...partnerHeaders(this.apiKey) },
+        headers: { "content-type": "application/json", ...(this.apiKey ? { "x-api-key": this.apiKey } : {}) },
         body: JSON.stringify(body),
         signal: AbortSignal.timeout(TIMEOUT_MS),
       });

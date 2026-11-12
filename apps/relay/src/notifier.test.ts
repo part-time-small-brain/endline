@@ -38,13 +38,13 @@ it("posts nothing and reads nothing without a webhook", async () => {
   expect(posted).not.toHaveBeenCalled();
 });
 
-it("sends a burst in order, a second apart", async () => {
+it("sends a burst in order, 3 s apart to stay under Telegram's group limit", async () => {
   const posted = webhook();
   const notifier = new Notifier(WEBHOOK, "mainnet", fakeChain().chain);
   for (const account of ["a.near", "b.near", "c.near"]) notifier.post(trade(account));
   await vi.advanceTimersByTimeAsync(0);
   expect(posted).toHaveBeenCalledTimes(1);
-  await vi.advanceTimersByTimeAsync(999);
+  await vi.advanceTimersByTimeAsync(2_999);
   expect(posted).toHaveBeenCalledTimes(1);
   await vi.advanceTimersByTimeAsync(1);
   expect(posted).toHaveBeenCalledTimes(2);

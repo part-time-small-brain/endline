@@ -30,45 +30,83 @@ function oneClick(statuses: Record<string, string | number>, tokens: unknown = T
 
 function setup(on = true) {
   const notifier = { on, post: vi.fn() };
-  const deposits = new Deposits("partner-jwt", notifier);
+  const deposits = new Deposits(notifier);
   const outcomes = () => notifier.post.mock.calls.map(([activity]) => `${activity.deposit.address} ${activity.outcome}`);
   return { notifier, deposits, outcomes };
 }
 
+const statusCalls = (fetch: ReturnType<typeof oneClick>) => fetch.mock.calls.filter(([url]) => url.includes("/status"));
+
 describe("deposit tracker", () => {
-  it.each(["SUCCESS", "REFUNDED", "FAILED"])("posts the issued address, waits through pending statuses and posts %s exactly once", async (final) => {
+  it.each(["SUCCESS", "REFUNDED", "FAILED"])("says nothing while a deposit is on its way and posts %s exactly once", async (final) => {
     const statuses: Record<string, string> = { A: "PENDING_DEPOSIT" };
     const fetch = oneClick(statuses);
     const { notifier, deposits, outcomes } = setup();
     deposits.track(REQUEST, quoteAt("A"));
     await vi.advanceTimersByTimeAsync(0);
-    expect(notifier.post).toHaveBeenCalledWith({ kind: "deposit", outcome: "issued", deposit: expect.objectContaining({ address: "A", accountId: "alice.near", sent: "1.0 SOL on sol", amountOut: 100_305_978n }) });
-    for (const status of ["PENDING_DEPOSIT", "KNOWN_DEPOSIT_TX", "INCOMPLETE_DEPOSIT", "PROCESSING", final, final]) {
+    await deposits.poll();
+    expect(notifier.post).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(2 * 60_000);
+    for (const status of ["KNOWN_DEPOSIT_TX", "INCOMPLETE_DEPOSIT", "PROCESSING", final, final]) {
       statuses.A = status;
       await deposits.poll();
     }
-    expect(outcomes()).toEqual(["A issued", `A ${final}`]);
-    const polled = fetch.mock.calls.filter(([url]) => url.includes("/status"));
-    expect(polled).toHaveLength(5);
-    expect(polled[0]).toEqual([`https://1click.chaindefuser.com/v0/status?depositAddress=A`, expect.objectContaining({ headers: { "x-api-key": "partner-jwt" } })]);
+    expect(outcomes()).toEqual([`A ${final}`]);
+    expect(notifier.post).toHaveBeenCalledWith({ kind: "deposit", outcome: final, deposit: expect.objectContaining({ address: "A", accountId: "alice.near", sent: "1.0 SOL on sol", amountOut: 100_305_978n }) });
+    expect(statusCalls(fetch)).toHaveLength(5);
   });
 
-  it("gives up an hour after the deadline with one notice, also while 1Click is down, and polls it no more", async () => {
-    const fetch = oneClick({ A: 503, B: "PENDING_DEPOSIT" });
-    const { deposits, outcomes } = setup();
+  it("asks 1Click without our partner key, so status polls never eat into the deposit quote limit", async () => {
+    const fetch = oneClick({});
+    const { deposits } = setup();
+    deposits.track(REQUEST, quoteAt("A"));
+    await vi.advanceTimersByTimeAsync(0);
+    await deposits.poll();
+    expect(statusCalls(fetch)[0]).toEqual(["https://1click.chaindefuser.com/v0/status?depositAddress=A", expect.not.objectContaining({ headers: expect.anything() })]);
+  });
+
+  it("checks a deposit nothing has reached yet only every 2 minutes, one on its way every poll", async () => {
+    const fetch = oneClick({ A: "PENDING_DEPOSIT", B: "PROCESSING" });
+    const { deposits } = setup();
     deposits.track(REQUEST, quoteAt("A"));
     deposits.track(REQUEST, quoteAt("B"));
     await vi.advanceTimersByTimeAsync(0);
-    vi.setSystemTime(Date.parse(REQUEST.deadline) + 3_600_000);
     await deposits.poll();
-    expect(outcomes()).toEqual(["A issued", "B issued"]);
+    vi.advanceTimersByTime(2 * 60_000 - 1);
+    await deposits.poll();
+    expect(statusCalls(fetch).map(([url]) => new URL(url).searchParams.get("depositAddress"))).toEqual(["A", "B", "B"]);
+    vi.advanceTimersByTime(1);
+    await deposits.poll();
+    expect(statusCalls(fetch).map(([url]) => new URL(url).searchParams.get("depositAddress")).filter((a) => a === "A")).toHaveLength(2);
+  });
+
+  it("drops a deposit nothing reached an hour after its deadline without a word, also while 1Click is down, but keeps one on its way", async () => {
+    const statuses: Record<string, string | number> = { A: 503, B: "PENDING_DEPOSIT", C: "PROCESSING" };
+    const fetch = oneClick(statuses);
+    const { deposits, outcomes } = setup();
+    for (const address of ["A", "B", "C"]) deposits.track(REQUEST, quoteAt(address));
+    await vi.advanceTimersByTimeAsync(0);
     vi.setSystemTime(Date.parse(REQUEST.deadline) + 3_600_001);
     await deposits.poll();
+    const before = statusCalls(fetch).length;
+    vi.advanceTimersByTime(10 * 60_000);
+    statuses.C = "SUCCESS";
     await deposits.poll();
-    expect(outcomes()).toEqual(["A issued", "B issued", "A expired", "B expired"]);
-    expect(fetch.mock.calls.filter(([url]) => url.includes("/status"))).toHaveLength(4);
+    expect(statusCalls(fetch).slice(before).map(([url]) => new URL(url).searchParams.get("depositAddress"))).toEqual(["C"]);
+    expect(outcomes()).toEqual(["C SUCCESS"]);
     expect(vi.mocked(console.error).mock.calls.flat().join("\n")).toMatch(/HTTP 503/);
-    expect(vi.mocked(console.error).mock.calls.flat().join("\n")).not.toContain("partner-jwt");
+  });
+
+  it("makes room by dropping the oldest when it already follows 200 deposits", async () => {
+    const fetch = oneClick({});
+    const { deposits } = setup();
+    for (let i = 0; i <= 200; i++) deposits.track(REQUEST, quoteAt(`D${i}`));
+    await vi.advanceTimersByTimeAsync(0);
+    await deposits.poll();
+    const polled = statusCalls(fetch).map(([url]) => new URL(url).searchParams.get("depositAddress"));
+    expect(polled).toHaveLength(200);
+    expect(polled).not.toContain("D0");
+    expect(polled).toContain("D200");
   });
 
   it("follows nothing and calls 1Click for nothing without a webhook", async () => {
@@ -101,13 +139,14 @@ describe("deposit tracker", () => {
   });
 
   it("names the token by its asset id while 1Click's token list is down, and asks for the list again next time", async () => {
-    const fetch = oneClick({}, 502);
+    const fetch = oneClick({ A: "SUCCESS", B: "SUCCESS", C: "SUCCESS" }, 502);
     const { notifier, deposits } = setup();
     deposits.track(REQUEST, quoteAt("A"));
     deposits.track(REQUEST, quoteAt("B"));
     await vi.advanceTimersByTimeAsync(0);
     deposits.track(REQUEST, quoteAt("C"));
     await vi.advanceTimersByTimeAsync(0);
+    await deposits.poll();
     expect(notifier.post.mock.calls.map(([activity]) => activity.deposit.sent)).toEqual(Array(3).fill(`1.0 ${DEPOSIT.originAsset}`));
     expect(fetch.mock.calls.filter(([url]) => url.endsWith("/tokens"))).toHaveLength(2);
   });

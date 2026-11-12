@@ -41,7 +41,7 @@ it("forwards a deposit quote with the partner key and returns 1Click's signed qu
 it("answers the quote at once while following the deposit hangs", async () => {
   vi.stubGlobal("fetch", async (url: string) => (url.endsWith("/quote") ? Response.json(SIGNED_QUOTE) : new Promise<Response>(() => {})));
   const notifier = { on: true, post: vi.fn() };
-  const oneClick = new OneClick(USDC, "partner-jwt", new Deposits("partner-jwt", notifier));
+  const oneClick = new OneClick(USDC, "partner-jwt", new Deposits(notifier));
   expect(await oneClick.quote(oneClick.schema.parse(DEPOSIT), CLIENT)).toEqual(SIGNED_QUOTE);
   expect(notifier.post).not.toHaveBeenCalled();
 });

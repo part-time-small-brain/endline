@@ -40,11 +40,9 @@ describe("render", () => {
   });
 
   it.each([
-    ["issued", "📥 mainnet · Deposit address issued\n1.0 SOL on sol for about $100 · alice.near"],
     ["SUCCESS", "💵 mainnet · Deposit credited\n1.0 SOL on sol for about $100 · alice.near"],
     ["REFUNDED", "↩️ mainnet · Deposit refunded\n1.0 SOL on sol for about $100 · alice.near"],
     ["FAILED", "❌ mainnet · Deposit failed\n1.0 SOL on sol for about $100 · alice.near"],
-    ["expired", "⌛ mainnet · Deposit expired\n1.0 SOL on sol for about $100 · alice.near · last status PENDING_DEPOSIT"],
   ] as const)("names a deposit that is %s", (outcome, message) => {
     expect(text({ kind: "deposit", deposit: { ...deposit, status: "PENDING_DEPOSIT" }, outcome })).toBe(message);
   });

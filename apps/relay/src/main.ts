@@ -60,7 +60,7 @@ await calls.load();
 const scoreCalls = () => void calls.score().catch(console.error).finally(() => setTimeout(scoreCalls, SCORE_MS));
 scoreCalls();
 
-const deposits = new Deposits(config.ONECLICK_JWT, notifier);
+const deposits = new Deposits(notifier);
 const oneClick = new OneClick(config.quote_asset, config.ONECLICK_JWT, deposits);
 const pollDeposits = () => void deposits.poll().catch(console.error).finally(() => setTimeout(pollDeposits, DEPOSITS_MS));
 if (notifier.on) pollDeposits();
