@@ -3,7 +3,7 @@ import { createRelativeLink } from "fumadocs-ui/mdx";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getMDXComponents } from "@/components/mdx";
-import { sourceUrl } from "@/lib/layout";
+import { openGraph, sourceUrl } from "@/lib/layout";
 import { markdownUrl } from "@/lib/paths";
 import { source } from "@/lib/source";
 
@@ -37,5 +37,5 @@ export async function generateMetadata(props: PageProps<"/[[...slug]]">): Promis
   const { slug } = await props.params;
   const page = source.getPage(slug);
   if (!page) notFound();
-  return { title: page.data.title, description: page.data.description };
+  return { title: page.data.title, description: page.data.description, openGraph: { ...openGraph, url: page.url } };
 }
