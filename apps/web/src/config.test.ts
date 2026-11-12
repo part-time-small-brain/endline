@@ -31,10 +31,10 @@ it("mock mode stays on mainnet ids unless VITE_NETWORK=testnet asks for a testne
 it("takes the contract ids from deploy/<VITE_NETWORK>.json, never from env", () => {
   vi.stubGlobal("window", { location: { origin: "https://app.example.com" } });
   const stale = { VITE_RPC_URL: "https://rpc.stale.example", VITE_INTENTS_ID: "intents.stale.testnet", VITE_OPTIONS_ID: "opt.stale.testnet", VITE_QUOTE_ASSET: "nep141:usdc.stale.testnet" };
-  expect(loadConfig({ ...ENV, ...stale })).toMatchObject({ network: "testnet", rpcUrl: testnet.rpc_url, intentsId: testnet.intents_id, optionsId: testnet.options_id, quoteAsset: testnet.quote_asset });
+  expect(loadConfig({ ...ENV, ...stale })).toMatchObject({ network: "testnet", rpcUrls: [testnet.rpc_url, ...testnet.rpc_fallbacks], intentsId: testnet.intents_id, optionsId: testnet.options_id, quoteAsset: testnet.quote_asset });
 });
 
 it("builds mainnet from deploy/mainnet.json, never testnet's", () => {
   vi.stubGlobal("window", { location: { origin: "https://app.endline.trade" } });
-  expect(loadConfig({ VITE_NETWORK: "mainnet", VITE_RELAY_URL: "https://api.endline.trade" })).toMatchObject({ network: "mainnet", rpcUrl: mainnet.rpc_url, intentsId: "intents.near", optionsId: mainnet.options_id, quoteAsset: mainnet.quote_asset });
+  expect(loadConfig({ VITE_NETWORK: "mainnet", VITE_RELAY_URL: "https://api.endline.trade" })).toMatchObject({ network: "mainnet", rpcUrls: [mainnet.rpc_url, ...mainnet.rpc_fallbacks], intentsId: "intents.near", optionsId: mainnet.options_id, quoteAsset: mainnet.quote_asset });
 });

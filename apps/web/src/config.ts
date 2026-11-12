@@ -20,7 +20,7 @@ export interface Config {
   relayUrl: string;
   paths: Paths;
   network: z.infer<typeof Network>;
-  rpcUrl: string;
+  rpcUrls: string[];
   intentsId: string;
   optionsId: string;
   quoteAsset: string;
@@ -31,7 +31,7 @@ const MOCK: Config = {
   relayUrl: "",
   paths: PATHS,
   network: "mainnet",
-  rpcUrl: "",
+  rpcUrls: [],
   intentsId: "intents.near",
   optionsId: "opt.demo.near",
   quoteAsset: "nep141:17208628f84f5d6ad33f0da3bbbeb27ffcb398eac501a31bd6ad2011e36133a1",
@@ -51,7 +51,7 @@ export function loadConfig(env: Record<string, unknown>): Config {
     relayUrl: e.VITE_RELAY_URL ?? window.location.origin,
     paths: e.VITE_APP_URL === undefined ? PATHS : pathsFor(e.VITE_APP_URL, window.location.origin),
     network: e.VITE_NETWORK,
-    rpcUrl: d.rpc_url,
+    rpcUrls: [d.rpc_url, ...d.rpc_fallbacks],
     intentsId: d.intents_id,
     optionsId: d.options_id,
     quoteAsset: d.quote_asset,

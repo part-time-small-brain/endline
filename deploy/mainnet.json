@@ -1,6 +1,7 @@
 {
   "network": "mainnet",
   "rpc_url": "https://near.drpc.org",
+  "rpc_fallbacks": ["https://rpc.intea.rs", "https://rpc.mainnet.near.org"],
   "owner": "endline.near",
   "intents_id": "intents.near",
   "options_id": "opt.endline.near",

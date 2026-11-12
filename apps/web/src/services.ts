@@ -14,7 +14,7 @@ export interface Services {
 export function createServices(config: Config): Services {
   return {
     relay: httpRelay(config.relayUrl),
-    chain: rpcChain(config.rpcUrl, config.intentsId, config.optionsId),
+    chain: rpcChain(config.rpcUrls, config.intentsId, config.optionsId),
     market: deribitMarket(),
     oneClick: config.network === "mainnet" ? oneClick(config.relayUrl) : null,
   };

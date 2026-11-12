@@ -64,7 +64,7 @@ The official NEAR Intents quote bus needs a partner key and KYC for market maker
 | Funding | 1Click from any chain | 100 test USDC a day from Add funds (relay `POST /faucet`) |
 | Oracle | `outlayer.near` | `outlayer.testnet`. Manual oracle: `oracle.near-options-dev.testnet`, driven by the proposer |
 
-Ids are in `deploy/mainnet.json` and `deploy/testnet.json`. RPC (`rpc_url`, also what the app uses in the browser): `https://near.drpc.org`, `https://rpc.testnet.fastnear.com`. Servers add more through `NEAR_RPC_URLS` ([Secrets](./running-locally.mdx#secrets)).
+Ids are in `deploy/mainnet.json` and `deploy/testnet.json`. RPC: `rpc_url` (`https://near.drpc.org`, `https://rpc.testnet.fastnear.com`). The app reads the chain in the browser from `rpc_url` and the keyless `rpc_fallbacks` after it, moving on when one fails or takes over 5 s and starting from the last one that answered. Servers add more through `NEAR_RPC_URLS` ([Secrets](./running-locally.mdx#secrets)).
 
 ## Keys on mainnet
 

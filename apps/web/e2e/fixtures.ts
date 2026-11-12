@@ -4,7 +4,7 @@ import testnet from "../../../deploy/testnet.json" with { type: "json" };
 const SEED = 4;
 const NOW = process.env.E2E_NOW ?? "2026-11-04T12:00:00Z";
 const IGNORED = [/Reduced Motion enabled/];
-export const RPC = `${testnet.rpc_url}/**`;
+export const RPC = (url: URL) => [testnet.rpc_url, ...testnet.rpc_fallbacks].some((rpc) => url.href.startsWith(rpc));
 
 function seedRandom(seed: number) {
   let state = seed;
