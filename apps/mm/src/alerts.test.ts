@@ -42,6 +42,13 @@ describe("settlementAlert", () => {
     );
   });
 
+  it("signs mainnet commands quietly with the admin key from the environment and deletes near CLI's command log, testnet ones from the keychain", () => {
+    const mainnet = { ...CONTRACT, networkId: "mainnet" };
+    expect(check(proposed("90000000000"), 80_705.19, { contract: mainnet })?.text).toMatch(/near --quiet contract call-function as-transaction opt6\.near-options-dev\.testnet override_settlement .* sign-as owner\.testnet network-config mainnet sign-with-plaintext-private-key "\$OWNER_PRIVATE_KEY" send; rm -f "\$TMPDIR\/near-cli-rs-final-command\.log"$/);
+    expect(check(null, 80_000, { nowSec: EXPIRY + 900, contract: mainnet })?.text).toMatch(/near --quiet contract call-function as-transaction .* sign-as oracle\.testnet network-config mainnet sign-with-plaintext-private-key "\$ORACLE_PRIVATE_KEY" send; rm -f "\$TMPDIR\/near-cli-rs-final-command\.log"$/);
+    expect(check(null, 80_000, { nowSec: EXPIRY + 900 })?.text).toMatch(/network-config testnet sign-with-legacy-keychain send$/);
+  });
+
   it("stays silent once the price is final, however wrong", () => {
     expect(check(proposed("1"), 80_000, { nowSec: FINAL_AT })).toBeUndefined();
     expect(check(proposed("1"), undefined, { nowSec: FINAL_AT + 1 })).toBeUndefined();
@@ -82,17 +89,17 @@ describe("reserveAlert", () => {
   const TWO_NEAR = 2n * 10n ** 24n;
 
   it("alerts one yocto below 2 NEAR over the storage cost, not at it", () => {
-    expect(reserveAlert("Relayer", CONTRACT.optionsId, STORAGE_YOCTO + TWO_NEAR, STORAGE_BYTES)).toBeUndefined();
-    expect(reserveAlert("Relayer", CONTRACT.optionsId, STORAGE_YOCTO + TWO_NEAR - 1n, STORAGE_BYTES)?.key).toBe(`reserve ${CONTRACT.optionsId}`);
+    expect(reserveAlert("Relayer", CONTRACT.optionsId, STORAGE_YOCTO + TWO_NEAR, STORAGE_BYTES, TWO_NEAR)).toBeUndefined();
+    expect(reserveAlert("Relayer", CONTRACT.optionsId, STORAGE_YOCTO + TWO_NEAR - 1n, STORAGE_BYTES, TWO_NEAR)?.key).toBe(`reserve ${CONTRACT.optionsId}`);
   });
 
   it("keys each account separately, so a low relayer doesn't hide a low intents contract", () => {
-    const keys = ["intents.testnet", "relayer.testnet"].map((id) => reserveAlert("Relayer", id, TWO_NEAR - 1n, 0)?.key);
+    const keys = ["intents.testnet", "relayer.testnet"].map((id) => reserveAlert("Relayer", id, TWO_NEAR - 1n, 0, TWO_NEAR)?.key);
     expect(keys).toEqual(["reserve intents.testnet", "reserve relayer.testnet"]);
   });
 
   it("reports a balance below the storage cost as negative", () => {
-    expect(reserveAlert("Relayer", CONTRACT.optionsId, STORAGE_YOCTO / 2n, STORAGE_BYTES)?.text).toContain("-0.500 NEAR above storage");
+    expect(reserveAlert("Relayer", CONTRACT.optionsId, STORAGE_YOCTO / 2n, STORAGE_BYTES, TWO_NEAR)?.text).toContain("-0.500 NEAR above storage");
   });
 });
 

@@ -19,7 +19,7 @@ Read from the process environment (no `.env` loading). `RELAYER_PRIVATE_KEY`, `M
 | Var | Meaning |
 |---|---|
 | `PORT` | HTTP and WS port, default `8080` |
-| `NETWORK_ID` | `mainnet` or `testnet`. Picks `deploy/<NETWORK_ID>.json`, the only source of `rpc_url`, `intents_id`, `options_id` and `quote_asset`. No file (mainnet today): the relay won't start |
+| `NETWORK_ID` | `mainnet` or `testnet`. Picks `deploy/<NETWORK_ID>.json`, the only source of `rpc_url`, `intents_id`, `options_id` and `quote_asset`. No file: the relay won't start |
 | `RELAYER_ACCOUNT_ID` | Account that sends `execute_intents` and pays gas |
 | `RELAYER_PRIVATE_KEY` | `ed25519:…` (or `secp256k1:…`) key of that account. A function-call key limited to `execute_intents` on `intents_id` is enough, unless `FAUCET=true`: the faucet's `ft_transfer_call` attaches 1 yocto, which needs a full-access key |
 | `MM_API_KEYS` | Comma list of MM API keys, at least 16 chars each |

@@ -1,0 +1,14 @@
+{
+  "network": "mainnet",
+  "rpc_url": "https://rpc.mainnet.fastnear.com",
+  "owner": "endline.near",
+  "intents_id": "intents.near",
+  "options_id": "opt.endline.near",
+  "quote_asset": "nep141:17208628f84f5d6ad33f0da3bbbeb27ffcb398eac501a31bd6ad2011e36133a1",
+  "accounts": {
+    "oracle": "oracle.endline.near",
+    "relayer": "relayer.endline.near",
+    "settler": "settler.endline.near",
+    "market_maker": "mm.endline.near"
+  }
+}

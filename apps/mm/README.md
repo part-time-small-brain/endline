@@ -39,10 +39,11 @@ Read from the process environment. `MM_PRIVATE_KEY`, `MM_API_KEY`, `ALERT_WEBHOO
 | `MM_API_KEY` | One of the relay's `MM_API_KEYS`, sent as `Authorization: Bearer <key>`. Quoting only |
 | `MM_ACCOUNT_ID` | Signer of quotes and writes. Monitor: optional, watches its NEAR for gas |
 | `MM_PRIVATE_KEY` | `ed25519:…` key registered for `MM_ACCOUNT_ID` on `intents_id` |
-| `NETWORK_ID` | `mainnet` or `testnet`, every command but `settle`. Picks `deploy/<NETWORK_ID>.json`, the only source of `rpc_url`, `intents_id` (the verifier; the monitor watches its NEAR) and `options_id`. No file (mainnet today): the command won't start. The monitor also uses it in the printed `near` commands |
+| `NETWORK_ID` | `mainnet` or `testnet`, every command but `settle`. Picks `deploy/<NETWORK_ID>.json`, the only source of `rpc_url`, `intents_id` (the verifier; the monitor watches its NEAR) and `options_id`. No file: the command won't start. The monitor also uses it in the printed `near` commands |
 | `SPREAD_VOL_POINTS` | Vol shock priced into each side, default `2` |
 | `MIN_PREMIUM_USD` | Default `1`. Asks are floored to it, bids below it are refused |
 | `MAX_TRADE_USD` | Max payout (contracts × width) per quote, default `2000`, at most `1e9`. The lister reads it too, to keep that much USDC free: set it the same for both |
+| `RESERVE_USD` | Lister only: USDC it never writes with, default `500`. It keeps `max(RESERVE_USD, MAX_TRADE_USD)` free |
 | `MAX_SERIES_USD` | Max net short/long payout per series, default `5000`. The lister stocks at most this much per series |
 | `MAX_DELTA_USD` | Max net delta per underlying after a fill, default `50000`. Near expiry a full `MAX_TRADE_USD` trade near the money is up to `MAX_TRADE_USD × spot / width` of delta (~$80k for BTC) and gets refused; demo-size trades fit |
 | `MAX_VEGA_USD` | Max net vega per vol point, default `200` |
@@ -97,13 +98,13 @@ SIGINT/SIGTERM closes the relay socket and stops all timers; already-signed quot
 
 ## Market lister
 
-`list` uses the same env as `write` (MM account and key; `MAX_SERIES_USD` caps the per-series target; `MAX_TRADE_USD` sets the USDC it keeps free). Every 10 min (`--once`: one pass, then exit), and on start, it reads the contract's config, underlyings and series, the Deribit index per underlying, and the MM's intents balances, then acts. One log line per action; a failed read or transaction is logged and retried next pass. The MM pays its own gas; actions are 3 s apart (RPC rate limits).
+`list` uses the same env as `write` (MM account and key; `MAX_SERIES_USD` caps the per-series target; `max(RESERVE_USD, MAX_TRADE_USD)` is the USDC it keeps free). Every 10 min (`--once`: one pass, then exit), and on start, it reads the contract's config, underlyings and series, the Deribit index per underlying, and the MM's intents balances, then acts. One log line per action; a failed read or transaction is logged and retried next pass. The MM pays its own gas; actions are 3 s apart (RPC rate limits).
 
 | Step | What |
 |---|---|
 | Expiries | Next 4 daily 08:00 UTC expiries still quotable 10 min from now (`quotableUntil(expiry, write_cutoff_sec) > now + 600`) and within `max_horizon_sec`. If `period_sec` < 1 day (testnet), also the next 4-hourly expiry (00, 04, …, 20 UTC) at least 90 min out, unless it is a daily. All on the contract's grid |
 | Strikes | Step = largest 1/2/5×10^n at most 1.5 % of spot (BTC $80k → $1,000). Dailies: 5 strikes around spot; short expiry: the strike either side of spot. Calls and puts, width 2 steps of the strike's own grid (`listedWidth` in the SDK: BTC $2,000), so a strike keeps its id when spot re-centres; puts whose width would reach the strike are skipped |
-| Create and write | Per target, nearest expiry and strike first: `create_series` if missing (30 TGas, 0.05 NEAR attached, storage charged, the rest refunded), then straight away top long inventory up to `min(MAX_SERIES_USD, $500)` of max payout, if the gap is at least the underlying's `min_write`, so a fresh contract gets prices within the first few series. Collateral is `ceil(n·W)` USDC, never spending the last `max($500, MAX_TRADE_USD)` of USDC, so a pending quote that buys back from a user still settles. Targets with nothing to write are created after the rest |
+| Create and write | Per target, nearest expiry and strike first: `create_series` if missing (30 TGas, 0.05 NEAR attached, storage charged, the rest refunded), then straight away top long inventory up to `min(MAX_SERIES_USD, $500)` of max payout, if the gap is at least the underlying's `min_write`, so a fresh contract gets prices within the first few series. Collateral is `ceil(n·W)` USDC, never spending the last `max(RESERVE_USD, MAX_TRADE_USD)` of USDC, so a pending quote that buys back from a user still settles. Targets with nothing to write are created after the rest |
 | Burn | From `quotableUntil(expiry, write_cutoff_sec)`, when the bot stops quoting, burn the MM's unsold pairs (`min(long, short)`) with `burn_pair`: one intent per series |
 | Redeem | Once a series' price is final, redeem the MM's shorts beyond its pairs, up to 10 per intent |
 | Exercise | Once a series' price is final, exercise the MM's longs beyond its pairs (bought back from users) that pay something, up to 10 per intent |
@@ -117,9 +118,9 @@ Burn, redeem and exercise cover series that expired up to 7 days ago, so the MM'
 
 | Alert | Title | When | Prints |
 |---|---|---|---|
-| `settle` | Settlement price for … looks wrong, or Can't check the settlement price for … (no reference) | Proposal before `final_at` that is off the reference (measured against the lower price) by more than 20 bps, the same tolerance as the oracle's Deribit veto; or that has no reference (Deribit down or no data) | `override_settlement` with `<price>` to fill in (derive it from the [oracle rules](https://docs.endline.trade/developers/oracle#what-it-computes), never paste Deribit), signed by the owner |
-| `missing` | No settlement price for … | No proposal 5 min after expiry + `oracle_window_sec` (the testnet proposer's first chance) | `propose_settlement` with `<price>` to fill in, signed by the first `get_oracles` account |
-| `reserve <account>` | Options contract / Intents contract / Relayer / Market maker low on NEAR | `amount − storage_usage × 10^19` yocto below 2 NEAR, for the options contract, `intents_id`, `RELAYER_ACCOUNT_ID` and `MM_ACCOUNT_ID` each | |
+| `settle` | Settlement price for … looks wrong, or Can't check the settlement price for … (no reference) | Proposal before `final_at` that is off the reference (measured against the lower price) by more than 20 bps, the same tolerance as the oracle's Deribit veto; or that has no reference (Deribit down or no data) | `override_settlement` with `<price>` to fill in (derive it from the [oracle rules](https://docs.endline.trade/developers/oracle#what-it-computes), never paste Deribit), signed by the owner (mainnet: `OWNER_PRIVATE_KEY` from `endline-admin` in the environment) |
+| `missing` | No settlement price for … | No proposal 5 min after expiry + `oracle_window_sec` (the testnet proposer's first chance) | `propose_settlement` with `<price>` to fill in, signed by the first `get_oracles` account (mainnet: `ORACLE_PRIVATE_KEY` from `endline-admin` in the environment) |
+| `reserve <account>` | Options contract / Intents contract / Relayer / Market maker low on NEAR | `amount − storage_usage × 10^19` yocto below 0.3 NEAR for the options contract (it only stores settlement and payout records), below 2 NEAR for `intents_id`, `RELAYER_ACCOUNT_ID` and `MM_ACCOUNT_ID` | |
 | `uptime` | Relay down | `HEALTH_URL` set and it doesn't answer `200` with `{"ok":true}` within 5 s. `uptime`, `quotes` and `priced` fire only on the second bad check in a row, so a deploy's restart doesn't page | The URL and the error |
 | `quotes` | No market maker connected | `/health` answers with `market_makers: 0`: no MM connected, so nobody gets a quote. Stays open while `uptime` is | |
 | `priced` | Market maker prices nothing | An MM is connected but `/marks` next to `HEALTH_URL` is empty: nothing in the app has a price (lister failing, no USDC or NEAR, no Deribit data). Stays open while `uptime` or `quotes` is, or `/marks` can't be read | |
