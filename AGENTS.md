@@ -63,7 +63,7 @@ Toolchain: Rust 1.95 with `wasm32-unknown-unknown` and `wasm32-wasip2`, `cargo-n
 
 ## Contract rules (non-negotiable)
 
-1. Collateral and options live inside `intents.near`. Users reach us only through a signed intents `transfer` with `msg`, which calls our `mt_on_transfer`. We pay out with `intents.near::mt_transfer`. No `ft_on_transfer`, no withdraw-with-msg paths.
+1. Collateral and options live inside `intents.near`. Users reach us only through a signed intents `transfer` with `msg`, which calls our `mt_on_transfer`. We pay out with `intents.near::mt_transfer`. No `ft_on_transfer`, and collateral never leaves through a withdraw-with-msg path.
 2. `mt_on_transfer` accepts calls only from `intents.near`. Amounts and `sender_id` come from intents, never from `msg`. A panic there is safe: intents refunds the signer.
 3. `mt_on_transfer` always returns a plain value, never a promise. Follow-up calls (delivering options, payouts) are detached and have their own callback.
 4. Payouts never exceed collateral. Holder payouts round down, protocol keeps the dust. `collateral_locked` is checked before every payout.
@@ -71,7 +71,7 @@ Toolchain: Rust 1.95 with `wasm32-unknown-unknown` and `wasm32-wasip2`, `cargo-n
 6. Series ids come from their parameters (`BTC-27NOV26-110000_112000-C`). Mainnet expiry is 08:00 UTC; testnet follows its configured minute grid.
 7. Every cross-contract call has a callback that handles failure explicitly. Don't change state after scheduling a promise in a way the callback can't undo.
 8. Math uses u128 with U256 intermediates. Overflow panics, it never wraps. Release builds keep `overflow-checks = true`.
-9. Admin can pause writes and override a settlement inside the dispute window. Admin can never move user collateral or block exits.
+9. Admin can pause writes and override a settlement inside the dispute window. Admin can never move user collateral or pause exits. It can stall settlement by removing every oracle account and pinning a WASM that never returns a price (a known gap in `developers/security.mdx`). Don't add another way to stall it.
 10. A change to math or series ids means updating `testdata/vectors.json`. Rust checks every field; TS mirrors only what the apps use (series ids, `longPayout`). Keep both green.
 
 ## Review cycle (every change, no exceptions)
@@ -92,7 +92,7 @@ Then get a fresh-context review of the whole package with the same questions. Fi
 
 ## Safety
 
-- Never push to `main` or `staging`, and never force-push. Work on a branch in its own worktree (`.worktrees/<name>`), commit with Conventional Commits, and open a PR to `staging` (`--assignee @me`). Merge only after a fresh-context review, and only when a maintainer merges or says an agent may.
+- Never push to `main` or `staging`, and never force-push. Work on a branch in its own worktree (`.worktrees/<name>`), commit with Conventional Commits, and open a PR to `staging` (maintainers: `--assignee @me`). Merge only after a fresh-context review, and only when a maintainer merges or says an agent may.
 - `staging` deploys to testnet. `main` deploys to mainnet, app.endline.trade and docs.endline.trade, and only moves through a promotion PR from `staging` (merge commit, never squash) that a maintainer merges. Roll back by reverting on `staging` and promoting again.
 - Never create remotes or change repo settings. A human does that.
 - Never sign transactions, deploy to mainnet or spend tokens. Testnet deploys only when a human asks.
