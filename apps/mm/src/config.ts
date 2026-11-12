@@ -1,5 +1,6 @@
 import { AccountId } from "@endline/sdk";
 import { readDeployment } from "@endline/sdk/deployment";
+import { rpcUrls } from "@endline/sdk/rpc";
 import { readSecretFiles } from "@endline/sdk/secrets";
 import { z } from "zod";
 
@@ -16,16 +17,17 @@ const Env = z.object({
   MAX_DELTA_USD: positive(50_000),
   MAX_VEGA_USD: positive(200),
   RESERVE_USD: positive(500),
+  NEAR_RPC_URLS: z.string().optional(),
 });
 
-const MonitorEnv = Env.pick({ NETWORK_ID: true }).extend({
+const MonitorEnv = Env.pick({ NETWORK_ID: true, NEAR_RPC_URLS: true }).extend({
   RELAYER_ACCOUNT_ID: AccountId.optional(),
   MM_ACCOUNT_ID: AccountId.optional(),
   ALERT_WEBHOOK_URL: z.url().optional(),
   HEALTH_URL: z.url().optional(),
 });
 
-const ProposerEnv = Env.pick({ NETWORK_ID: true }).extend({
+const ProposerEnv = Env.pick({ NETWORK_ID: true, NEAR_RPC_URLS: true }).extend({
   ORACLE_ACCOUNT_ID: AccountId,
   ORACLE_PRIVATE_KEY: z.string().regex(/^ed25519:[1-9A-HJ-NP-Za-km-z]+$/, "ed25519:<base58>"),
   WASMTIME: z.string().min(1).default("wasmtime"),
@@ -34,6 +36,7 @@ const ProposerEnv = Env.pick({ NETWORK_ID: true }).extend({
 const SettlerEnv = z.object({
   SETTLER_ACCOUNT_ID: AccountId,
   SETTLER_PRIVATE_KEY: Env.shape.MM_PRIVATE_KEY,
+  NEAR_RPC_URLS: Env.shape.NEAR_RPC_URLS,
 });
 
 const RelayEnv = z.object({
@@ -41,8 +44,10 @@ const RelayEnv = z.object({
   MM_API_KEY: z.string().min(16),
 });
 
-const SECRETS = ["MM_PRIVATE_KEY", "MM_API_KEY", "ALERT_WEBHOOK_URL", "ORACLE_PRIVATE_KEY", "SETTLER_PRIVATE_KEY"];
+const SECRETS = ["MM_PRIVATE_KEY", "MM_API_KEY", "ALERT_WEBHOOK_URL", "ORACLE_PRIVATE_KEY", "SETTLER_PRIVATE_KEY", "NEAR_RPC_URLS"];
 const secrets = (env: Record<string, string | undefined>) => readSecretFiles(env, SECRETS);
+
+const rpcOf = (d: { rpc_url: string; network: string }, extra: string | undefined) => ({ urls: rpcUrls(d.rpc_url, extra), network: d.network });
 
 export type Config = ReturnType<typeof loadConfig>;
 export type Settings = Config["settings"];
@@ -54,7 +59,7 @@ export function loadConfig(env: Record<string, string | undefined>) {
   return {
     accountId: e.MM_ACCOUNT_ID,
     privateKey: e.MM_PRIVATE_KEY as `ed25519:${string}`,
-    rpcUrl: d.rpc_url,
+    rpc: rpcOf(d, e.NEAR_RPC_URLS),
     intentsId: d.intents_id,
     optionsId: d.options_id,
     settings: {
@@ -80,7 +85,7 @@ export function loadMonitorConfig(env: Record<string, string | undefined>) {
   const e = MonitorEnv.parse(secrets(env));
   const d = readDeployment(e.NETWORK_ID);
   return {
-    rpcUrl: d.rpc_url,
+    rpc: rpcOf(d, e.NEAR_RPC_URLS),
     optionsId: d.options_id,
     intentsId: d.intents_id,
     relayerId: e.RELAYER_ACCOUNT_ID,
@@ -96,7 +101,7 @@ export type ProposerConfig = ReturnType<typeof loadProposerConfig>;
 export function loadProposerConfig(env: Record<string, string | undefined>) {
   const e = ProposerEnv.parse(secrets(env));
   const d = readDeployment(e.NETWORK_ID);
-  return { rpcUrl: d.rpc_url, optionsId: d.options_id, oracleAccountId: e.ORACLE_ACCOUNT_ID, oraclePrivateKey: e.ORACLE_PRIVATE_KEY, wasmtime: e.WASMTIME };
+  return { rpc: rpcOf(d, e.NEAR_RPC_URLS), optionsId: d.options_id, oracleAccountId: e.ORACLE_ACCOUNT_ID, oraclePrivateKey: e.ORACLE_PRIVATE_KEY, wasmtime: e.WASMTIME };
 }
 
 export type SettlerConfig = ReturnType<typeof loadSettlerConfig>;
@@ -104,5 +109,5 @@ export type SettlerConfig = ReturnType<typeof loadSettlerConfig>;
 export function loadSettlerConfig(env: Record<string, string | undefined>) {
   const e = SettlerEnv.parse(secrets(env));
   const d = readDeployment("mainnet");
-  return { rpcUrl: d.rpc_url, optionsId: d.options_id, accountId: e.SETTLER_ACCOUNT_ID, privateKey: e.SETTLER_PRIVATE_KEY };
+  return { rpc: rpcOf(d, e.NEAR_RPC_URLS), optionsId: d.options_id, accountId: e.SETTLER_ACCOUNT_ID, privateKey: e.SETTLER_PRIVATE_KEY };
 }

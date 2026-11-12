@@ -39,7 +39,7 @@ class OracleChain extends ChainReader {
   private readonly account: Account;
 
   constructor(config: ProposerConfig) {
-    super(config.rpcUrl, config.optionsId);
+    super(config.rpc, config.optionsId);
     this.account = new Account(config.oracleAccountId, this.provider, config.oraclePrivateKey as KeyPairString);
   }
 

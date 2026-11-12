@@ -1,5 +1,6 @@
 import { Amount, CLAIM_WINDOW_SEC, Config as ContractConfig, readPayload, Series, Settlement, type SignedPayload } from "@endline/sdk";
-import { Account, actions, baseEncode, getTransactionLastResult, JsonRpcProvider, KeyPair, type KeyPairString, KeyPairSigner, type Transaction } from "near-api-js";
+import { RoutedRpcProvider, rpcUrls } from "@endline/sdk/rpc";
+import { Account, actions, baseEncode, getTransactionLastResult, KeyPair, type KeyPairString, KeyPairSigner, type Transaction } from "near-api-js";
 import { UnknownTransactionError } from "near-api-js/rpc-errors";
 import { z } from "zod";
 import type { Config } from "./config.ts";
@@ -9,7 +10,7 @@ const EXECUTE_GAS = 300_000_000_000_000n;
 const FT_TRANSFER_CALL_GAS = 100_000_000_000_000n;
 const PAGE = 200;
 const OUTCOME_POLL_MS = 3_000;
-const PAST_DEADLINE_MS = 5_000;
+const PAST_DEADLINE_MS = 60_000;
 
 const Simulation = z.object({ invariant_violated: z.unknown().optional() });
 type Simulation = z.infer<typeof Simulation>;
@@ -100,7 +101,7 @@ interface NearChain extends Chain {
 }
 
 export function nearChain(config: Config): NearChain {
-  const provider = new JsonRpcProvider({ url: config.rpc_url });
+  const provider = new RoutedRpcProvider({ urls: rpcUrls(config.rpc_url, config.NEAR_RPC_URLS), network: config.network });
   const key = KeyPair.fromString(config.RELAYER_PRIVATE_KEY as KeyPairString);
   const relayer = new Account(config.RELAYER_ACCOUNT_ID, provider, config.RELAYER_PRIVATE_KEY as KeyPairString);
   const view = (contractId: string, method: string, args: Record<string, unknown> = {}) =>

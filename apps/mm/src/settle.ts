@@ -21,7 +21,7 @@ class SettlerChain extends ChainReader {
   private readonly account: Account;
 
   constructor(config: SettlerConfig) {
-    super(config.rpcUrl, config.optionsId);
+    super(config.rpc, config.optionsId);
     this.account = new Account(config.accountId, this.provider, config.privateKey as KeyPairString);
   }
 

@@ -20,7 +20,7 @@ vi.mock("near-api-js", () => ({
 vi.mock("./chain.ts", () => ({
   ChainReader: class {
     constructor(
-      _rpcUrl: string,
+      _rpc: unknown,
       readonly optionsId: string,
     ) {}
     networkId = async () => chain.network;
@@ -33,7 +33,7 @@ vi.mock("./chain.ts", () => ({
 const series = (underlying: string, expiry: number, kind: "call" | "put" = "call") =>
   ({ id: `${underlying}-${expiry}-${kind}`, underlying, kind, strike: "1", expiry, underlying_decimals: 8, width: "1" }) as Series;
 const btc = { underlying: "BTC", expiry: EXPIRY };
-const config = { rpcUrl: "http://rpc", optionsId: "opt.near", accountId: "settler.near", privateKey: "ed25519:x" };
+const config = { rpc: { urls: ["https://rpc"], network: "testnet" }, optionsId: "opt.near", accountId: "settler.near", privateKey: "ed25519:x" };
 
 afterEach(() => {
   vi.restoreAllMocks();

@@ -40,7 +40,7 @@ vi.mock("node:child_process", () => ({
 vi.mock("./chain.ts", () => ({
   ChainReader: class {
     constructor(
-      _rpcUrl: string,
+      _rpc: unknown,
       readonly optionsId: string,
     ) {}
     networkId = async () => listed.network;
@@ -128,7 +128,7 @@ describe("proposeCommand", () => {
       return pin && { url: `https://ipfs.example/${pin.body}`, sha256: pin.sha256 };
     };
 
-    const config = { rpcUrl: "http://rpc", optionsId: "opt.testnet", oracleAccountId: "oracle.testnet", oraclePrivateKey: "ed25519:x", wasmtime: "wasmtime" };
+    const config = { rpc: { urls: ["https://rpc"], network: "testnet" }, optionsId: "opt.testnet", oracleAccountId: "oracle.testnet", oraclePrivateKey: "ed25519:x", wasmtime: "wasmtime" };
     await expect(proposeCommand(config, false)).rejects.toThrow("stop");
 
     expect(fetch.mock.calls.map(([url]) => url)).toEqual(["https://ipfs.example/a", "https://ipfs.example/b"]);
@@ -144,7 +144,7 @@ describe("proposeCommand", () => {
     Object.assign(listed, { series: [series("BTC", EXPIRY)], settled: false });
     wasmOutput.stdout = '{"ok":true,"price":"80000000000","source":"cex_twap_median"}';
 
-    await proposeCommand({ rpcUrl: "http://rpc", optionsId: "opt.testnet", oracleAccountId: "oracle.testnet", oraclePrivateKey: "ed25519:x", wasmtime: "wasmtime" }, true);
+    await proposeCommand({ rpc: { urls: ["https://rpc"], network: "testnet" }, optionsId: "opt.testnet", oracleAccountId: "oracle.testnet", oraclePrivateKey: "ed25519:x", wasmtime: "wasmtime" }, true);
 
     expect(sent).toEqual([{ contractId: "opt.testnet", methodName: "propose_settlement", args: { underlying: "BTC", expiry: EXPIRY, price: "80000000000" }, gas: 0n, deposit: 1n }]);
     expect(spawned).toEqual([{ args: ["run", "-S", "http", "--env", `NEAR_BLOCK_TIMESTAMP=${BigInt((EXPIRY + WINDOW) * 1000) * 1_000_000n}`, expect.stringMatching(new RegExp(`^${tmpdir()}/oracle-\\w+/${sha256}\\.wasm$`))], env: { PATH: process.env.PATH } }]);
@@ -155,7 +155,7 @@ describe("proposeCommand", () => {
     listed.network = "mainnet";
     const fetch = vi.fn();
     vi.stubGlobal("fetch", fetch);
-    await expect(proposeCommand({ rpcUrl: "http://rpc", optionsId: "opt.near", oracleAccountId: "oracle.near", oraclePrivateKey: "ed25519:x", wasmtime: "wasmtime" }, true)).rejects.toThrow(/testnet only/);
+    await expect(proposeCommand({ rpc: { urls: ["https://rpc"], network: "testnet" }, optionsId: "opt.near", oracleAccountId: "oracle.near", oraclePrivateKey: "ed25519:x", wasmtime: "wasmtime" }, true)).rejects.toThrow(/testnet only/);
     expect(fetch).not.toHaveBeenCalled();
   });
 
@@ -174,7 +174,7 @@ describe("proposeCommand", () => {
       if (sleep.mock.calls.length === 3) throw new Error("stop");
     });
 
-    await expect(proposeCommand({ rpcUrl: "http://rpc", optionsId: "opt.testnet", oracleAccountId: "oracle.testnet", oraclePrivateKey: "ed25519:x", wasmtime: "wasmtime" }, false)).rejects.toThrow("stop");
+    await expect(proposeCommand({ rpc: { urls: ["https://rpc"], network: "testnet" }, optionsId: "opt.testnet", oracleAccountId: "oracle.testnet", oraclePrivateKey: "ed25519:x", wasmtime: "wasmtime" }, false)).rejects.toThrow("stop");
 
     expect(fetch).toHaveBeenCalledTimes(2);
   });
@@ -187,7 +187,7 @@ describe("proposeCommand", () => {
     pinned.next = () => ({ url: "https://ipfs.example/a", sha256 });
     listed.series = [series("BTC", EXPIRY)];
 
-    await proposeCommand({ rpcUrl: "http://rpc", optionsId: "opt.testnet", oracleAccountId: "oracle.testnet", oraclePrivateKey: "ed25519:x", wasmtime: "wasmtime" }, true);
+    await proposeCommand({ rpc: { urls: ["https://rpc"], network: "testnet" }, optionsId: "opt.testnet", oracleAccountId: "oracle.testnet", oraclePrivateKey: "ed25519:x", wasmtime: "wasmtime" }, true);
 
     expect(listed.settlementReads).toEqual([["BTC", EXPIRY]]);
   });

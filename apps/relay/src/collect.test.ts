@@ -244,7 +244,7 @@ describe("gasless sends whose execute call errored", () => {
     const s = signed([exercise]);
     const deadline = Date.parse(readPayload(s).deadline);
     vi.spyOn(chain, "finalTimeMs").mockImplementation(async () => {
-      if (Date.now() > deadline + 5_000 && Date.now() < deadline + 12_000) throw new Error("rpc down");
+      if (Date.now() > deadline + 60_000 && Date.now() < deadline + 67_000) throw new Error("rpc down");
       return Date.now() - 1_000;
     });
     let result: unknown;
@@ -252,7 +252,7 @@ describe("gasless sends whose execute call errored", () => {
     await vi.advanceTimersByTimeAsync(deadline - Date.now() - 60_000);
     expect(result).toBeUndefined();
     expect(await httpStatus(collector.execute(signed([exercise])))).toBe(409);
-    await vi.advanceTimersByTimeAsync(60_000 + 11_000);
+    await vi.advanceTimersByTimeAsync(60_000 + 66_000);
     expect(result).toBeUndefined();
     await vi.advanceTimersByTimeAsync(6_000);
     expect(result).toMatchObject({ message: "Request timeout" });
