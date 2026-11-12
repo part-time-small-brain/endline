@@ -3,6 +3,7 @@ import { DEPOSIT_SYMBOLS, type DepositAsset } from "../api/oneClick.ts";
 const CHAINS: Record<string, string> = {
   base: "Base",
   arb: "Arbitrum",
+  op: "Optimism",
   sol: "Solana",
   pol: "Polygon",
   bsc: "BNB Chain",
@@ -15,9 +16,13 @@ const CHAINS: Record<string, string> = {
   aptos: "Aptos",
   abs: "Abstract",
   hood: "Robinhood Chain",
+  scroll: "Scroll",
+  xlayer: "X Layer",
+  monad: "Monad",
+  ton: "TON",
   miden: "Miden",
 };
-const CHAIN_ORDER = Object.keys(CHAINS);
+export const CHAIN_ORDER = Object.keys(CHAINS);
 
 export const chainName = (code: string) => CHAINS[code] ?? code.toUpperCase();
 
