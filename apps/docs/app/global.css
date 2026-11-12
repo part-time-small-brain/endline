@@ -120,7 +120,6 @@ h3,
   color: var(--ink);
 }
 
-/* Prose */
 .prose {
   --tw-prose-body: var(--ink);
   font-variant-numeric: tabular-nums;
@@ -185,7 +184,6 @@ h3,
   background: var(--well-hover);
 }
 
-/* Wordmark */
 .wordmark {
   display: inline-flex;
   align-items: center;

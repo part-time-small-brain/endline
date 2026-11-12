@@ -3,6 +3,8 @@ resolver = "2"
 members = ["contracts/*", "oracle", "tests/sandbox"]
 
 [workspace.package]
+license = "MIT"
+repository = "https://github.com/part-time-small-brain/endline"
 edition = "2021"
 publish = false
 
