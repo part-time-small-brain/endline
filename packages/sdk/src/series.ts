@@ -1,4 +1,5 @@
 import { capPrice } from "./math.ts";
+import { formatPrice } from "./money.ts";
 import type { Series } from "./protocol.ts";
 
 export type OptionKind = "call" | "put";
@@ -79,6 +80,10 @@ function formatStrike(strike: bigint, quoteDecimals: number): string {
   if (frac === 0n) return whole.toString();
   const digits = frac.toString().padStart(quoteDecimals, "0").replace(/0+$/, "");
   return `${whole}d${digits}`;
+}
+
+export function seriesTitle(series: Pick<Series, "underlying" | "kind" | "strike">, quoteDecimals: number): string {
+  return `${series.underlying} ${series.kind === "call" ? "Up" : "Down"} ${formatPrice(BigInt(series.strike), quoteDecimals)}`;
 }
 
 export function longTokenId(seriesId: string): string {

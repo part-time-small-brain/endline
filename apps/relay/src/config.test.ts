@@ -33,10 +33,25 @@ describe("secret files", () => {
   };
   const { RELAYER_PRIVATE_KEY, MM_API_KEYS, ...rest } = ENV;
 
-  it("reads the key, the shared MM_API_KEY file and an empty optional file", () => {
-    const config = loadConfig({ ...rest, RELAYER_PRIVATE_KEY_FILE: file("key", `${RELAYER_PRIVATE_KEY}\n`), MM_API_KEYS_FILE: file("mm", `${MM_API_KEYS}\n`), ONECLICK_JWT_FILE: file("jwt", "") });
+  it("reads the key, the shared MM_API_KEY file and empty optional files", () => {
+    const config = loadConfig({ ...rest, RELAYER_PRIVATE_KEY_FILE: file("key", `${RELAYER_PRIVATE_KEY}\n`), MM_API_KEYS_FILE: file("mm", `${MM_API_KEYS}\n`), ONECLICK_JWT_FILE: file("jwt", ""), ALERT_WEBHOOK_URL_FILE: file("hook", "\n") });
     expect(config).toMatchObject({ RELAYER_PRIVATE_KEY, MM_API_KEYS: [MM_API_KEYS] });
     expect(config.ONECLICK_JWT).toBeUndefined();
+    expect(config.ALERT_WEBHOOK_URL).toBeUndefined();
+  });
+
+  it("reads the webhook from its file and refuses one that isn't a url without printing it", () => {
+    const hook = "https://api.telegram.org/bot123:secret-token/sendMessage?chat_id=-100";
+    expect(loadConfig({ ...ENV, ALERT_WEBHOOK_URL_FILE: file("hook", `${hook}\n`) }).ALERT_WEBHOOK_URL).toBe(hook);
+    const error = (() => {
+      try {
+        loadConfig({ ...ENV, ALERT_WEBHOOK_URL_FILE: file("bad-hook", "api.telegram.org/bot123:secret-token") });
+      } catch (e) {
+        return String(e);
+      }
+    })();
+    expect(error).toContain("ALERT_WEBHOOK_URL");
+    expect(error).not.toContain("secret-token");
   });
 
   it("names a bad key without printing it", () => {

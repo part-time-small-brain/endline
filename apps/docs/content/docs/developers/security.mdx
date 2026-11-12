@@ -106,4 +106,6 @@ The `SHA-256 checksum bs58` it prints must equal the contract's code hash, `D6Y3
 | `uptime`, `quotes`, `priced` | Relay down / No market maker connected / Market maker prices nothing | With `HEALTH_URL` set: the relay's `/health` doesn't answer `{"ok":true}` within 5 s, no market maker is connected, or one is connected but `/marks` is empty, two checks in a row |
 | `pending` | New oracle pending / New oracle WASM pending / New contract owner pending | A pending oracle or oracle WASM (`get_pending_oracle_changes`, with when it takes effect) or a pending owner (`get_config.pending_owner_id`, until it accepts) |
 
+The relay posts each trade, collect, deposit and free call, with the user's account id, to the same webhook (Notifications in `apps/relay/README.md`).
+
 Not built yet: alerts on large single payouts, and a solvency check of locked collateral against the contract's intents USDC balance.

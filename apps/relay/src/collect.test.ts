@@ -42,9 +42,10 @@ function setup(fills = boughtPlenty) {
   const fake = fakeChain();
   const dir = mkdtempSync(join(tmpdir(), "relay-"));
   const claims = new Claims(dir);
-  const collector = new Collector(fake.chain, { intents_id: INTENTS, options_id: OPTIONS }, claims, fills);
+  const notify = vi.fn();
+  const collector = new Collector(fake.chain, { intents_id: INTENTS, options_id: OPTIONS }, claims, fills, notify);
   const settle = (price = "120000000000") => fake.settlements.set(`${SERIES.underlying}:${SERIES.expiry}`, { price, final_at: FINAL_AT });
-  return { ...fake, dir, claims, collector, settle };
+  return { ...fake, dir, claims, collector, settle, notify };
 }
 
 describe("gasless collect", () => {
@@ -178,10 +179,12 @@ describe("gasless collect", () => {
     const under = setup();
     under.settle("110099000000");
     expect(await httpStatus(under.collector.execute(signed([exercise])))).toBe(400);
-    const { collector, executed, settle } = setup();
+    expect(under.notify).not.toHaveBeenCalled();
+    const { collector, executed, settle, notify } = setup();
     settle("110100000000");
     expect(await collector.execute(signed([exercise]))).toBe("tx1");
     expect(executed).toHaveLength(1);
+    expect(notify).toHaveBeenCalledExactlyOnceWith({ kind: "collect", accountId: "alice.test", legs: [{ asset: OPTION, series: SERIES, amount: 1_000_000n }], payout: 1_000_000n, txHash: "tx1", auto: false });
   });
 
   it("refuses a payload for another verifier", async () => {
@@ -269,13 +272,14 @@ describe("auto-collect claims", () => {
   afterEach(() => vi.useRealTimers());
 
   it("stores an exercise before expiry and submits it only once the price is final", async () => {
-    const { collector, claims, executed, settle, dir } = setup();
+    const { collector, claims, executed, settle, dir, notify } = setup();
     await collector.claim(claimed([exercise]));
     await collector.submitClaims();
     vi.setSystemTime((FINAL_AT + 30) * 1000);
     settle();
     await collector.submitClaims();
     expect(executed).toHaveLength(0);
+    expect(notify).not.toHaveBeenCalled();
 
     const reloaded = new Claims(dir);
     await reloaded.load();
@@ -285,6 +289,7 @@ describe("auto-collect claims", () => {
     await collector.submitClaims();
     expect(executed).toHaveLength(1);
     expect(claims.all()).toEqual([]);
+    expect(notify).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ kind: "collect", accountId: "alice.test", payout: 20_000_000n, txHash: "tx1", auto: true }));
   });
 
   it("drops a claim with under 2 minutes left instead of sending one that could expire on-chain", async () => {
@@ -365,7 +370,7 @@ describe("auto-collect claims", () => {
 
   it("resends a claim only if its failed send never used the nonce", async () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
-    const { chain, collector, claims, executed, settle } = setup();
+    const { chain, collector, claims, executed, settle, notify } = setup();
     await collector.claim(claimed([exercise]));
     vi.setSystemTime((FINAL_AT + 60) * 1000);
     settle();
@@ -373,6 +378,7 @@ describe("auto-collect claims", () => {
     const send = vi.spyOn(chain, "execute").mockRejectedValueOnce(new Error("rpc down"));
     await collector.submitClaims();
     expect(claims.all()).toHaveLength(1);
+    expect(notify).not.toHaveBeenCalled();
     await collector.submitClaims();
     expect(claims.all()).toEqual([]);
 
