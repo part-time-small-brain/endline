@@ -105,11 +105,11 @@ test("an address past its send-by time is hidden but still checked until refunds
   const sheet = await openAddFunds(page);
   await expect(sheet.locator("code")).toHaveText(pending.depositAddress);
   await page.clock.runFor(61_000);
-  await expect(sheet.getByRole("status")).toHaveText("This address has expired. If you already sent, we're still checking, and it arrives in your balance or comes back as a refund.");
+  await expect(sheet.getByRole("status")).toHaveText("This address has expired. If you already sent, we're still checking. It arrives in your balance or is refunded to your NEAR Intents account.");
   for (const gone of [sheet.locator("code"), sheet.getByRole("img", { name: "Deposit address QR code" }), sheet.getByRole("button", { name: /^Copy/ })]) await expect(gone).toHaveCount(0);
   await expect(sheet.getByRole("button", { name: "Back" })).toBeVisible();
   await page.clock.fastForward(2 * 3_600_000 + 35_000 + 10 * 60_000 - 3_000);
-  await expect(sheet.getByRole("status")).toHaveText("This address has expired. If you already sent, we're still checking, and it arrives in your balance or comes back as a refund.");
+  await expect(sheet.getByRole("status")).toHaveText("This address has expired. If you already sent, we're still checking. It arrives in your balance or is refunded to your NEAR Intents account.");
   expect(await savedAddress(page)).toBe(pending.depositAddress);
   await page.clock.runFor(3_000);
   await expect(sheet.getByRole("status")).toHaveText("This address has expired. Get a new one.");
@@ -130,6 +130,20 @@ test("a deposit reaching its send-by time never overwrites a newer one another t
   await page.clock.runFor(61_000);
   await expect(sheet.getByRole("status")).toHaveText(/^This address has expired\. If you already sent/);
   expect(await savedAddress(page)).toBe("0x00000000000000000000000000000000000000bb");
+});
+
+test("a new address replaces whatever another tab saved, so the latest deposit is the one reopened", async ({ page }) => {
+  await connectDemo(page);
+  const sheet = await openAddFunds(page);
+  await expect(sheet.getByRole("button", { name: "Get deposit address" })).toBeVisible();
+  const now = await page.evaluate(() => Date.now());
+  const at = (ms: number) => new Date(now + ms).toISOString();
+  await store(page, JSON.stringify({ depositAddress: "0x00000000000000000000000000000000000000bb", amountIn: "25000000", amountOut: "24975000", timeEstimate: 35, sendBefore: at(3_600_000), deadline: at(3 * 3_600_000), clockOffsetMs: 0, asset: { assetId: "nep141:base-usdc", symbol: "USDC", blockchain: "base", decimals: 6, price: 1 } }));
+  await sheet.getByRole("textbox", { name: "Amount to deposit" }).fill("25");
+  await sheet.getByRole("button", { name: "Get deposit address" }).click();
+  const address = await sheet.locator("code").textContent();
+  expect(address).not.toBe("0x00000000000000000000000000000000000000bb");
+  await expect.poll(() => savedAddress(page)).toBe(address);
 });
 
 test("a transfer seen after the send-by time stays saved and shows its progress", async ({ page }) => {

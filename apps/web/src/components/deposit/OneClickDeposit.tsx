@@ -53,7 +53,6 @@ export function OneClickDeposit({ oneClick, accountId }: { oneClick: OneClick; a
   const now = useNow(1_000);
   const stage = pending && depositStage(status, pending, now);
   const done = stage === "done";
-  const polling = !done && !(stage === "expired" && status !== undefined);
   const root = useRef<HTMLDivElement>(null);
   const moveFocus = useRef(false);
 
@@ -62,7 +61,7 @@ export function OneClickDeposit({ oneClick, accountId }: { oneClick: OneClick; a
   }, [oneClick]);
 
   useEffect(() => {
-    if (!pending || !polling) return;
+    if (!pending || done) return;
     let alive = true;
     const check = () => oneClick.status(pending.depositAddress).then((next) => alive && setStatus(next), () => {});
     check();
@@ -71,7 +70,7 @@ export function OneClickDeposit({ oneClick, accountId }: { oneClick: OneClick; a
       alive = false;
       clearInterval(timer);
     };
-  }, [oneClick, pending, polling]);
+  }, [oneClick, pending, done]);
 
   useEffect(() => {
     if (!pending || !stage) return;
